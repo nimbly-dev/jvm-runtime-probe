@@ -1,4 +1,4 @@
-## jvm-runtime-probe (Initial Phase)
+## mcp-jvm-debugger
 
 Local MCP server for machine-verifiable Java code-path hits via runtime `-javaagent` probes.
 
@@ -21,6 +21,44 @@ npm.cmd install
 npm.cmd run build
 mvn -f java-agent\pom.xml -DskipTests package
 ```
+
+### One-Command Install (Skill + MCP)
+
+Use the installer to configure Codex and/or Kiro. It is idempotent:
+- skips MCP install if the server name already exists
+- skips skill install if the skill folder already exists
+
+PowerShell examples:
+
+```powershell
+# Install for both Codex and Kiro
+npm.cmd run install:integrations
+
+# Install only for Codex
+npm.cmd run install:integrations -- --client codex
+
+# Install only for Kiro
+npm.cmd run install:integrations -- --client kiro
+```
+
+Bash/terminal script with interactive input (prompts when run with no args):
+
+```bash
+./scripts/install-integrations.sh
+
+# non-interactive
+./scripts/install-integrations.sh --client codex
+./scripts/install-integrations.sh --client kiro --dry-run
+```
+
+Useful options:
+- `--probe-base-url http://127.0.0.1:9193`
+- `--workspace-root C:\path\to\workspace`
+- `--codex-home ~/.codex` (`~` is expanded to your home directory, e.g. `C:\Users\<username>` on Windows)
+- `--kiro-config C:\path\to\kiro\mcp.json` (override auto-detected Kiro config path)
+- `--kiro-skills-dir C:\path\to\kiro\skills` (override auto-detected Kiro skills path)
+- `--skip-skill` or `--skip-mcp`
+- `--dry-run`
 
 ### Install MCP (Codex)
 
