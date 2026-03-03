@@ -4,6 +4,9 @@ export type RecipeCandidate = {
   queryTemplate: string;
   fullUrlHint: string;
   bodyTemplate?: string;
+  confidence?: number;
+  assumptions?: string[];
+  needsConfirmation?: string[];
   rationale: string[];
 };
 
@@ -19,4 +22,3 @@ export type RecipeExecutionPlan = {
   naturalSteps: RecipeExecutionStep[];
   actuatedSteps: RecipeExecutionStep[];
 };
-

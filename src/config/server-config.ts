@@ -6,6 +6,7 @@ import { MCP_ENV, type McpEnvVar } from "./env-vars";
 
 export type ServerConfig = {
   workspaceRootAbs: string;
+  workspaceRootSource: "arg" | "env" | "session" | "cwd";
   probeBaseUrl: string;
   probeWaitMaxRetries: number;
   recipeOutputTemplate?: string;
@@ -20,10 +21,19 @@ export class ServerConfigLoader {
   }
 
   load(): ServerConfig {
-    const workspaceRoot =
-      this.args.get("--workspace-root") ??
-      this.env(MCP_ENV.WORKSPACE_ROOT) ??
-      process.cwd();
+    const argWorkspaceRoot = this.args.get("--workspace-root");
+    const envWorkspaceRoot = this.env(MCP_ENV.WORKSPACE_ROOT);
+    const sessionWorkspaceRoot = this.detectSessionWorkspaceRoot();
+    const cwdWorkspaceRoot = process.cwd();
+
+    const workspaceRoot = argWorkspaceRoot ?? envWorkspaceRoot ?? sessionWorkspaceRoot ?? cwdWorkspaceRoot;
+    const workspaceRootSource: ServerConfig["workspaceRootSource"] = argWorkspaceRoot
+      ? "arg"
+      : envWorkspaceRoot
+        ? "env"
+        : sessionWorkspaceRoot
+          ? "session"
+          : "cwd";
 
     const probeBaseUrl =
       this.args.get("--probe-base-url") ??
@@ -61,6 +71,7 @@ export class ServerConfigLoader {
 
     return {
       workspaceRootAbs: path.resolve(workspaceRoot),
+      workspaceRootSource,
       probeBaseUrl: probeBaseUrlRequired,
       probeWaitMaxRetries,
       authLoginDiscoveryEnabled,
@@ -88,6 +99,21 @@ export class ServerConfigLoader {
     if (n < min) return min;
     if (n > max) return max;
     return n;
+  }
+
+  private detectSessionWorkspaceRoot(): string | undefined {
+    const candidates = [
+      process.env.CODEX_WORKSPACE_ROOT,
+      process.env.CODEX_CWD,
+      process.env.INIT_CWD,
+      process.env.PWD,
+    ];
+    for (const c of candidates) {
+      if (typeof c === "string" && c.trim().length > 0) {
+        return c.trim();
+      }
+    }
+    return undefined;
   }
 
   private validateProbeBaseUrl(probeBaseUrl: string): void {
