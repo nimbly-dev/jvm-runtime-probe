@@ -84,6 +84,7 @@ export async function generateRecipe(args: {
   const controllerMatch = await findControllerRequestCandidate({
     searchRootsAbs,
     methodHint: args.methodHint,
+    inferredTargetFileAbs: top.file,
   });
 
   const bestRequest = controllerMatch.recipe;
@@ -147,14 +148,12 @@ export async function generateRecipe(args: {
       resultType = "report";
       status = "unreachable_natural";
       nextAction = inferredTarget.key
-        ? `Natural path is unreachable. If you want fallback, rerun recipe_generate with mode=actuated using key=${inferredTarget.key}.`
-        : "Natural path is unreachable. If you want fallback, rerun recipe_generate with mode=actuated after refining target inference.";
+        ? `Natural mode unavailable: no endpoint candidate could be inferred. Actuated mode is available with key=${inferredTarget.key}.`
+        : "Natural mode unavailable: no endpoint candidate could be inferred and target key is missing. Refine classHint/methodHint/lineHint first.";
     } else if (auth.status === "needs_user_input") {
-      resultType = "report";
-      status = "unreachable_natural";
-      nextAction = args.authToken
-        ? "Provide complete auth credentials required by the inferred endpoint, then rerun natural mode."
-        : "Provide authToken (and login credentials if required), then rerun natural mode.";
+      nextAction =
+        `Missing input: ${(auth.missing ?? ["authToken"]).join(", ")}. ` +
+        "Provide missing auth inputs and execute the same natural request template.";
     }
   } else if (!inferredTarget.key) {
     resultType = "report";
@@ -185,6 +184,21 @@ export async function generateRecipe(args: {
 
   if (matchedBranchCondition) {
     baseNotes.push(`Line/branch precondition hint: ${matchedBranchCondition}`);
+  }
+
+  if (bestRequest?.confidence !== undefined) {
+    baseNotes.push(`Request candidate confidence=${bestRequest.confidence.toFixed(2)}.`);
+  }
+  if (bestRequest?.needsConfirmation?.length) {
+    baseNotes.push(`Needs confirmation: ${bestRequest.needsConfirmation.join(" ")}`);
+  }
+  if (bestRequest?.assumptions?.length) {
+    baseNotes.push(`Assumed: ${bestRequest.assumptions.join(" ")}`);
+  }
+  if (auth.status === "needs_user_input" && bestRequest) {
+    baseNotes.push(
+      `Missing input: ${(auth.missing ?? ["authToken"]).join(", ")}. Use the generated request skeleton after providing these values.`,
+    );
   }
 
   if (requestedMode === "natural") {

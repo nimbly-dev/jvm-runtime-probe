@@ -14,10 +14,15 @@ function formatSteps(steps: RecipeExecutionStep[]): string {
 
 function formatRecipeSteps(generated: GeneratedRecipe): string {
   if (generated.resultType === "report") {
+    const missingInput =
+      generated.auth.status === "needs_user_input"
+        ? `Missing Input: ${(generated.auth.missing ?? []).join(", ") || "authToken"}`
+        : "Missing Input: (none)";
     return [
       "Natural reproduction report",
       `Status: ${generated.status}`,
       generated.nextAction ? `Next Action: ${generated.nextAction}` : "Next Action: (none)",
+      missingInput,
       "",
       "Context:",
       formatSteps(generated.executionPlan.naturalSteps),
@@ -50,8 +55,10 @@ export function buildRecipeTemplateModel(args: {
     : `${classHint}.${methodHint}`;
   const firstReq = generated.requestCandidates[0];
   const requestDetails = firstReq
-    ? `${firstReq.method} ${firstReq.fullUrlHint}${firstReq.bodyTemplate ? ` body=${firstReq.bodyTemplate}` : ""}`
-    : "No request candidate inferred";
+    ? `${firstReq.method} ${firstReq.fullUrlHint}${firstReq.bodyTemplate ? ` body=${firstReq.bodyTemplate}` : ""}${typeof firstReq.confidence === "number" ? ` confidence=${firstReq.confidence.toFixed(2)}` : ""}`
+    : generated.nextAction
+      ? `Request candidate unavailable. ${generated.nextAction}`
+      : "Request candidate unavailable. Provide workspace/class/method hints and rerun.";
   const authHeaders = generated.auth.requestHeaders
     ? Object.entries(generated.auth.requestHeaders)
         .map(([k, v]) => `${k}: ${redactSecret(v)}`)

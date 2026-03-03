@@ -649,6 +649,21 @@ async function buildRecipeCandidate(args: {
     mappedParam?.source === "body"
       ? mappedParam
       : controllerMethodParams.find((p) => p.source === "body");
+  let confidence = 0.65;
+  const assumptions: string[] = [];
+  const needsConfirmation: string[] = [];
+  if (openApiOperation) {
+    confidence = 0.95;
+  } else if (endpointMapping) {
+    confidence = 0.82;
+  } else if (openapiPath) {
+    confidence = 0.75;
+    assumptions.push("Path inferred from OpenAPI parameter usage; confirm endpoint method/path.");
+    needsConfirmation.push("Confirm HTTP method/path against controller mapping.");
+  } else {
+    assumptions.push("Method/path inferred from static code patterns.");
+    needsConfirmation.push("Confirm endpoint mapping before execution.");
+  }
   const out: { recipe?: RecipeCandidate; branchCondition?: string } = {
     recipe: {
       method,
@@ -656,6 +671,9 @@ async function buildRecipeCandidate(args: {
       queryTemplate: queryParts.join("&"),
       fullUrlHint,
       ...(bodyParam ? { bodyTemplate: sampleBodyForType(bodyParam.javaType) } : {}),
+      confidence,
+      ...(assumptions.length > 0 ? { assumptions } : {}),
+      ...(needsConfirmation.length > 0 ? { needsConfirmation } : {}),
       rationale: [
         `Controller call matched: ${args.methodNameForRationale}`,
         `Inferred endpoint path: ${pathHint}`,
@@ -672,9 +690,59 @@ async function buildRecipeCandidate(args: {
   return out;
 }
 
+async function buildBestEffortCandidateFromControllerDeclaration(args: {
+  controllerFileAbs: string;
+  methodHint: string;
+  searchRootsAbs: string[];
+}): Promise<ControllerRequestMatch> {
+  let text = "";
+  try {
+    text = await fs.readFile(args.controllerFileAbs, "utf8");
+  } catch {
+    return {};
+  }
+  const lines = text.split(/\r?\n/);
+  const methodLine = findMethodDeclarationLine(lines, args.methodHint);
+  if (typeof methodLine !== "number") return {};
+
+  const params = parseControllerMethodParams(text, methodLine + 1);
+  const pseudoCall: MethodCallContext = {
+    line: methodLine + 1,
+    contextLines: lines.slice(Math.max(0, methodLine - 3), Math.min(lines.length, methodLine + 3)),
+    argNames: params.map((p) => p.name),
+    enclosingMethodName: args.methodHint,
+  };
+  const built = await buildRecipeCandidate({
+    text,
+    call: pseudoCall,
+    methodNameForRationale: `${args.methodHint}(...) [best-effort controller declaration]`,
+    searchRootsAbs: args.searchRootsAbs,
+  });
+  if (!built.recipe) return {};
+
+  const updated: RecipeCandidate = {
+    ...built.recipe,
+    confidence: Math.min(built.recipe.confidence ?? 0.8, 0.78),
+    assumptions: [
+      ...(built.recipe.assumptions ?? []),
+      "Controller declaration mapping is used as a best-effort fallback when full call-chain mapping is incomplete.",
+    ],
+    needsConfirmation: [
+      ...(built.recipe.needsConfirmation ?? []),
+      "Best-effort candidate from controller declaration; confirm mapping/auth before execution.",
+    ],
+  };
+  return {
+    recipe: updated,
+    matchedControllerFile: args.controllerFileAbs,
+    ...(built.branchCondition ? { matchedBranchCondition: built.branchCondition } : {}),
+  };
+}
+
 export async function findControllerRequestCandidate(args: {
   searchRootsAbs: string[];
   methodHint: string;
+  inferredTargetFileAbs?: string;
 }): Promise<ControllerRequestMatch> {
   const operationIdHints = new Set<string>([args.methodHint]);
   const schemaFirst = await findOpenApiOperationByOperationIds({
@@ -693,12 +761,24 @@ export async function findControllerRequestCandidate(args: {
         queryTemplate: "",
         fullUrlHint: schemaFirst.path,
         ...(bodyTemplate ? { bodyTemplate } : {}),
+        confidence: 0.95,
         rationale: [
           `Resolved endpoint from local OpenAPI schema first (operationId hint: ${args.methodHint}).`,
           "Controller lookup is used as fallback when OpenAPI mapping is unavailable.",
         ],
       },
     };
+  }
+
+  if (args.inferredTargetFileAbs && /controller/i.test(path.basename(args.inferredTargetFileAbs))) {
+    const bestEffort = await buildBestEffortCandidateFromControllerDeclaration({
+      controllerFileAbs: args.inferredTargetFileAbs,
+      methodHint: args.methodHint,
+      searchRootsAbs: args.searchRootsAbs,
+    });
+    if (bestEffort.recipe) {
+      return bestEffort;
+    }
   }
 
   for (const rootAbs of args.searchRootsAbs) {
@@ -833,6 +913,10 @@ export async function findControllerRequestCandidate(args: {
         queryTemplate: "",
         fullUrlHint: openApiFallback.path,
         ...(bodyTemplate ? { bodyTemplate } : {}),
+        confidence: 0.9,
+        needsConfirmation: [
+          "Resolved via OpenAPI fallback after controller chain ambiguity.",
+        ],
         rationale: [
           `Recovered endpoint from OpenAPI operationId hint(s): ${Array.from(operationIdHints).join(", ")}`,
           "Controller-to-target call chain was ambiguous in static analysis.",

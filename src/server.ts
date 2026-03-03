@@ -34,6 +34,7 @@ import {
 
 async function main() {
   const cfg = loadConfigFromEnvAndArgs(process.argv);
+  const SERVER_REPO_ROOT_ABS = path.resolve(__dirname, "..");
   const PROBE_STATUS_PATH = CONFIG_DEFAULTS.PROBE_STATUS_PATH;
   const PROBE_RESET_PATH = CONFIG_DEFAULTS.PROBE_RESET_PATH;
   const PROBE_ACTUATE_PATH = CONFIG_DEFAULTS.PROBE_ACTUATE_PATH;
@@ -55,6 +56,10 @@ async function main() {
       lastDiscoveryRootAbs = rootAbs;
     }
     return discoveredProjects;
+  }
+
+  function isLikelyServerRepoRoot(rootAbs: string): boolean {
+    return path.resolve(rootAbs) === SERVER_REPO_ROOT_ABS;
   }
 
   async function resolveProjectRoot(args: {
@@ -97,6 +102,7 @@ async function main() {
         name: "mcp-jvm-debugger",
         version: "0.1.0",
         workspaceRoot: cfg.workspaceRootAbs,
+        workspaceRootSource: cfg.workspaceRootSource,
         probe: {
           baseUrl: cfg.probeBaseUrl,
           statusPath: PROBE_STATUS_PATH,
@@ -151,7 +157,28 @@ async function main() {
       inputSchema: ProjectsDiscoverInputSchema,
     },
     async ({ workspaceRoot, maxProjects, maxJavaFilesPerProject }) => {
-      const rootAbs = path.resolve(workspaceRoot ?? cfg.workspaceRootAbs);
+      const hasWorkspaceOverride =
+        typeof workspaceRoot === "string" && workspaceRoot.trim().length > 0;
+      const rootAbs = path.resolve(hasWorkspaceOverride ? workspaceRoot : cfg.workspaceRootAbs);
+      const usingImplicitServerDefault = !hasWorkspaceOverride && cfg.workspaceRootSource !== "arg" && cfg.workspaceRootSource !== "env";
+      if (usingImplicitServerDefault && isLikelyServerRepoRoot(rootAbs)) {
+        hasExplicitDiscovery = false;
+        discoveredProjects = [];
+        const structuredContent = {
+          resultType: "report",
+          status: "workspace_root_required",
+          workspaceRoot: rootAbs,
+          workspaceRootSource: cfg.workspaceRootSource,
+          warning:
+            "Resolved workspace points to the mcp-jvm-debugger tool repository, which is likely not your active project workspace.",
+          nextAction:
+            "Call projects_discover again with workspaceRoot=<active project root>, or set MCP_WORKSPACE_ROOT explicitly.",
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
       const limit = clampInt(maxProjects ?? 50, 1, 200);
       const javaFileLimit = clampInt(maxJavaFilesPerProject ?? 300, 10, 2_000);
       discoveredProjects = await discoverProjects(rootAbs, limit, javaFileLimit);
@@ -218,6 +245,18 @@ async function main() {
       inputSchema: TargetInferInputSchema,
     },
     async ({ classHint, methodHint, lineHint, serviceHint, projectId, workspaceRoot, maxCandidates }) => {
+      if (!hasExplicitDiscovery && (!workspaceRoot || workspaceRoot.trim().length === 0)) {
+        const structuredContent = {
+          resultType: "report",
+          status: "workspace_discovery_required",
+          nextAction:
+            "Call projects_discover first (preferably with workspaceRoot set to the active project root), then rerun target_infer.",
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
       const resolveArgs: Parameters<typeof resolveProjectRoot>[0] = {};
       if (workspaceRoot) resolveArgs.workspaceRoot = workspaceRoot;
       if (projectId) resolveArgs.projectId = projectId;
@@ -270,7 +309,7 @@ async function main() {
       authPassword,
       outputTemplate,
     }) => {
-      if (!hasExplicitDiscovery) {
+      if (!hasExplicitDiscovery && (!workspaceRoot || workspaceRoot.trim().length === 0)) {
         const structuredContent = {
           resultType: "report",
           status: "unreachable_natural",

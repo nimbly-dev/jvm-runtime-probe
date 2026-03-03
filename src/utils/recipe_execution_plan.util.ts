@@ -62,6 +62,14 @@ export function buildRecipeExecutionPlan(args: {
           "Controller/request mapping could not be inferred for this target. Natural reproduction is currently unreachable.",
       });
       naturalSteps.push({
+        phase: "prepare",
+        title: "Deterministic fallback",
+        instruction:
+          key === "(not inferred)"
+            ? "actuated_mode: unavailable (missing inferred target key). Refine classHint/methodHint/lineHint."
+            : `actuated_mode: available (targetKey=${key}${typeof args.lineHint === "number" ? `:${args.lineHint}` : ""}). Use explicit actuated run only after reporting natural unavailability.`,
+      });
+      naturalSteps.push({
         phase: "verify",
         title: "Report limitation",
         instruction:
