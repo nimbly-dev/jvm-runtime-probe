@@ -47,6 +47,7 @@ async function main() {
   // Important: keep startup fast; do discovery lazily (large workspaces can be slow to scan).
   let discoveredProjects: Awaited<ReturnType<typeof discoverProjects>> = [];
   let lastDiscoveryRootAbs = cfg.workspaceRootAbs;
+  let hasExplicitDiscovery = false;
 
   async function ensureProjects(rootAbs: string): Promise<Awaited<ReturnType<typeof discoverProjects>>> {
     if (discoveredProjects.length === 0 || lastDiscoveryRootAbs !== rootAbs) {
@@ -155,6 +156,7 @@ async function main() {
       const javaFileLimit = clampInt(maxJavaFilesPerProject ?? 300, 10, 2_000);
       discoveredProjects = await discoverProjects(rootAbs, limit, javaFileLimit);
       lastDiscoveryRootAbs = rootAbs;
+      hasExplicitDiscovery = true;
 
       const defaultProjectId =
         discoveredProjects.length === 1 ? discoveredProjects.at(0)!.id : undefined;
@@ -252,7 +254,7 @@ async function main() {
     "recipe_generate",
     {
       description:
-        "Generate a reproducible request recipe for hitting a target method, inferred from code hints and optional OpenAPI files. Includes auth/login hints when available.",
+        "Generate a reproducible request recipe for hitting a target method, inferred from code hints and optional local OpenAPI schema files. Includes auth/login hints when available.",
       inputSchema: RecipeGenerateInputSchema,
     },
     async ({
@@ -268,6 +270,23 @@ async function main() {
       authPassword,
       outputTemplate,
     }) => {
+      if (!hasExplicitDiscovery) {
+        const structuredContent = {
+          resultType: "report",
+          status: "unreachable_natural",
+          nextAction:
+            "Call projects_discover first, then rerun recipe_generate. Discovery is required before endpoint/route inference.",
+          notes: [
+            "recipe_generate is blocked until projects_discover is completed at least once.",
+            "This guard prevents endpoint guessing and reduces false negatives from wrong base/context paths.",
+          ],
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
+
       const resolveArgs: Parameters<typeof resolveProjectRoot>[0] = {};
       if (workspaceRoot) resolveArgs.workspaceRoot = workspaceRoot;
       if (projectId) resolveArgs.projectId = projectId;

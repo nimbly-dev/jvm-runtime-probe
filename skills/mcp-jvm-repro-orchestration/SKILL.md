@@ -22,20 +22,21 @@ Use this workflow for requests like:
 
 ## Tool Sequence
 
-1. Call `recipe_generate` with:
+1. Call `projects_discover` first to establish workspace/project scope.
+2. Call `recipe_generate` with:
    - `mode: "natural"`
    - `classHint`, `methodHint`, optional `lineHint`
    - auth fields if available
-2. Inspect `structuredContent`:
+3. Inspect `structuredContent`:
    - `resultType`
    - `status`
    - `nextAction`
    - `executionPlan`
-3. Branch:
+4. Branch:
    - If `resultType="recipe"` and `status="natural_ready"`: execute natural plan.
    - If `resultType="report"` and `status="unreachable_natural"`: explain reason and ask user whether to proceed with actuated mode.
-4. Only after user confirmation, call `recipe_generate` again with `mode: "actuated"`.
-5. Run actuated flow:
+5. Only after user confirmation, call `recipe_generate` again with `mode: "actuated"`.
+6. Run actuated flow:
    - `probe_actuate(mode=actuate, targetKey=..., returnBoolean=...)`
    - execute trigger request
    - verify (`line_hit` preferred, probe status secondary)
@@ -96,3 +97,4 @@ Use this exact confirmation intent before actuated mode:
 3. Do not keep actuation armed after run completion.
 4. Keep internal handling machine-first (`structuredContent`), human output concise.
 5. Do not omit trigger request/response details in the final user-facing summary.
+6. On Windows PowerShell, always use `curl.exe` (never `curl` alias) and avoid long inline JSON/header quoting; prefer variables/files for payloads.

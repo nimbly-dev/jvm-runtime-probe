@@ -98,7 +98,8 @@ export function buildRecipeExecutionPlan(args: {
       title: "Execute natural request",
       instruction:
         `${request.method} ${request.fullUrlHint} (headers: ${formatAuthHeaderHint(args.auth)})` +
-        (request.bodyTemplate ? ` body: ${request.bodyTemplate}` : ""),
+        (request.bodyTemplate ? ` body: ${request.bodyTemplate}` : "") +
+        " On Windows PowerShell, use curl.exe (not curl alias) and pass payload via a file or variable to avoid quoting/alias issues.",
     });
     naturalSteps.push({
       phase: "verify",

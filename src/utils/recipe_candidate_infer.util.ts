@@ -577,6 +577,14 @@ async function buildRecipeCandidate(args: {
       searchRootsAbs: args.searchRootsAbs,
     }));
   const endpoint = endpointMapping?.path ?? inferClassBasePath(args.text);
+  const openApiOperationHints = uniqueStrings([
+    args.call.enclosingMethodName ?? "",
+    (args.methodNameForRationale.split("(")[0] ?? "").split(" ").at(-1) ?? "",
+  ]);
+  const openApiOperation = await findOpenApiOperationByOperationIds({
+    searchRootsAbs: args.searchRootsAbs,
+    operationIds: openApiOperationHints,
+  });
 
   const mappedParam = args.call.argNames
     .map((argName) => controllerMethodParams.find((p) => p.name === argName))
@@ -617,11 +625,17 @@ async function buildRecipeCandidate(args: {
   const openapiPath = requestParamName
     ? await findOpenApiPathHint(args.searchRootsAbs, requestParamName)
     : null;
-  if (!endpointMapping && openapiPath) pathHint = openapiPath;
-  const method = endpointMapping?.method ?? "GET";
+  let method: RecipeCandidate["method"] = endpointMapping?.method ?? "GET";
+  // OpenAPI is authoritative when available to avoid context/base-path drift.
+  if (openApiOperation) {
+    pathHint = openApiOperation.path;
+    method = openApiOperation.method;
+  } else if (openapiPath) {
+    pathHint = openapiPath;
+  }
 
   // Avoid emitting fake "GET /" routes; treat unresolved entrypoint as no candidate.
-  const routeResolved = Boolean(endpointMapping) || Boolean(openapiPath);
+  const routeResolved = Boolean(endpointMapping) || Boolean(openapiPath) || Boolean(openApiOperation);
   if (!routeResolved && pathHint === "/") {
     const out: { recipe?: RecipeCandidate; branchCondition?: string } = {};
     if (branchCondition) out.branchCondition = branchCondition;
@@ -645,6 +659,7 @@ async function buildRecipeCandidate(args: {
       rationale: [
         `Controller call matched: ${args.methodNameForRationale}`,
         `Inferred endpoint path: ${pathHint}`,
+        ...(openApiOperation ? ["Endpoint source: OpenAPI operationId match (preferred)."] : []),
         `Inferred request param: ${
           requestParamName ??
           (bodyParam ? `${bodyParam.name} (request body)` : "(unknown)")
@@ -662,6 +677,29 @@ export async function findControllerRequestCandidate(args: {
   methodHint: string;
 }): Promise<ControllerRequestMatch> {
   const operationIdHints = new Set<string>([args.methodHint]);
+  const schemaFirst = await findOpenApiOperationByOperationIds({
+    searchRootsAbs: args.searchRootsAbs,
+    operationIds: [args.methodHint],
+  });
+  if (schemaFirst) {
+    const bodyTemplate =
+      schemaFirst.method === "GET" || schemaFirst.method === "DELETE"
+        ? undefined
+        : '{"example":"value"}';
+    return {
+      recipe: {
+        method: schemaFirst.method,
+        path: schemaFirst.path,
+        queryTemplate: "",
+        fullUrlHint: schemaFirst.path,
+        ...(bodyTemplate ? { bodyTemplate } : {}),
+        rationale: [
+          `Resolved endpoint from local OpenAPI schema first (operationId hint: ${args.methodHint}).`,
+          "Controller lookup is used as fallback when OpenAPI mapping is unavailable.",
+        ],
+      },
+    };
+  }
 
   for (const rootAbs of args.searchRootsAbs) {
     const controllerFiles = await inferTargets({
