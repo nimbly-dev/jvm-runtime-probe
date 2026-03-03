@@ -1,13 +1,12 @@
 {
   "name": "mcp-jvm-debugger",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "",
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "test": "node --test -r ts-node/register test/**/*.test.ts",
-    "install:integrations": "node scripts/install-integrations.js",
     "install:integrations:sh": "bash ./scripts/install-integrations.sh"
   },
   "repository": {

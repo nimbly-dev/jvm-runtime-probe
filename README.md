@@ -1,20 +1,27 @@
-## mcp-jvm-debugger
+# mcp-jvm-debugger
 
-Local MCP server for machine-verifiable Java code-path hits via runtime `-javaagent` probes.
+[![node](https://img.shields.io/badge/node-v24.13.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![npm](https://img.shields.io/badge/npm-11.6.2-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/)
+[![JDK](https://img.shields.io/badge/JDK-21%2B-007396?logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Java Agent Target](https://img.shields.io/badge/Java%20Agent%20Target-17-ED8B00?logo=openjdk&logoColor=white)](https://maven.apache.org/)
+[![package](https://img.shields.io/badge/package-mcp--jvm--debugger%400.1.0-0A66C2)](https://github.com/nimbly-dev/mcp-jvm-debugger)
 
-It complements, not replaces, JDWP:
-- JDWP/IntelliJ: pause, inspect stack/variables.
-- Probe endpoint: deterministic hit signal for agent loops (`hitCount`, `lastHitEpochMs`).
+Coding agents execute the debugging workflow; this project supplies live runtime probe data from a ByteBuddy Java agent through MCP tools so agents can generate reproducible steps and line-hit verification.
 
-### Prereqs
+This is **not** a JDWP replacement.
 
-- Node.js (tested with Node 24)
-- JDK 21+
-- Maven (for building the Java agent)
+---
 
-### Build
+## Requirements
 
-PowerShell note: use `npm.cmd`.
+- Node.js `v24.13.0` (tested)
+- npm `11.6.2` (tested)
+- JDK `21+`
+- Maven
+
+---
+
+## Build
 
 ```powershell
 npm.cmd install
@@ -22,72 +29,41 @@ npm.cmd run build
 mvn -f java-agent\pom.xml -DskipTests package
 ```
 
-### One-Command Install (Skill + MCP)
+---
 
-Use the installer to configure Codex and/or Kiro. It is idempotent:
-- skips MCP install if the server name already exists
-- skips skill install if the skill folder already exists
+## Java Agent
 
-PowerShell examples:
+```text
+-javaagent:C:\Users\Altheo\repository\mcp-jvm-debugger\java-agent\target\mcp-jvm-probe-agent-0.1.0-all.jar=host=0.0.0.0;port=9191;include=com.nimbly.phshoesbackend.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
+```
+
+---
+
+## Install MCP
+
+<details>
+<summary><strong>Codex</strong></summary>
 
 ```powershell
-# Install for both Codex and Kiro
-npm.cmd run install:integrations
-
-# Install only for Codex
-npm.cmd run install:integrations -- --client codex
-
-# Install only for Kiro
-npm.cmd run install:integrations -- --client kiro
+codex.cmd mcp add mcp-jvm-debugger --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 -- node C:\Users\{desktopName}\repository\mcp-jvm-debugger\dist\server.js
 ```
 
-Bash/terminal script with interactive input (prompts when run with no args):
+Optional env:
+- `MCP_WORKSPACE_ROOT`
 
-```bash
-./scripts/install-integrations.sh
-
-# non-interactive
-./scripts/install-integrations.sh --client codex
-./scripts/install-integrations.sh --client kiro --dry-run
-```
-
-Useful options:
-- `--probe-base-url http://127.0.0.1:9193`
-- `--workspace-root C:\path\to\workspace`
-- `--codex-home ~/.codex` (`~` is expanded to your home directory, e.g. `C:\Users\<username>` on Windows)
-- `--kiro-config C:\path\to\kiro\mcp.json` (default detection prefers `~/.kiro/mcp.json`)
-- `--kiro-skills-dir C:\path\to\kiro\skills` (default: `~/.kiro/skills`)
-- `--skip-skill` or `--skip-mcp`
-- `--dry-run`
-
-### Install MCP (Codex)
-
-Required envs:
-- `MCP_PROBE_BASE_URL`
-- Probe paths are static in code:
-  - `status`: `/__probe/status`
-  - `reset`: `/__probe/reset`
-  - `actuate`: `/__probe/actuate`
-
-Optional:
-- `MCP_WORKSPACE_ROOT` (not required; if omitted, defaults to MCP server process working directory)
+Reinstall:
 
 ```powershell
-codex mcp add mcp-jvm-debugger `
-  --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 `
-  -- node C:\Users\Altheo\repository\mcp-jvm-debugger\dist\server.js
+codex.cmd mcp remove mcp-jvm-debugger
+codex.cmd mcp add mcp-jvm-debugger --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 -- node C:\Users\{desktopName}\repository\mcp-jvm-debugger\dist\server.js
 ```
 
-Remove/re-add:
+</details>
 
-```powershell
-codex mcp remove mcp-jvm-debugger
-codex mcp add mcp-jvm-debugger --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 -- node C:\Users\Altheo\repository\mcp-jvm-debugger\dist\server.js
-```
+<details>
+<summary><strong>Kiro / mcpServers JSON</strong></summary>
 
-### Install MCP (Anthropic/Kiro-style config)
-
-For clients that use an `mcpServers` JSON block (for example Anthropic/Kiro MCP integrations), add:
+Example (`~/.kiro/mcp.json`):
 
 ```json
 {
@@ -95,7 +71,7 @@ For clients that use an `mcpServers` JSON block (for example Anthropic/Kiro MCP 
     "mcp-jvm-debugger": {
       "command": "node",
       "args": [
-        "C:\\Users\\Altheo\\repository\\mcp-jvm-debugger\\dist\\server.js"
+        "C:\\Users\\{desktopName}\\repository\\mcp-jvm-debugger\\dist\\server.js"
       ],
       "env": {
         "MCP_PROBE_BASE_URL": "http://127.0.0.1:9193"
@@ -105,22 +81,42 @@ For clients that use an `mcpServers` JSON block (for example Anthropic/Kiro MCP 
 }
 ```
 
-Optional envs you can add in the same `env` block:
-- `MCP_WORKSPACE_ROOT=C:\\Users\\Altheo\\repository\\ph-shoes-project`
-- `MCP_PROBE_WAIT_MAX_RETRIES=1`
+Optional env:
+- `MCP_WORKSPACE_ROOT`
 
-### Optional Auth Settings
+</details>
 
-- `MCP_AUTH_LOGIN_DISCOVERY_ENABLED` (default: `true`, only for login endpoint hint extraction)
-- `MCP_PROBE_WAIT_MAX_RETRIES` (default: `1`, max: `10`)
+---
 
-Behavior:
-- Automatic credential discovery is disabled (no env/`.env` token pickup).
-- If auth is required and credentials are not provided as tool inputs, recipe auth is `needs_user_input` and includes missing fields.
-- If route/auth requirements cannot be inferred, recipe auth is also `needs_user_input` so the coding agent asks for credentials explicitly.
-- If login endpoint is inferable from OpenAPI, recipe includes login hint (`auth.login.path`, `auth.login.body`) to help ask the user for proper creds.
+## Installer Script
 
-### Tools
+```bash
+./scripts/install-integrations.sh
+```
+
+Non-interactive:
+
+```bash
+./scripts/install-integrations.sh --client codex --probe-base-url http://127.0.0.1:9193
+./scripts/install-integrations.sh --client kiro --dry-run
+```
+
+---
+
+## Runtime Config
+
+Required:
+- `MCP_PROBE_BASE_URL`
+
+Optional:
+- `MCP_WORKSPACE_ROOT`
+- `MCP_PROBE_WAIT_MAX_RETRIES` (default `1`, max `10`)
+- `MCP_AUTH_LOGIN_DISCOVERY_ENABLED` (default `true`)
+- `MCP_RECIPE_OUTPUT_TEMPLATE`
+
+---
+
+## MCP Tools
 
 - `debug_ping`
 - `projects_discover`
@@ -131,43 +127,3 @@ Behavior:
 - `probe_reset`
 - `probe_wait_hit`
 - `probe_actuate`
-
-### Start Service With `-javaagent`
-
-```text
--javaagent:C:\Users\Altheo\repository\mcp-jvm-debugger\java-agent\target\mcp-jvm-probe-agent-0.1.0-all.jar=host=0.0.0.0;port=9191;include=com.nimbly.phshoesbackend.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
-```
-
-Probe endpoints:
-1. `GET /__probe/status?key=<key>`
-2. `POST /__probe/reset` body: `{ "key": "<key>" }`
-
-### Recipe Output Template
-
-Configure default template via env:
-- `MCP_RECIPE_OUTPUT_TEMPLATE`
-
-Default template resource file:
-- `resources/default_recipe_output.template.txt`
-
-Template variables:
-- `recipe.*`: `recipe.mode`, `recipe.mode_reason`, `recipe.steps`, `recipe.natural_steps`, `recipe.actuated_steps`
-- `target.*`: `target.path`, `target.class`, `target.method`, `target.line_hint`
-- `http.*`: `http.request`, `http.method`, `http.path`, `http.query`, `http.code`, `http.response`
-- `execution`: `execution_hit`, `api_outcome`, `repro_status`
-- `auth.*`: `auth.required`, `auth.status`, `auth.strategy`, `auth.next_action`, `auth.headers`, `auth.missing`, `auth.source`, `auth.login.path`, `auth.login.body`
-- `probe.*`: `probe.key`, `probe.hit`
-- `run.*`: `run.duration`, `run.notes`
-
-Recipe behavior:
-- Default output is natural, step-by-step repro when a request path is inferable.
-- `outputTemplate` only changes rendering; recipe mode/steps are generated separately.
-- If natural repro is unavailable, output switches to `mode=actuated` with reason + enable/verify/cleanup steps.
-
-### Prompt Style (Natural)
-
-No need to include probe/api base in prompt if MCP env is already set.
-
-Examples:
-- `Give me reproducible recipe for Specification<CatalogShoe> hasKeyword(String keyword), line 132.`
-- `Give me reproducible recipe for JsonNode getOrInit(String userId), line 42 under class AccountSettingsServiceImpl in useraccounts.`
