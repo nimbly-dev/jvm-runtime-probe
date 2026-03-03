@@ -55,8 +55,8 @@ Useful options:
 - `--probe-base-url http://127.0.0.1:9193`
 - `--workspace-root C:\path\to\workspace`
 - `--codex-home ~/.codex` (`~` is expanded to your home directory, e.g. `C:\Users\<username>` on Windows)
-- `--kiro-config C:\path\to\kiro\mcp.json` (override auto-detected Kiro config path)
-- `--kiro-skills-dir C:\path\to\kiro\skills` (override auto-detected Kiro skills path)
+- `--kiro-config C:\path\to\kiro\mcp.json` (default detection prefers `~/.kiro/mcp.json`)
+- `--kiro-skills-dir C:\path\to\kiro\skills` (default: `~/.kiro/skills`)
 - `--skip-skill` or `--skip-mcp`
 - `--dry-run`
 
@@ -64,19 +64,17 @@ Useful options:
 
 Required envs:
 - `MCP_PROBE_BASE_URL`
-- `MCP_PROBE_STATUS_PATH`
-- `MCP_PROBE_RESET_PATH`
-- `MCP_PROBE_ACTUATE_PATH` (optional, default: `/__probe/actuate`)
+- Probe paths are static in code:
+  - `status`: `/__probe/status`
+  - `reset`: `/__probe/reset`
+  - `actuate`: `/__probe/actuate`
 
-Optional but recommended:
-- `MCP_WORKSPACE_ROOT` (if omitted, defaults to MCP server process working directory)
+Optional:
+- `MCP_WORKSPACE_ROOT` (not required; if omitted, defaults to MCP server process working directory)
 
 ```powershell
 codex mcp add mcp-jvm-debugger `
   --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 `
-  --env MCP_PROBE_STATUS_PATH=/__probe/status `
-  --env MCP_PROBE_RESET_PATH=/__probe/reset `
-  --env MCP_PROBE_ACTUATE_PATH=/__probe/actuate `
   -- node C:\Users\Altheo\repository\mcp-jvm-debugger\dist\server.js
 ```
 
@@ -84,7 +82,7 @@ Remove/re-add:
 
 ```powershell
 codex mcp remove mcp-jvm-debugger
-codex mcp add mcp-jvm-debugger --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 --env MCP_PROBE_STATUS_PATH=/__probe/status --env MCP_PROBE_RESET_PATH=/__probe/reset --env MCP_PROBE_ACTUATE_PATH=/__probe/actuate -- node C:\Users\Altheo\repository\mcp-jvm-debugger\dist\server.js
+codex mcp add mcp-jvm-debugger --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 -- node C:\Users\Altheo\repository\mcp-jvm-debugger\dist\server.js
 ```
 
 ### Install MCP (Anthropic/Kiro-style config)
@@ -100,10 +98,7 @@ For clients that use an `mcpServers` JSON block (for example Anthropic/Kiro MCP 
         "C:\\Users\\Altheo\\repository\\mcp-jvm-debugger\\dist\\server.js"
       ],
       "env": {
-        "MCP_PROBE_BASE_URL": "http://127.0.0.1:9193",
-        "MCP_PROBE_STATUS_PATH": "/__probe/status",
-        "MCP_PROBE_RESET_PATH": "/__probe/reset",
-        "MCP_PROBE_ACTUATE_PATH": "/__probe/actuate"
+        "MCP_PROBE_BASE_URL": "http://127.0.0.1:9193"
       }
     }
   }

@@ -13,9 +13,6 @@ Options:
   --server-name <name>            MCP server name. Default: mcp-jvm-debugger
   --skill-name <name>             Skill folder name in ./skills. Default: mcp-jvm-repro-orchestration
   --probe-base-url <url>          Default: http://127.0.0.1:9193
-  --probe-status-path <path>      Default: /__probe/status
-  --probe-reset-path <path>       Default: /__probe/reset
-  --probe-actuate-path <path>     Default: /__probe/actuate
   --workspace-root <absPath>      Optional MCP_WORKSPACE_ROOT value
   --codex-home <absPath>          Override CODEX_HOME (default: ~/.codex)
   --kiro-config <absPath>         Override Kiro MCP config path
@@ -37,9 +34,6 @@ CLIENT="both"
 SERVER_NAME="mcp-jvm-debugger"
 SKILL_NAME="mcp-jvm-repro-orchestration"
 PROBE_BASE_URL="http://127.0.0.1:9193"
-PROBE_STATUS_PATH="/__probe/status"
-PROBE_RESET_PATH="/__probe/reset"
-PROBE_ACTUATE_PATH="/__probe/actuate"
 WORKSPACE_ROOT=""
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 KIRO_CONFIG=""
@@ -60,9 +54,6 @@ while [[ $# -gt 0 ]]; do
     --server-name) SERVER_NAME="${2:-}"; shift 2 ;;
     --skill-name) SKILL_NAME="${2:-}"; shift 2 ;;
     --probe-base-url) PROBE_BASE_URL="${2:-}"; shift 2 ;;
-    --probe-status-path) PROBE_STATUS_PATH="${2:-}"; shift 2 ;;
-    --probe-reset-path) PROBE_RESET_PATH="${2:-}"; shift 2 ;;
-    --probe-actuate-path) PROBE_ACTUATE_PATH="${2:-}"; shift 2 ;;
     --workspace-root) WORKSPACE_ROOT="${2:-}"; shift 2 ;;
     --codex-home) CODEX_HOME="${2:-}"; shift 2 ;;
     --kiro-config) KIRO_CONFIG="${2:-}"; shift 2 ;;
@@ -151,9 +142,6 @@ if [[ "$INTERACTIVE" -eq 1 ]]; then
   SERVER_NAME="$(prompt_default "MCP server name" "$SERVER_NAME")"
   SKILL_NAME="$(prompt_default "Skill name (folder under ./skills)" "$SKILL_NAME")"
   PROBE_BASE_URL="$(prompt_default "MCP_PROBE_BASE_URL" "$PROBE_BASE_URL")"
-  PROBE_STATUS_PATH="$(prompt_default "MCP_PROBE_STATUS_PATH" "$PROBE_STATUS_PATH")"
-  PROBE_RESET_PATH="$(prompt_default "MCP_PROBE_RESET_PATH" "$PROBE_RESET_PATH")"
-  PROBE_ACTUATE_PATH="$(prompt_default "MCP_PROBE_ACTUATE_PATH" "$PROBE_ACTUATE_PATH")"
   read -r -p "MCP_WORKSPACE_ROOT (optional, empty to skip): " WORKSPACE_ROOT
   if prompt_yes_no "Install Skill?" "y"; then SKIP_SKILL=0; else SKIP_SKILL=1; fi
   if prompt_yes_no "Install MCP?" "y"; then SKIP_MCP=0; else SKIP_MCP=1; fi
@@ -208,19 +196,17 @@ install_skill_if_missing() {
 
 detect_kiro_config_path() {
   local candidates=()
+  candidates+=("$HOME/.kiro/mcp.json")
   if [[ "$OSTYPE" == "darwin"* ]]; then
     candidates+=("$HOME/Library/Application Support/Kiro/User/mcp.json")
     candidates+=("$HOME/Library/Application Support/Kiro/User/settings.json")
-    candidates+=("$HOME/.kiro/mcp.json")
   elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* ]]; then
     local appdata="${APPDATA:-$HOME/AppData/Roaming}"
     candidates+=("$appdata/Kiro/User/mcp.json")
     candidates+=("$appdata/Kiro/User/settings.json")
-    candidates+=("$HOME/.kiro/mcp.json")
   else
     candidates+=("$HOME/.config/Kiro/User/mcp.json")
     candidates+=("$HOME/.config/Kiro/User/settings.json")
-    candidates+=("$HOME/.kiro/mcp.json")
   fi
 
   local c
@@ -234,14 +220,7 @@ detect_kiro_config_path() {
 }
 
 detect_kiro_skills_dir() {
-  if [[ "$OSTYPE" == "darwin"* ]]; then
-    printf '%s\n' "$HOME/Library/Application Support/Kiro/User/skills"
-  elif [[ "$OSTYPE" == "msys"* || "$OSTYPE" == "cygwin"* ]]; then
-    local appdata="${APPDATA:-$HOME/AppData/Roaming}"
-    printf '%s\n' "$appdata/Kiro/User/skills"
-  else
-    printf '%s\n' "$HOME/.config/Kiro/User/skills"
-  fi
+  printf '%s\n' "$HOME/.kiro/skills"
 }
 
 append_codex_mcp_if_missing() {
@@ -271,9 +250,6 @@ append_codex_mcp_if_missing() {
     printf "args = ['%s']\n\n" "$server_js"
     printf '[mcp_servers.%s.env]\n' "$server_name"
     printf 'MCP_PROBE_BASE_URL = "%s"\n' "$PROBE_BASE_URL"
-    printf 'MCP_PROBE_STATUS_PATH = "%s"\n' "$PROBE_STATUS_PATH"
-    printf 'MCP_PROBE_RESET_PATH = "%s"\n' "$PROBE_RESET_PATH"
-    printf 'MCP_PROBE_ACTUATE_PATH = "%s"\n' "$PROBE_ACTUATE_PATH"
     if [[ -n "$WORKSPACE_ROOT" ]]; then
       printf "MCP_WORKSPACE_ROOT = '%s'\n" "$WORKSPACE_ROOT"
     fi
@@ -296,7 +272,7 @@ install_kiro_mcp_if_missing() {
     printf '{}\n' > "$config_path"
   fi
 
-  node - "$config_path" "$server_name" "$server_js" "$PROBE_BASE_URL" "$PROBE_STATUS_PATH" "$PROBE_RESET_PATH" "$PROBE_ACTUATE_PATH" "$WORKSPACE_ROOT" <<'NODE'
+  node - "$config_path" "$server_name" "$server_js" "$PROBE_BASE_URL" "$WORKSPACE_ROOT" <<'NODE'
 const fs = require("node:fs");
 
 const [
@@ -304,9 +280,6 @@ const [
   serverName,
   serverJs,
   probeBaseUrl,
-  probeStatusPath,
-  probeResetPath,
-  probeActuatePath,
   workspaceRoot,
 ] = process.argv.slice(2);
 
@@ -329,9 +302,6 @@ if (doc.mcpServers[serverName]) {
 
 const env = {
   MCP_PROBE_BASE_URL: probeBaseUrl,
-  MCP_PROBE_STATUS_PATH: probeStatusPath,
-  MCP_PROBE_RESET_PATH: probeResetPath,
-  MCP_PROBE_ACTUATE_PATH: probeActuatePath,
 };
 if (workspaceRoot) {
   env.MCP_WORKSPACE_ROOT = workspaceRoot;

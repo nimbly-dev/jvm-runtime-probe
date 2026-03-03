@@ -4,7 +4,8 @@ import * as path from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
-import { loadConfigFromEnvAndArgs } from "./lib/config";
+import { loadConfigFromEnvAndArgs } from "./config/server-config";
+import { CONFIG_DEFAULTS } from "./config/defaults";
 import {
   renderRecipeTemplate,
 } from "./lib/recipe_template";
@@ -33,6 +34,9 @@ import {
 
 async function main() {
   const cfg = loadConfigFromEnvAndArgs(process.argv);
+  const PROBE_STATUS_PATH = CONFIG_DEFAULTS.PROBE_STATUS_PATH;
+  const PROBE_RESET_PATH = CONFIG_DEFAULTS.PROBE_RESET_PATH;
+  const PROBE_ACTUATE_PATH = CONFIG_DEFAULTS.PROBE_ACTUATE_PATH;
 
   const server = new McpServer({
     name: "mcp-jvm-debugger",
@@ -94,9 +98,9 @@ async function main() {
         workspaceRoot: cfg.workspaceRootAbs,
         probe: {
           baseUrl: cfg.probeBaseUrl,
-          statusPath: cfg.probeStatusPath,
-          resetPath: cfg.probeResetPath,
-          actuatePath: cfg.probeActuatePath,
+          statusPath: PROBE_STATUS_PATH,
+          resetPath: PROBE_RESET_PATH,
+          actuatePath: PROBE_ACTUATE_PATH,
           waitMaxRetriesDefault: cfg.probeWaitMaxRetries,
         },
         recipe: {
@@ -196,8 +200,8 @@ async function main() {
     async ({ baseUrl, timeoutMs }) => {
       const diagnoseArgs: Parameters<typeof probeDiagnose>[0] = {
         baseUrl: baseUrl ?? cfg.probeBaseUrl,
-        statusPath: cfg.probeStatusPath,
-        resetPath: cfg.probeResetPath,
+        statusPath: PROBE_STATUS_PATH,
+        resetPath: PROBE_RESET_PATH,
       };
       if (typeof timeoutMs === "number") diagnoseArgs.timeoutMs = timeoutMs;
       return await probeDiagnose(diagnoseArgs);
@@ -350,7 +354,7 @@ async function main() {
     async ({ baseUrl, mode, actuatorId, targetKey, returnBoolean, timeoutMs }) => {
       const args: Parameters<typeof probeActuate>[0] = {
         baseUrl: baseUrl ?? cfg.probeBaseUrl,
-        actuatePath: cfg.probeActuatePath,
+        actuatePath: PROBE_ACTUATE_PATH,
       };
       if (typeof mode === "string") args.mode = mode;
       if (typeof actuatorId === "string") args.actuatorId = actuatorId;
@@ -372,7 +376,7 @@ async function main() {
       const args: Parameters<typeof probeStatus>[0] = {
         key,
         baseUrl: baseUrl ?? cfg.probeBaseUrl,
-        statusPath: cfg.probeStatusPath,
+        statusPath: PROBE_STATUS_PATH,
       };
       if (typeof lineHint === "number") args.lineHint = lineHint;
       if (typeof timeoutMs !== "undefined") args.timeoutMs = timeoutMs;
@@ -391,7 +395,7 @@ async function main() {
       const args: Parameters<typeof probeReset>[0] = {
         key,
         baseUrl: baseUrl ?? cfg.probeBaseUrl,
-        resetPath: cfg.probeResetPath,
+        resetPath: PROBE_RESET_PATH,
       };
       if (typeof lineHint === "number") args.lineHint = lineHint;
       if (typeof timeoutMs !== "undefined") args.timeoutMs = timeoutMs;
@@ -410,7 +414,7 @@ async function main() {
       const args: Parameters<typeof probeWaitHit>[0] = {
         key,
         baseUrl: baseUrl ?? cfg.probeBaseUrl,
-        statusPath: cfg.probeStatusPath,
+        statusPath: PROBE_STATUS_PATH,
       };
       if (typeof lineHint === "number") args.lineHint = lineHint;
       if (typeof timeoutMs !== "undefined") args.timeoutMs = timeoutMs;
