@@ -159,4 +159,3 @@ test("single_line_probe actuated mode adds enable and disable cleanup calls", ()
     },
   });
 });
-

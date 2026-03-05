@@ -30,4 +30,3 @@ export function parseProbeSnapshot(structuredContent: Record<string, unknown>): 
   if (typeof lastHitEpochMs === "number") out.lastHitEpochMs = lastHitEpochMs;
   return out;
 }
-

@@ -13,19 +13,20 @@ export const RecipeGenerateInputSchema = {
   authToken: z
     .string()
     .optional()
-    .describe("Optional bearer token. If auth is required and missing, tool returns needs_user_input."),
+    .describe(
+      "Optional bearer token. If auth is required and missing, tool returns needs_user_input.",
+    ),
   authUsername: z
     .string()
     .optional()
     .describe("Optional auth username/email for login discovery flows."),
-  authPassword: z
-    .string()
-    .optional()
-    .describe("Optional auth password for login discovery flows."),
+  authPassword: z.string().optional().describe("Optional auth password for login discovery flows."),
   actuationEnabled: z
     .boolean()
     .optional()
-    .describe("Optional flag to emit probe_actuate enable/disable steps around probe verification."),
+    .describe(
+      "Optional flag to emit probe_actuate enable/disable steps around probe verification.",
+    ),
   actuationReturnBoolean: z
     .boolean()
     .optional()

@@ -68,7 +68,10 @@ test("execution readiness requires user confirmation when candidate is uncertain
   });
 
   assert.equal(readiness.executionReadiness, "needs_user_input");
-  assert.equal(readiness.missingInputs.some((m: any) => m.category === "confirmation"), true);
+  assert.equal(
+    readiness.missingInputs.some((m: any) => m.category === "confirmation"),
+    true,
+  );
 });
 
 test("execution readiness requires explicit actuation decision when enabled", () => {

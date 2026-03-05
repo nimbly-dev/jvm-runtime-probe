@@ -5,4 +5,3 @@ export function inferBranchCondition(contextLines: string[]): string | undefined
   if (candidates.length === 0) return undefined;
   return candidates[candidates.length - 1];
 }
-

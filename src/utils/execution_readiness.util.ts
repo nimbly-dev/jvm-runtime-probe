@@ -37,7 +37,8 @@ export function collectMissingExecutionInputs(args: ReadinessArgs): MissingExecu
       category: "probe",
       field: "lineHint",
       reason: "Probe-capable modes require a strict Class#method:line target.",
-      suggestedAction: "Provide lineHint (or explicit Class#method:line target) and rerun recipe generation.",
+      suggestedAction:
+        "Provide lineHint (or explicit Class#method:line target) and rerun recipe generation.",
     });
   }
 
@@ -73,12 +74,17 @@ export function collectMissingExecutionInputs(args: ReadinessArgs): MissingExecu
     });
   }
 
-  if (args.actuationEnabled && needsLineTarget && typeof args.actuationReturnBoolean !== "boolean") {
+  if (
+    args.actuationEnabled &&
+    needsLineTarget &&
+    typeof args.actuationReturnBoolean !== "boolean"
+  ) {
     missingInputs.push({
       category: "actuation",
       field: "actuationReturnBoolean",
       reason: "Actuated flow requires explicit branch decision.",
-      suggestedAction: "Provide actuationReturnBoolean=true|false to enable deterministic branch forcing.",
+      suggestedAction:
+        "Provide actuationReturnBoolean=true|false to enable deterministic branch forcing.",
     });
   }
 

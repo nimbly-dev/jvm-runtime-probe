@@ -1,7 +1,4 @@
-import {
-  LINE_TARGET_MISSING_NOTE,
-  type IntentMode,
-} from "./recipe_constants.util";
+import { LINE_TARGET_MISSING_NOTE, type IntentMode } from "./recipe_constants.util";
 
 export type RoutingContext = {
   requestedIntentMode: IntentMode;
@@ -36,13 +33,6 @@ export function requiresLineTarget(mode: IntentMode): boolean {
   return mode === "single_line_probe" || mode === "regression_plus_line_probe";
 }
 
-export function shouldRunProbeTools(decision: RoutingDecision): boolean {
-  return (
-    decision.selectedMode === "single_line_probe" ||
-    decision.selectedMode === "regression_plus_line_probe"
-  );
-}
-
 export function resolveSelectedMode(ctx: RoutingContext): RoutingDecision {
   const lineTargetProvided = hasExplicitLineTarget(ctx);
   const probeIntentRequested = requiresLineTarget(ctx.requestedIntentMode);
@@ -73,4 +63,3 @@ export function resolveSelectedMode(ctx: RoutingContext): RoutingDecision {
           : "Combined API regression and line probe verification requested with explicit line target.",
   };
 }
-

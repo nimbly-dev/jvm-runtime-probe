@@ -4,4 +4,3 @@ export function redactSecret(value: string): string {
   if (v.length <= 8) return "***";
   return `${v.slice(0, 4)}...${v.slice(-2)}`;
 }
-

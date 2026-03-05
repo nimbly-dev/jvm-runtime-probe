@@ -9,4 +9,3 @@ export const TargetInferInputSchema = {
   workspaceRoot: z.string().optional().describe("Optional workspace root override"),
   maxCandidates: z.number().int().positive().optional(),
 } as const;
-

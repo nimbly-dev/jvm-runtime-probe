@@ -1,10 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type {
-  AuthLoginHint,
-  AuthResolution,
-  AuthStrategy,
-} from "../models/auth_resolution.model";
+import type { AuthLoginHint, AuthResolution, AuthStrategy } from "../models/auth_resolution.model";
 
 type SecretValue = {
   value: string;
@@ -36,10 +32,7 @@ function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function pathBlockContainsSecurity(
-  text: string,
-  endpointPath: string | undefined,
-): boolean {
+function pathBlockContainsSecurity(text: string, endpointPath: string | undefined): boolean {
   if (!endpointPath) return false;
   const lines = text.split(/\r?\n/);
   const pathRx = new RegExp(`^\\s{2}${escapeRegExp(endpointPath)}:\\s*$`);
@@ -164,9 +157,7 @@ async function readOpenApiHints(args: {
   };
 }
 
-async function controllerMayRequireAuth(
-  controllerFileAbs: string | undefined,
-): Promise<boolean> {
+async function controllerMayRequireAuth(controllerFileAbs: string | undefined): Promise<boolean> {
   if (!controllerFileAbs) return false;
   let text = "";
   try {
@@ -198,7 +189,9 @@ export async function resolveAuthForRecipe(args: {
   const controllerSecure = await controllerMayRequireAuth(args.controllerFileAbs);
   if (controllerSecure) notes.push("Controller has security annotations.");
 
-  notes.push("Automatic credential discovery is disabled; credentials must be provided explicitly.");
+  notes.push(
+    "Automatic credential discovery is disabled; credentials must be provided explicitly.",
+  );
 
   const required = openapi.required || controllerSecure;
   let strategy: AuthStrategy = required ? openapi.strategy : "none";
