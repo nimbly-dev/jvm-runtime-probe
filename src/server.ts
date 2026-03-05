@@ -35,8 +35,8 @@ import {
 async function main() {
   const cfg = loadConfigFromEnvAndArgs(process.argv);
   const SERVER_REPO_ROOT_ABS = path.resolve(__dirname, "..");
-  const PROBE_STATUS_PATH = CONFIG_DEFAULTS.PROBE_STATUS_PATH;
-  const PROBE_RESET_PATH = CONFIG_DEFAULTS.PROBE_RESET_PATH;
+  const PROBE_STATUS_PATH = cfg.probeStatusPath;
+  const PROBE_RESET_PATH = cfg.probeResetPath;
   const PROBE_ACTUATE_PATH = CONFIG_DEFAULTS.PROBE_ACTUATE_PATH;
 
   const server = new McpServer({
