@@ -103,6 +103,7 @@ Non-interactive:
 ```bash
 ./scripts/install-integrations.sh --client codex --probe-base-url http://127.0.0.1:9193
 ./scripts/install-integrations.sh --client kiro --dry-run
+./scripts/install-integrations.sh --client both --update-skill-if-exists
 ```
 
 ---

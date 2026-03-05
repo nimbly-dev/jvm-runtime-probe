@@ -1,12 +1,15 @@
 import type { AuthResolution } from "../models/auth_resolution.model";
+import type { RoutingDecision } from "./recipe_intent_routing.util";
 import { redactSecret } from "./redaction.util";
-import type { RecipeCandidate, RecipeExecutionPlan, RecipeExecutionStep } from "./recipe_types.util";
+import type {
+  RecipeCandidate,
+  RecipeExecutionPlan,
+  RecipeExecutionStep,
+} from "./recipe_types.util";
 
 function formatAuthHeaderHint(auth: AuthResolution): string {
   if (!auth.requestHeaders) {
-    if (auth.status === "needs_user_input") {
-      return `Auth unresolved. ${auth.nextAction}`;
-    }
+    if (auth.status === "needs_user_input") return `Auth unresolved. ${auth.nextAction}`;
     return "No auth headers required.";
   }
   return Object.entries(auth.requestHeaders)
@@ -14,159 +17,226 @@ function formatAuthHeaderHint(auth: AuthResolution): string {
     .join("; ");
 }
 
-function buildLineHitInstruction(args: {
+function resolveLineTarget(args: {
+  inferredTargetKey?: string;
+  lineHint?: number;
+}): string | undefined {
+  if (!args.inferredTargetKey || typeof args.lineHint !== "number") return undefined;
+  return `${args.inferredTargetKey}:${args.lineHint}`;
+}
+
+function buildResolveAuthStep(auth: AuthResolution): RecipeExecutionStep | undefined {
+  if (auth.status !== "needs_user_input") return undefined;
+  return {
+    phase: "prepare",
+    title: "Resolve authentication",
+    instruction: auth.nextAction,
+  };
+}
+
+function buildExecuteRequestStep(args: {
+  requestCandidate: RecipeCandidate;
+  auth: AuthResolution;
+  title: string;
+}): RecipeExecutionStep {
+  const request = args.requestCandidate;
+  return {
+    phase: "execute",
+    title: args.title,
+    instruction:
+      `${request.method} ${request.fullUrlHint} (headers: ${formatAuthHeaderHint(args.auth)})` +
+      (request.bodyTemplate ? ` body: ${request.bodyTemplate}` : "") +
+      " On Windows PowerShell, use curl.exe (not curl alias) and pass payload via a file or variable to avoid quoting issues.",
+  };
+}
+
+function buildMissingRequestSteps(context: string): RecipeExecutionStep[] {
+  return [
+    {
+      phase: "prepare",
+      title: "Request candidate missing",
+      instruction:
+        `Cannot ${context} because request mapping is unavailable. Refine classHint/methodHint/lineHint or provide explicit request context.`,
+    },
+    {
+      phase: "verify",
+      title: "Return report",
+      instruction: "Return report with status=api_request_not_inferred.",
+    },
+  ];
+}
+
+function buildRegressionApiSteps(args: {
+  requestCandidate?: RecipeCandidate;
+  auth: AuthResolution;
+}): RecipeExecutionStep[] {
+  const steps: RecipeExecutionStep[] = [];
+  const authStep = buildResolveAuthStep(args.auth);
+  if (authStep) steps.push(authStep);
+  if (!args.requestCandidate) return steps.concat(buildMissingRequestSteps("run regression API checks"));
+
+  steps.push(
+    buildExecuteRequestStep({
+      requestCandidate: args.requestCandidate,
+      auth: args.auth,
+      title: "Execute regression API check",
+    }),
+  );
+  steps.push({
+    phase: "verify",
+    title: "Verify API regression outcome",
+    instruction: "Validate HTTP code/response and service-side assertions for regression checks.",
+  });
+  return steps;
+}
+
+function buildSingleLineProbeSteps(args: {
+  requestCandidate?: RecipeCandidate;
+  auth: AuthResolution;
+  lineTarget?: string;
   lineHint?: number;
   targetFile?: string;
-  inferredTargetKey?: string;
-}): string {
-  if (typeof args.lineHint !== "number") {
-    return "Line hint is required for strict line verification. Return report with status=line_key_required.";
+}): RecipeExecutionStep[] {
+  const steps: RecipeExecutionStep[] = [];
+  const authStep = buildResolveAuthStep(args.auth);
+  if (authStep) steps.push(authStep);
+  if (!args.lineTarget || typeof args.lineHint !== "number") {
+    steps.push({
+      phase: "prepare",
+      title: "Line target unresolved",
+      instruction:
+        "Probe flow requires a strict line target (Class#method:line). Refine inference input and rerun.",
+    });
+    steps.push({
+      phase: "verify",
+      title: "Return report",
+      instruction: "Return report with status=target_not_inferred.",
+    });
+    return steps;
   }
-  const breakpointHint = args.targetFile
-    ? `Set/confirm a JVM breakpoint at ${args.targetFile}:${args.lineHint}.`
-    : `Set/confirm a JVM breakpoint at target line ${args.lineHint}.`;
-  const lineKey = args.inferredTargetKey ? `${args.inferredTargetKey}:${args.lineHint}` : undefined;
-  if (lineKey) {
-    return `${breakpointHint} Success criterion is line_hit via probe_status(key=${lineKey}) with hitCount increased after the request.`;
+  if (!args.requestCandidate) return steps.concat(buildMissingRequestSteps("trigger line probe verification"));
+
+  steps.push({
+    phase: "prepare",
+    title: "Reset probe baseline",
+    instruction: `Call probe_reset with key=${args.lineTarget} before running trigger request.`,
+  });
+  steps.push(
+    buildExecuteRequestStep({
+      requestCandidate: args.requestCandidate,
+      auth: args.auth,
+      title: "Execute probe trigger request",
+    }),
+  );
+  steps.push({
+    phase: "verify",
+    title: "Verify single-line probe hit",
+    instruction:
+      `Require line_hit on ${args.lineTarget} using probe_wait_hit and confirm with probe_status.` +
+      (args.targetFile
+        ? ` Correlate with ${args.targetFile}:${args.lineHint}.`
+        : ""),
+  });
+  return steps;
+}
+
+function buildCombinedSteps(args: {
+  requestCandidate?: RecipeCandidate;
+  auth: AuthResolution;
+  lineTarget?: string;
+  lineHint?: number;
+  targetFile?: string;
+}): RecipeExecutionStep[] {
+  const steps: RecipeExecutionStep[] = [];
+  const authStep = buildResolveAuthStep(args.auth);
+  if (authStep) steps.push(authStep);
+  if (!args.lineTarget || typeof args.lineHint !== "number") {
+    steps.push({
+      phase: "prepare",
+      title: "Line target unresolved",
+      instruction:
+        "Combined mode requires a strict line target (Class#method:line). Refine inference input and rerun.",
+    });
+    steps.push({
+      phase: "verify",
+      title: "Return report",
+      instruction: "Return report with status=target_not_inferred.",
+    });
+    return steps;
   }
-  return `${breakpointHint} Line key could not be derived for strict line verification. Return report with status=line_key_required.`;
+  if (!args.requestCandidate) return steps.concat(buildMissingRequestSteps("run combined API + probe verification"));
+
+  steps.push({
+    phase: "prepare",
+    title: "Reset probe baseline",
+    instruction: `Call probe_reset with key=${args.lineTarget} before regression API execution.`,
+  });
+  steps.push(
+    buildExecuteRequestStep({
+      requestCandidate: args.requestCandidate,
+      auth: args.auth,
+      title: "Execute regression API request",
+    }),
+  );
+  steps.push({
+    phase: "verify",
+    title: "Verify API and line probe outcomes",
+    instruction:
+      `Require line_hit on ${args.lineTarget} via probe_wait_hit/probe_status and validate API regression assertions in the same run.` +
+      (args.targetFile
+        ? ` Correlate with ${args.targetFile}:${args.lineHint}.`
+        : ""),
+  });
+  return steps;
 }
 
 export function buildRecipeExecutionPlan(args: {
-  requestedMode?: "natural" | "actuated";
+  decision: RoutingDecision;
   inferredTargetKey?: string;
   targetFile?: string;
   lineHint?: number;
   requestCandidate?: RecipeCandidate;
   auth: AuthResolution;
 }): RecipeExecutionPlan {
-  const requestedMode = args.requestedMode ?? "natural";
-  const key = args.inferredTargetKey ?? "(not inferred)";
-  const request = args.requestCandidate;
-  const naturalSteps: RecipeExecutionStep[] = [];
-  const actuatedSteps: RecipeExecutionStep[] = [];
+  const lineTarget = resolveLineTarget({
+    ...(args.inferredTargetKey ? { inferredTargetKey: args.inferredTargetKey } : {}),
+    ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
+  });
 
-  if (requestedMode === "natural") {
-    if (!request) {
-      if (args.auth.status === "needs_user_input") {
-        naturalSteps.push({
-          phase: "prepare",
-          title: "Resolve authentication",
-          instruction: args.auth.nextAction,
-        });
-      }
-      naturalSteps.push({
-        phase: "prepare",
-        title: "Natural path unavailable",
-        instruction:
-          "Controller/request mapping could not be inferred for this target. Natural reproduction is currently unreachable.",
-      });
-      naturalSteps.push({
-        phase: "prepare",
-        title: "Deterministic fallback",
-        instruction:
-          key === "(not inferred)"
-            ? "actuated_mode: unavailable (missing inferred target key). Refine classHint/methodHint/lineHint."
-            : `actuated_mode: available (targetKey=${key}${typeof args.lineHint === "number" ? `:${args.lineHint}` : ""}). Use explicit actuated run only after reporting natural unavailability.`,
-      });
-      naturalSteps.push({
-        phase: "verify",
-        title: "Report limitation",
-        instruction:
-          "Return REPORT with status=unreachable_natural and ask whether to proceed with explicit actuated mode.",
-      });
-      return {
-        mode: "natural",
-        modeReason:
-          "Natural HTTP reproduction path could not be inferred from controller/OpenAPI mapping.",
-        naturalSteps,
-        actuatedSteps: [],
-      };
-    }
-
-    if (args.auth.status === "needs_user_input") {
-      naturalSteps.push({
-        phase: "prepare",
-        title: "Resolve authentication",
-        instruction: args.auth.nextAction,
-      });
-    }
-    naturalSteps.push({
-      phase: "prepare",
-      title: "Reset probe baseline",
-      instruction:
-        key === "(not inferred)"
-          ? "Probe key was not inferred; skip reset and rely on application-side logs."
-          : typeof args.lineHint === "number"
-            ? `Call probe_reset with key=${key}:${args.lineHint} before sending the request.`
-            : "Line hint is required for strict line verification; do not run probe reset/status with method-only key.",
-    });
-    naturalSteps.push({
-      phase: "execute",
-      title: "Execute natural request",
-      instruction:
-        `${request.method} ${request.fullUrlHint} (headers: ${formatAuthHeaderHint(args.auth)})` +
-        (request.bodyTemplate ? ` body: ${request.bodyTemplate}` : "") +
-        " On Windows PowerShell, use curl.exe (not curl alias) and pass payload via a file or variable to avoid quoting/alias issues.",
-    });
-    naturalSteps.push({
-      phase: "verify",
-      title: typeof args.lineHint === "number" ? "Verify line hit" : "Line verification unavailable",
-      instruction: buildLineHitInstruction({
-        ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
-        ...(args.targetFile ? { targetFile: args.targetFile } : {}),
-        ...(args.inferredTargetKey ? { inferredTargetKey: args.inferredTargetKey } : {}),
-      }),
-    });
+  if (args.decision.selectedMode === "regression_api_only") {
     return {
-      mode: "natural",
-      modeReason:
-        "Natural reproduction path is available from inferred controller/request mapping.",
-      naturalSteps,
-      actuatedSteps: [],
+      selectedMode: args.decision.selectedMode,
+      routingReason: args.decision.routingReason,
+      steps: buildRegressionApiSteps({
+        ...(args.requestCandidate ? { requestCandidate: args.requestCandidate } : {}),
+        auth: args.auth,
+      }),
     };
   }
 
-  const modeReason =
-    "Actuated mode was explicitly requested. This is non-natural execution and should be used only after natural mode is reported unreachable.";
-  if (key === "(not inferred)") {
-    actuatedSteps.push({
-      phase: "prepare",
-      title: "Refine target inference",
-      instruction:
-        "Actuation cannot be enabled because probe key was not inferred. Re-run recipe_generate with tighter classHint/methodHint/lineHint.",
-    });
-  } else {
-    const lineActuateKey = typeof args.lineHint === "number" ? `${key}:${args.lineHint}` : undefined;
-    const actuateInstruction = lineActuateKey
-      ? `Call probe_actuate with mode=actuate, targetKey=${lineActuateKey}, returnBoolean=true, actuatorId=recipe_generate_fallback to force branch-taken on conditional jumps at that line. Use returnBoolean=false to force fallthrough.`
-      : "Line hint is required for branch actuation. Return report with status=line_key_required.";
-    actuatedSteps.push({
-      phase: "prepare",
-      title: "Enable actuation mode",
-      instruction: actuateInstruction,
-    });
-    actuatedSteps.push({
-      phase: "verify",
-      title: typeof args.lineHint === "number" ? "Verify line hit after trigger" : "Line verification unavailable",
-      instruction:
-        typeof args.lineHint === "number"
-          ? `Invoke the closest reachable trigger path. Then require line_hit at line ${args.lineHint}; do not treat probe_hit alone as success.`
-          : "Line hint is required for strict line verification. Return report with status=line_key_required.",
-    });
-    actuatedSteps.push({
-      phase: "cleanup",
-      title: "Cleanup actuation",
-      instruction:
-        lineActuateKey
-          ? `Call probe_actuate with mode=observe, targetKey=${lineActuateKey} to disarm override behavior.`
-          : "Call probe_actuate with mode=observe to disarm override behavior.",
-    });
+  if (args.decision.selectedMode === "single_line_probe") {
+    return {
+      selectedMode: args.decision.selectedMode,
+      routingReason: args.decision.routingReason,
+      steps: buildSingleLineProbeSteps({
+        ...(args.requestCandidate ? { requestCandidate: args.requestCandidate } : {}),
+        auth: args.auth,
+        ...(lineTarget ? { lineTarget } : {}),
+        ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
+        ...(args.targetFile ? { targetFile: args.targetFile } : {}),
+      }),
+    };
   }
+
   return {
-    mode: "actuated",
-    modeReason,
-    naturalSteps,
-    actuatedSteps,
+    selectedMode: args.decision.selectedMode,
+    routingReason: args.decision.routingReason,
+    steps: buildCombinedSteps({
+      ...(args.requestCandidate ? { requestCandidate: args.requestCandidate } : {}),
+      auth: args.auth,
+      ...(lineTarget ? { lineTarget } : {}),
+      ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
+      ...(args.targetFile ? { targetFile: args.targetFile } : {}),
+    }),
   };
 }

@@ -83,8 +83,6 @@ export async function probeDiagnose(args: {
     "recipe.mode_reason":
       "Direct probe diagnostic output; this is a wiring check rather than request recipe inference.",
     "recipe.steps": recipeSteps,
-    "recipe.natural_steps": recipeSteps,
-    "recipe.actuated_steps": "No steps available.",
     "target.path": "mcp.jvm.diagnose#key",
     "probe.key": "mcp.jvm.diagnose#key",
     "http.request": `POST ${resetUrl} + GET ${statusUrl.toString()}`,

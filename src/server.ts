@@ -31,6 +31,7 @@ import {
   probeStatus,
   probeWaitHit,
 } from "./tools/probe";
+import { buildRoutingContext, resolveSelectedMode } from "./utils/recipe_intent_routing.util";
 
 async function main() {
   const cfg = loadConfigFromEnvAndArgs(process.argv);
@@ -300,7 +301,7 @@ async function main() {
       classHint,
       methodHint,
       lineHint,
-      mode,
+      intentMode,
       serviceHint,
       projectId,
       workspaceRoot,
@@ -310,9 +311,20 @@ async function main() {
       outputTemplate,
     }) => {
       if (!hasExplicitDiscovery && (!workspaceRoot || workspaceRoot.trim().length === 0)) {
+        const routingDecision = resolveSelectedMode(
+          buildRoutingContext({
+            intentMode,
+            ...(typeof lineHint === "number" ? { lineHint } : {}),
+          }),
+        );
         const structuredContent = {
           resultType: "report",
-          status: "unreachable_natural",
+          status: "projects_discover_required",
+          selectedMode: routingDecision.selectedMode,
+          ...(routingDecision.downgradedFrom
+            ? { downgradedFrom: routingDecision.downgradedFrom }
+            : {}),
+          ...(routingDecision.routingNote ? { routingNote: routingDecision.routingNote } : {}),
           nextAction:
             "Call projects_discover first, then rerun recipe_generate. Discovery is required before endpoint/route inference.",
           notes: [
@@ -337,7 +349,7 @@ async function main() {
         workspaceRootAbs: resolved.workspaceRootAbs,
         classHint,
         methodHint,
-        ...(mode ? { mode } : {}),
+        intentMode,
         authLoginDiscoveryEnabled: cfg.authLoginDiscoveryEnabled,
       };
       if (typeof lineHint === "number") generateArgs.lineHint = lineHint;
@@ -373,6 +385,13 @@ async function main() {
         executionPlan: generated.executionPlan,
         resultType: generated.resultType,
         status: generated.status,
+        selectedMode: generated.selectedMode,
+        ...(generated.downgradedFrom
+          ? { downgradedFrom: generated.downgradedFrom }
+          : {}),
+        lineTargetProvided: generated.lineTargetProvided,
+        probeIntentRequested: generated.probeIntentRequested,
+        ...(generated.routingNote ? { routingNote: generated.routingNote } : {}),
         ...(generated.nextAction ? { nextAction: generated.nextAction } : {}),
         auth: generated.auth,
         notes: generated.notes,
@@ -381,9 +400,15 @@ async function main() {
       const internalContent = {
         resultType: generated.resultType,
         status: generated.status,
+        selectedMode: generated.selectedMode,
+        ...(generated.downgradedFrom
+          ? { downgradedFrom: generated.downgradedFrom }
+          : {}),
+        lineTargetProvided: generated.lineTargetProvided,
+        probeIntentRequested: generated.probeIntentRequested,
+        ...(generated.routingNote ? { routingNote: generated.routingNote } : {}),
         ...(generated.nextAction ? { nextAction: generated.nextAction } : {}),
-        mode: generated.executionPlan.mode,
-        modeReason: generated.executionPlan.modeReason,
+        routingReason: generated.executionPlan.routingReason,
         inferredTarget: structuredContent.inferredTarget,
         requestCandidates: generated.requestCandidates,
         executionPlan: generated.executionPlan,

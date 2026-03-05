@@ -1,8 +1,8 @@
 Reproduction Recipe
 ===================
 
-Mode: {{recipe.mode}}
-Mode Reason:
+Selected Mode: {{recipe.mode}}
+Routing Reason:
 {{recipe.mode_reason}}
 
 Steps:
