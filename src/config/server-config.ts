@@ -8,6 +8,8 @@ export type ServerConfig = {
   workspaceRootAbs: string;
   workspaceRootSource: "arg" | "env" | "session" | "cwd";
   probeBaseUrl: string;
+  probeStatusPath: string;
+  probeResetPath: string;
   probeWaitMaxRetries: number;
   recipeOutputTemplate?: string;
   authLoginDiscoveryEnabled: boolean;
@@ -38,6 +40,18 @@ export class ServerConfigLoader {
     const probeBaseUrl =
       this.args.get("--probe-base-url") ??
       this.env(MCP_ENV.PROBE_BASE_URL);
+
+    const probeStatusPath = this.resolveProbePath(
+      this.args.get("--probe-status-path"),
+      MCP_ENV.PROBE_STATUS_PATH,
+      CONFIG_DEFAULTS.PROBE_STATUS_PATH,
+    );
+
+    const probeResetPath = this.resolveProbePath(
+      this.args.get("--probe-reset-path"),
+      MCP_ENV.PROBE_RESET_PATH,
+      CONFIG_DEFAULTS.PROBE_RESET_PATH,
+    );
 
     const recipeOutputTemplate =
       this.args.get("--recipe-output-template") ??
@@ -73,6 +87,8 @@ export class ServerConfigLoader {
       workspaceRootAbs: path.resolve(workspaceRoot),
       workspaceRootSource,
       probeBaseUrl: probeBaseUrlRequired,
+      probeStatusPath,
+      probeResetPath,
       probeWaitMaxRetries,
       authLoginDiscoveryEnabled,
       ...(recipeOutputTemplate ? { recipeOutputTemplate } : {}),
@@ -99,6 +115,30 @@ export class ServerConfigLoader {
     if (n < min) return min;
     if (n > max) return max;
     return n;
+  }
+
+  private resolveProbePath(argValue: string | undefined, envVar: McpEnvVar, defaultValue: string): string {
+    const raw = this.firstNonEmpty(argValue, this.env(envVar)) ?? defaultValue;
+    this.validateProbePath(raw, envVar);
+    return raw;
+  }
+
+  private firstNonEmpty(...values: Array<string | undefined>): string | undefined {
+    for (const value of values) {
+      if (typeof value !== "string") continue;
+      const trimmed = value.trim();
+      if (trimmed.length > 0) return trimmed;
+    }
+    return undefined;
+  }
+
+  private validateProbePath(pathValue: string, envVar: McpEnvVar): void {
+    if (!pathValue.startsWith("/")) {
+      throw new Error(
+        `Invalid ${envVar}='${pathValue}'. ` +
+          "Probe path must start with '/' (example: /__probe/status).",
+      );
+    }
   }
 
   private detectSessionWorkspaceRoot(): string | undefined {

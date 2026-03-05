@@ -50,6 +50,8 @@ codex.cmd mcp add mcp-jvm-debugger --env MCP_PROBE_BASE_URL=http://127.0.0.1:919
 
 Optional env:
 - `MCP_WORKSPACE_ROOT`
+- `MCP_PROBE_STATUS_PATH` (default `"/__probe/status"`)
+- `MCP_PROBE_RESET_PATH` (default `"/__probe/reset"`)
 
 Reinstall:
 
@@ -83,6 +85,8 @@ Example (`~/.kiro/mcp.json`):
 
 Optional env:
 - `MCP_WORKSPACE_ROOT`
+- `MCP_PROBE_STATUS_PATH` (default `"/__probe/status"`)
+- `MCP_PROBE_RESET_PATH` (default `"/__probe/reset"`)
 
 </details>
 
@@ -110,6 +114,8 @@ Required:
 
 Optional:
 - `MCP_WORKSPACE_ROOT`
+- `MCP_PROBE_STATUS_PATH` (default `"/__probe/status"`)
+- `MCP_PROBE_RESET_PATH` (default `"/__probe/reset"`)
 - `MCP_PROBE_WAIT_MAX_RETRIES` (default `1`, max `10`)
 - `MCP_AUTH_LOGIN_DISCOVERY_ENABLED` (default `true`)
 - `MCP_RECIPE_OUTPUT_TEMPLATE`
