@@ -1,0 +1,88 @@
+const assert = require("node:assert/strict");
+const test = require("node:test");
+
+const { buildRecipeExecutionPlan } = require("../../src/utils/recipe_execution_plan.util");
+
+const auth = {
+  required: "unknown",
+  status: "ok",
+  strategy: "none",
+  nextAction: "none",
+  notes: [],
+};
+
+const requestCandidate = {
+  method: "GET",
+  path: "/api/catalog/items",
+  queryTemplate: "?id=1",
+  fullUrlHint: "http://127.0.0.1:8080/api/catalog/items?id=1",
+  rationale: ["test candidate"],
+};
+
+test("regression_api_only plan does not include probe calls", () => {
+  const plan = buildRecipeExecutionPlan({
+    decision: {
+      requestedMode: "regression_api_only",
+      selectedMode: "regression_api_only",
+      lineTargetProvided: false,
+      probeIntentRequested: false,
+      routingReason: "regression only",
+    },
+    requestCandidate,
+    auth,
+  });
+
+  assert.equal(plan.selectedMode, "regression_api_only");
+  assert.equal(plan.steps.length, 2);
+  const instructions = plan.steps.map((s: any) => s.instruction).join(" ");
+  assert.equal(instructions.includes("probe_"), false);
+});
+
+test("single_line_probe enforces reset -> execute -> verify order", () => {
+  const plan = buildRecipeExecutionPlan({
+    decision: {
+      requestedMode: "single_line_probe",
+      selectedMode: "single_line_probe",
+      lineTargetProvided: true,
+      probeIntentRequested: true,
+      routingReason: "probe only",
+    },
+    requestCandidate,
+    inferredTargetKey: "com.example.Foo#bar",
+    lineHint: 42,
+    targetFile: "src/main/java/com/example/Foo.java",
+    auth,
+  });
+
+  assert.equal(plan.selectedMode, "single_line_probe");
+  assert.equal(plan.steps.length, 3);
+  assert.match(plan.steps[0].instruction, /probe_reset/);
+  assert.match(plan.steps[1].instruction, /^GET /);
+  assert.match(plan.steps[2].instruction, /probe_wait_hit/);
+  assert.match(plan.steps[2].instruction, /probe_status/);
+});
+
+test("combined mode enforces reset -> API -> verify order", () => {
+  const plan = buildRecipeExecutionPlan({
+    decision: {
+      requestedMode: "regression_plus_line_probe",
+      selectedMode: "regression_plus_line_probe",
+      lineTargetProvided: true,
+      probeIntentRequested: true,
+      routingReason: "combined",
+    },
+    requestCandidate,
+    inferredTargetKey: "com.example.Foo#bar",
+    lineHint: 21,
+    targetFile: "src/main/java/com/example/Foo.java",
+    auth,
+  });
+
+  assert.equal(plan.selectedMode, "regression_plus_line_probe");
+  assert.equal(plan.steps.length, 3);
+  assert.match(plan.steps[0].instruction, /probe_reset/);
+  assert.match(plan.steps[1].title, /Execute regression API request/);
+  assert.match(plan.steps[2].instruction, /probe_wait_hit/);
+  assert.match(plan.steps[2].instruction, /API regression assertions/);
+});
+

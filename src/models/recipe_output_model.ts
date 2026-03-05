@@ -13,33 +13,30 @@ function formatSteps(steps: RecipeExecutionStep[]): string {
 }
 
 function formatRecipeSteps(generated: GeneratedRecipe): string {
+  const selectedModeLine = `Selected mode: ${generated.selectedMode}`;
   if (generated.resultType === "report") {
     const missingInput =
       generated.auth.status === "needs_user_input"
         ? `Missing Input: ${(generated.auth.missing ?? []).join(", ") || "authToken"}`
         : "Missing Input: (none)";
     return [
-      "Natural reproduction report",
+      "Reproduction report",
+      selectedModeLine,
       `Status: ${generated.status}`,
+      generated.routingNote ? `Routing Note: ${generated.routingNote}` : "Routing Note: (none)",
       generated.nextAction ? `Next Action: ${generated.nextAction}` : "Next Action: (none)",
       missingInput,
       "",
       "Context:",
-      formatSteps(generated.executionPlan.naturalSteps),
-    ].join("\n");
-  }
-  const plan = generated.executionPlan;
-  if (plan.mode === "natural") {
-    return [
-      "Natural reproduction mode",
-      formatSteps(plan.naturalSteps),
+      formatSteps(generated.executionPlan.steps),
     ].join("\n");
   }
   return [
-    "Natural reproduction unavailable",
-    `Reason: ${plan.modeReason}`,
-    "Non-natural mode: actuated",
-    formatSteps(plan.actuatedSteps),
+    "Reproduction execution plan",
+    selectedModeLine,
+    `Routing Reason: ${generated.executionPlan.routingReason}`,
+    generated.routingNote ? `Routing Note: ${generated.routingNote}` : "Routing Note: (none)",
+    formatSteps(generated.executionPlan.steps),
   ].join("\n");
 }
 
@@ -68,12 +65,14 @@ export function buildRecipeTemplateModel(args: {
   const authLoginPath = generated.auth.loginHint?.path ?? "Not inferred";
   const authLoginBody = generated.auth.loginHint?.bodyTemplate ?? "Not inferred";
   const recipeSteps = formatRecipeSteps(generated);
-  const planMode = generated.executionPlan.mode;
-  const planReason = generated.executionPlan.modeReason;
+  const planMode = generated.executionPlan.selectedMode;
+  const planReason = generated.executionPlan.routingReason;
   const successCriterion =
-    typeof lineHint === "number"
-      ? "line_hit (probe key Class#method:line; breakpoint optional)"
-      : "line_key_required (Class#method:line)";
+    generated.selectedMode === "regression_api_only"
+      ? "api_regression_only"
+      : typeof lineHint === "number"
+        ? "line_hit (probe key Class#method:line; breakpoint optional)"
+        : "line_key_required (Class#method:line)";
 
   return {
     "target.path": inferredPath,
@@ -103,17 +102,19 @@ export function buildRecipeTemplateModel(args: {
     "recipe.mode": planMode,
     "recipe.mode_reason": planReason,
     "recipe.steps": recipeSteps,
-    "recipe.natural_steps": formatSteps(generated.executionPlan.naturalSteps),
-    "recipe.actuated_steps": formatSteps(generated.executionPlan.actuatedSteps),
     "run.duration": "Not measured",
-    "run.notes": [
-      `result_type=${generated.resultType}`,
-      `status=${generated.status}`,
-      `mode=${planMode}`,
-      `mode_reason=${planReason}`,
-      `success_criterion=${successCriterion}`,
-      ...generated.notes,
-      ...generated.auth.notes,
-    ].join(" | ") || "-",
+    "run.notes":
+      [
+        `result_type=${generated.resultType}`,
+        `status=${generated.status}`,
+        `selected_mode=${generated.selectedMode}`,
+        `routing_reason=${planReason}`,
+        generated.routingNote ? `routing_note=${generated.routingNote}` : "",
+        `success_criterion=${successCriterion}`,
+        ...generated.notes,
+        ...generated.auth.notes,
+      ]
+        .filter((s) => s.length > 0)
+        .join(" | ") || "-",
   };
 }

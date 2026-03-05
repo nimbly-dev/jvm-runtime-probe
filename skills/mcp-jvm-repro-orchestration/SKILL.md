@@ -1,100 +1,71 @@
 ---
 name: mcp-jvm-repro-orchestration
-description: "Orchestrate mcp-jvm-debugger reproducibility requests with strict natural-first behavior and explicit user-confirmed actuated fallback. Use when a user asks for a reproducible recipe/report for Class.method.line, especially when line-level reachability, auth-gated endpoints, or probe/line-hit distinctions are involved."
+description: "Orchestrate mcp-jvm-debugger reproducibility requests with deterministic intent routing across regression-only, line-probe-only, and combined runs."
 ---
 
 # MCP JVM Repro Orchestration
 
-Use this workflow for requests like:
-- "Given this token, give me reproducible recipe for X.class X.method line N"
-- "Why was this line not hit?"
-- "Try actuate mode only if needed"
+Use this workflow for reproducibility requests that mention API regression checks, line probe verification, or both.
 
-## Core Contract
+## Deterministic Routing Contract
 
-1. Treat `line_hit` as success when `lineHint` is provided.
-   - Verify with line probe key format: `Class#method:<line>`.
-2. Treat `probe_hit` as secondary telemetry only.
-3. Run natural mode first.
-4. Do not auto-switch to actuated mode.
-5. If natural is unreachable, return report and ask explicit confirmation for actuated mode.
-6. If actuated is used, always cleanup with `probe_actuate(mode=observe, ...)`.
+Classify each request into exactly one selected mode:
+
+1. `regression_api_only`
+2. `single_line_probe`
+3. `regression_plus_line_probe`
+
+Rules:
+
+1. Probe-capable modes (`single_line_probe`, `regression_plus_line_probe`) require an explicit line target (`Class#method:line` or `lineHint`).
+2. If probe intent exists but no line target is provided:
+   - downgrade to `regression_api_only`
+   - do not call `probe_reset`, `probe_status`, `probe_wait_hit`, or `probe_actuate`
+   - include exact note:
+     - `Line target missing; provide Class#method: to enable line verification.`
 
 ## Tool Sequence
 
-1. Call `projects_discover` first to establish workspace/project scope.
+1. Call `projects_discover`.
 2. Call `recipe_generate` with:
-   - `mode: "natural"`
+   - `intentMode`
    - `classHint`, `methodHint`, optional `lineHint`
-   - auth fields if available
-3. Inspect `structuredContent`:
-   - `resultType`
+   - auth fields when available
+3. Read `structuredContent`:
+   - `selectedMode`
    - `status`
-   - `nextAction`
-   - `executionPlan`
-4. Branch:
-   - If `resultType="recipe"` and `status="natural_ready"`: execute natural plan.
-   - If `resultType="report"` and `status="unreachable_natural"`: explain reason and ask user whether to proceed with actuated mode.
-5. Only after user confirmation, call `recipe_generate` again with `mode: "actuated"`.
-6. Run actuated flow:
-   - `probe_actuate(mode=actuate, targetKey=..., returnBoolean=...)`
-   - execute trigger request
-   - verify (`line_hit` preferred, probe status secondary)
-   - `probe_actuate(mode=observe, targetKey=...)`
+   - `routingNote`
+   - `executionPlan.steps`
+4. Execute steps exactly in order.
 
-## Reporting Rules
+## Mode-Specific Execution Rules
 
-1. Natural success:
-   - Return reproducible recipe.
-   - Include target endpoint, auth requirements, verification steps.
-2. Natural unreachable:
-   - Return report, not recipe.
-   - Include concrete reason from `status/nextAction`.
-   - Offer actuated second-step prompt.
-3. Actuated success:
-   - Label as non-natural reproduction.
-   - Include enable/verify/cleanup steps and exact target key.
+1. `regression_api_only`
+   - run API checks only
+   - zero probe tool calls
+2. `single_line_probe`
+   - run line verification flow:
+     - `probe_reset` -> trigger request -> `probe_wait_hit` / `probe_status`
+3. `regression_plus_line_probe`
+   - run combined flow in one execution:
+     - `probe_reset` -> API regression request -> probe verification
 
-## Required Human Response Format
+## Required Human Run Summary
 
-When reporting execution results, always include this exact set of fields in human-readable form:
+Always include these fields:
 
-1. `Mode Used`
-   - `observe` or `actuate` (and final mode after cleanup).
-2. `Target`
-   - line key used for verification (`Class#method:<line>`).
-3. `Actuation`
-   - whether armed, `targetKey`, `returnBoolean`, `actuatorId`.
-4. `Trigger Request`
-   - full method + URL.
-   - request headers that matter (especially `Authorization` presence).
-   - request body/query actually sent.
-5. `HTTP Result`
-   - status code and response payload.
-6. `Probe Verification`
-   - probe key checked.
-   - before/after or reset/after hit counts.
-   - explicit verdict: `line_hit` or `not_hit`.
-7. `Cleanup`
-   - disarm call result (`mode=observe`).
-8. `Trust Note`
-   - If mode was `actuate`, include warning:
-     - `Actuation result is synthetic; validate final reproducibility in observe mode.`
-   - If mode was `observe`, include:
-     - `Observe mode reflects natural runtime behavior.`
-
-## Required Confirmation Message
-
-Use this exact confirmation intent before actuated mode:
-
-"Natural path is unreachable for this line. Proceed with non-natural actuated mode?"
+1. `Selected Mode`
+   - one of: `regression_api_only`, `single_line_probe`, `regression_plus_line_probe`
+2. `Routing Note`
+   - explicit note or `none`
+3. `Trigger Request`
+4. `HTTP Result`
+5. `Probe Verification`
+6. `Cleanup`
+7. `Trust Note`
 
 ## Guardrails
 
-1. Do not claim line-level success from probe counters alone.
-   - Method key `Class#method` is not line-level proof; use `Class#method:<line>` for line_hit.
-2. Do not hide mode switching.
-3. Do not keep actuation armed after run completion.
-4. Keep internal handling machine-first (`structuredContent`), human output concise.
-5. Do not omit trigger request/response details in the final user-facing summary.
-6. On Windows PowerShell, always use `curl.exe` (never `curl` alias) and avoid long inline JSON/header quoting; prefer variables/files for payloads.
+1. Never run probe tools when selected mode is `regression_api_only`.
+2. Never claim line success without strict line key verification (`Class#method:line`).
+3. Keep output machine-first from `structuredContent`, with concise human summary.

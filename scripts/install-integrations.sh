@@ -17,6 +17,7 @@ Options:
   --codex-home <absPath>          Override CODEX_HOME (default: ~/.codex)
   --kiro-config <absPath>         Override Kiro MCP config path
   --kiro-skills-dir <absPath>     Override Kiro skills directory
+  --update-skill-if-exists        Replace existing installed skill folder
   --skip-skill                    Install MCP only
   --skip-mcp                      Install skill only
   --no-build                      Do not run build when dist/server.js is missing
@@ -25,7 +26,8 @@ Options:
   --help                          Show this help
 
 Behavior:
-- Idempotent: skips if Skill/MCP already installed.
+- Idempotent by default: skips if Skill/MCP already installed.
+- Use --update-skill-if-exists to replace existing installed skill folders.
 - If no args are provided, interactive mode is enabled automatically.
 EOF
 }
@@ -40,6 +42,7 @@ KIRO_CONFIG=""
 KIRO_SKILLS_DIR=""
 SKIP_SKILL=0
 SKIP_MCP=0
+UPDATE_SKILL_IF_EXISTS=0
 BUILD_IF_MISSING=1
 INTERACTIVE=0
 DRY_RUN=0
@@ -58,6 +61,7 @@ while [[ $# -gt 0 ]]; do
     --codex-home) CODEX_HOME="${2:-}"; shift 2 ;;
     --kiro-config) KIRO_CONFIG="${2:-}"; shift 2 ;;
     --kiro-skills-dir) KIRO_SKILLS_DIR="${2:-}"; shift 2 ;;
+    --update-skill-if-exists) UPDATE_SKILL_IF_EXISTS=1; shift ;;
     --skip-skill) SKIP_SKILL=1; shift ;;
     --skip-mcp) SKIP_MCP=1; shift ;;
     --no-build) BUILD_IF_MISSING=0; shift ;;
@@ -145,6 +149,7 @@ if [[ "$INTERACTIVE" -eq 1 ]]; then
   read -r -p "MCP_WORKSPACE_ROOT (optional, empty to skip): " WORKSPACE_ROOT
   if prompt_yes_no "Install Skill?" "y"; then SKIP_SKILL=0; else SKIP_SKILL=1; fi
   if prompt_yes_no "Install MCP?" "y"; then SKIP_MCP=0; else SKIP_MCP=1; fi
+  if prompt_yes_no "Update existing skill installs?" "n"; then UPDATE_SKILL_IF_EXISTS=1; fi
   if prompt_yes_no "Dry run only?" "n"; then DRY_RUN=1; fi
 fi
 
@@ -174,18 +179,44 @@ ensure_build() {
   fi
 }
 
-install_skill_if_missing() {
+replace_skill_dir() {
+  local dest_dir="$1"
+  local guard_root="$2"
+
+  if [[ -z "$dest_dir" || "$dest_dir" == "/" ]]; then
+    echo "Refusing to replace unsafe destination: '$dest_dir'" >&2
+    exit 1
+  fi
+  case "$dest_dir" in
+    "$guard_root"/*) ;;
+    *)
+      echo "Refusing to replace destination outside expected skills root: $dest_dir" >&2
+      echo "Expected root prefix: $guard_root" >&2
+      exit 1
+      ;;
+  esac
+  rm -rf "$dest_dir"
+}
+
+install_or_update_skill() {
   local source_dir="$1"
   local dest_dir="$2"
   local label="$3"
+  local guard_root="$4"
 
   if [[ ! -d "$source_dir" ]]; then
     echo "$label source not found: $source_dir" >&2
     exit 1
   fi
   if [[ -d "$dest_dir" ]]; then
-    echo "- $label: already installed, skipping ($dest_dir)"
-    return
+    if [[ "$UPDATE_SKILL_IF_EXISTS" -eq 0 ]]; then
+      echo "- $label: already installed, skipping ($dest_dir)"
+      return
+    fi
+    echo "- $label: updating existing install at $dest_dir"
+    if [[ "$DRY_RUN" -eq 0 ]]; then
+      replace_skill_dir "$dest_dir" "$guard_root"
+    fi
   fi
   echo "- $label: installing to $dest_dir"
   if [[ "$DRY_RUN" -eq 0 ]]; then
@@ -324,7 +355,7 @@ fi
 
 if [[ "$CLIENT" == "codex" || "$CLIENT" == "both" ]]; then
   if [[ "$SKIP_SKILL" -eq 0 ]]; then
-    install_skill_if_missing "$SKILL_SOURCE" "$CODEX_HOME/skills/$SKILL_NAME" "Codex skill"
+    install_or_update_skill "$SKILL_SOURCE" "$CODEX_HOME/skills/$SKILL_NAME" "Codex skill" "$CODEX_HOME/skills"
   fi
   if [[ "$SKIP_MCP" -eq 0 ]]; then
     append_codex_mcp_if_missing "$CODEX_HOME/config.toml" "$SERVER_NAME" "$SERVER_JS_PATH"
@@ -339,7 +370,7 @@ if [[ "$CLIENT" == "kiro" || "$CLIENT" == "both" ]]; then
     KIRO_CONFIG="$(detect_kiro_config_path)"
   fi
   if [[ "$SKIP_SKILL" -eq 0 ]]; then
-    install_skill_if_missing "$SKILL_SOURCE" "$KIRO_SKILLS_DIR/$SKILL_NAME" "Kiro skill"
+    install_or_update_skill "$SKILL_SOURCE" "$KIRO_SKILLS_DIR/$SKILL_NAME" "Kiro skill" "$KIRO_SKILLS_DIR"
   fi
   if [[ "$SKIP_MCP" -eq 0 ]]; then
     install_kiro_mcp_if_missing "$KIRO_CONFIG" "$SERVER_NAME" "$SERVER_JS_PATH"

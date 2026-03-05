@@ -109,8 +109,6 @@ function renderProbeRecipe(args: {
     "recipe.mode_reason":
       "Direct probe tool execution output; no request-inference planning was performed.",
     "recipe.steps": recipeSteps,
-    "recipe.natural_steps": recipeSteps,
-    "recipe.actuated_steps": "No steps available.",
     "target.path": args.targetPath,
     "probe.key": args.probeKey,
     "http.request": args.httpRequest,

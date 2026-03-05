@@ -1,3 +1,5 @@
+import type { IntentMode } from "./recipe_constants.util";
+
 export type RecipeCandidate = {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
@@ -17,8 +19,7 @@ export type RecipeExecutionStep = {
 };
 
 export type RecipeExecutionPlan = {
-  mode: "natural" | "actuated";
-  modeReason: string;
-  naturalSteps: RecipeExecutionStep[];
-  actuatedSteps: RecipeExecutionStep[];
+  selectedMode: IntentMode;
+  routingReason: string;
+  steps: RecipeExecutionStep[];
 };
