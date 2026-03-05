@@ -1,10 +1,6 @@
 export type AuthRequired = boolean | "unknown";
 
-export type AuthStatus =
-  | "not_required"
-  | "auto_resolved"
-  | "needs_user_input"
-  | "unknown";
+export type AuthStatus = "not_required" | "auto_resolved" | "needs_user_input" | "unknown";
 
 export type AuthStrategy = "none" | "bearer" | "basic" | "cookie" | "unknown";
 
@@ -25,4 +21,3 @@ export type AuthResolution = {
   source?: string;
   loginHint?: AuthLoginHint;
 };
-

@@ -126,8 +126,7 @@ function buildMissingRequestSteps(context: string): RecipeExecutionStep[] {
     {
       phase: "prepare",
       title: "Request candidate missing",
-      instruction:
-        `Cannot ${context} because request mapping is unavailable. Refine classHint/methodHint/lineHint or provide explicit request context.`,
+      instruction: `Cannot ${context} because request mapping is unavailable. Refine classHint/methodHint/lineHint or provide explicit request context.`,
     },
     {
       phase: "verify",
@@ -144,7 +143,8 @@ function buildRegressionApiSteps(args: {
   const steps: RecipeExecutionStep[] = [];
   const authStep = buildResolveAuthStep(args.auth);
   if (authStep) steps.push(authStep);
-  if (!args.requestCandidate) return steps.concat(buildMissingRequestSteps("run regression API checks"));
+  if (!args.requestCandidate)
+    return steps.concat(buildMissingRequestSteps("run regression API checks"));
 
   steps.push(
     buildExecuteRequestStep({
@@ -189,9 +189,14 @@ function buildSingleLineProbeSteps(args: {
     });
     return steps;
   }
-  if (!args.requestCandidate) return steps.concat(buildMissingRequestSteps("trigger line probe verification"));
+  if (!args.requestCandidate)
+    return steps.concat(buildMissingRequestSteps("trigger line probe verification"));
 
-  if (args.actuationEnabled && args.actuationConfigured && typeof args.actuationReturnBoolean === "boolean") {
+  if (
+    args.actuationEnabled &&
+    args.actuationConfigured &&
+    typeof args.actuationReturnBoolean === "boolean"
+  ) {
     steps.push(
       buildActuateEnableStep({
         lineTarget: args.lineTarget,
@@ -217,9 +222,7 @@ function buildSingleLineProbeSteps(args: {
     title: "Verify single-line probe hit",
     instruction:
       `Require line_hit on ${args.lineTarget} using probe_wait_hit.` +
-      (args.targetFile
-        ? ` Correlate with ${args.targetFile}:${args.lineHint}.`
-        : ""),
+      (args.targetFile ? ` Correlate with ${args.targetFile}:${args.lineHint}.` : ""),
   });
   if (args.actuationEnabled && args.actuationConfigured) {
     steps.push(
@@ -260,9 +263,14 @@ function buildCombinedSteps(args: {
     });
     return steps;
   }
-  if (!args.requestCandidate) return steps.concat(buildMissingRequestSteps("run combined API + probe verification"));
+  if (!args.requestCandidate)
+    return steps.concat(buildMissingRequestSteps("run combined API + probe verification"));
 
-  if (args.actuationEnabled && args.actuationConfigured && typeof args.actuationReturnBoolean === "boolean") {
+  if (
+    args.actuationEnabled &&
+    args.actuationConfigured &&
+    typeof args.actuationReturnBoolean === "boolean"
+  ) {
     steps.push(
       buildActuateEnableStep({
         lineTarget: args.lineTarget,
@@ -288,9 +296,7 @@ function buildCombinedSteps(args: {
     title: "Verify API and line probe outcomes",
     instruction:
       `Require line_hit on ${args.lineTarget} via probe_wait_hit and validate API regression assertions in the same run.` +
-      (args.targetFile
-        ? ` Correlate with ${args.targetFile}:${args.lineHint}.`
-        : ""),
+      (args.targetFile ? ` Correlate with ${args.targetFile}:${args.lineHint}.` : ""),
   });
   if (args.actuationEnabled && args.actuationConfigured) {
     steps.push(

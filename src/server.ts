@@ -6,9 +6,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 import { loadConfigFromEnvAndArgs } from "./config/server-config";
 import { CONFIG_DEFAULTS } from "./config/defaults";
-import {
-  renderRecipeTemplate,
-} from "./lib/recipe_template";
+import { renderRecipeTemplate } from "./lib/recipe_template";
 import { buildRecipeTemplateModel } from "./models/recipe_output_model";
 import {
   ProbeDiagnoseInputSchema,
@@ -25,12 +23,7 @@ import { discoverProjects } from "./tools/projects_discover";
 import { probeDiagnose } from "./tools/probe_diagnose";
 import { generateRecipe } from "./tools/recipe_generate";
 import { inferTargets } from "./tools/target_infer";
-import {
-  probeReset,
-  probeActuate,
-  probeStatus,
-  probeWaitHit,
-} from "./tools/probe";
+import { probeReset, probeActuate, probeStatus, probeWaitHit } from "./tools/probe";
 import { buildRoutingContext, resolveSelectedMode } from "./utils/recipe_intent_routing.util";
 
 async function main() {
@@ -51,7 +44,9 @@ async function main() {
   let lastDiscoveryRootAbs = cfg.workspaceRootAbs;
   let hasExplicitDiscovery = false;
 
-  async function ensureProjects(rootAbs: string): Promise<Awaited<ReturnType<typeof discoverProjects>>> {
+  async function ensureProjects(
+    rootAbs: string,
+  ): Promise<Awaited<ReturnType<typeof discoverProjects>>> {
     if (discoveredProjects.length === 0 || lastDiscoveryRootAbs !== rootAbs) {
       discoveredProjects = await discoverProjects(rootAbs, 100, 300);
       lastDiscoveryRootAbs = rootAbs;
@@ -112,7 +107,7 @@ async function main() {
           waitMaxRetriesDefault: cfg.probeWaitMaxRetries,
         },
         recipe: {
-          hasCustomTemplate: Boolean(cfg.recipeOutputTemplate),
+          hasCustomTemplate: false,
         },
         auth: {
           loginDiscoveryEnabled: cfg.authLoginDiscoveryEnabled,
@@ -161,7 +156,10 @@ async function main() {
       const hasWorkspaceOverride =
         typeof workspaceRoot === "string" && workspaceRoot.trim().length > 0;
       const rootAbs = path.resolve(hasWorkspaceOverride ? workspaceRoot : cfg.workspaceRootAbs);
-      const usingImplicitServerDefault = !hasWorkspaceOverride && cfg.workspaceRootSource !== "arg" && cfg.workspaceRootSource !== "env";
+      const usingImplicitServerDefault =
+        !hasWorkspaceOverride &&
+        cfg.workspaceRootSource !== "arg" &&
+        cfg.workspaceRootSource !== "env";
       if (usingImplicitServerDefault && isLikelyServerRepoRoot(rootAbs)) {
         hasExplicitDiscovery = false;
         discoveredProjects = [];
@@ -208,9 +206,7 @@ async function main() {
       lines.push("projects:");
       for (const p of discoveredProjects) {
         lines.push(`  - id=${p.id} build=${p.build} root=${p.rootAbs}`);
-        lines.push(
-          `    probeIncludeSuggested=${p.probeScope.suggestedInclude ?? "(none)"}`,
-        );
+        lines.push(`    probeIncludeSuggested=${p.probeScope.suggestedInclude ?? "(none)"}`);
       }
 
       return {
@@ -245,7 +241,15 @@ async function main() {
         "Infer likely runtime probe keys (fully.qualified.Class#method) from class/method/line hints in project code.",
       inputSchema: TargetInferInputSchema,
     },
-    async ({ classHint, methodHint, lineHint, serviceHint, projectId, workspaceRoot, maxCandidates }) => {
+    async ({
+      classHint,
+      methodHint,
+      lineHint,
+      serviceHint,
+      projectId,
+      workspaceRoot,
+      maxCandidates,
+    }) => {
       if (!hasExplicitDiscovery && (!workspaceRoot || workspaceRoot.trim().length === 0)) {
         const structuredContent = {
           resultType: "report",
@@ -375,9 +379,7 @@ async function main() {
       const hasExplicitTemplate =
         typeof outputTemplate === "string" && outputTemplate.trim().length > 0;
       const template = hasExplicitTemplate ? outputTemplate : undefined;
-      const rendered = template
-        ? renderRecipeTemplate(template, model)
-        : undefined;
+      const rendered = template ? renderRecipeTemplate(template, model) : undefined;
 
       const structuredContent = {
         workspaceRoot: resolved.workspaceRootAbs,
@@ -403,9 +405,7 @@ async function main() {
         resultType: generated.resultType,
         status: generated.status,
         selectedMode: generated.selectedMode,
-        ...(generated.downgradedFrom
-          ? { downgradedFrom: generated.downgradedFrom }
-          : {}),
+        ...(generated.downgradedFrom ? { downgradedFrom: generated.downgradedFrom } : {}),
         lineTargetProvided: generated.lineTargetProvided,
         probeIntentRequested: generated.probeIntentRequested,
         executionReadiness: generated.executionReadiness,
@@ -420,9 +420,7 @@ async function main() {
         resultType: generated.resultType,
         status: generated.status,
         selectedMode: generated.selectedMode,
-        ...(generated.downgradedFrom
-          ? { downgradedFrom: generated.downgradedFrom }
-          : {}),
+        ...(generated.downgradedFrom ? { downgradedFrom: generated.downgradedFrom } : {}),
         lineTargetProvided: generated.lineTargetProvided,
         probeIntentRequested: generated.probeIntentRequested,
         executionReadiness: generated.executionReadiness,

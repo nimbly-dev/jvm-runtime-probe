@@ -4,10 +4,7 @@ export async function fetchJson(
 ): Promise<{ status: number; json: any; text: string }> {
   const { timeoutMs, ...rest } = init;
   const controller = new AbortController();
-  const t =
-    timeoutMs && timeoutMs > 0
-      ? setTimeout(() => controller.abort(), timeoutMs)
-      : null;
+  const t = timeoutMs && timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
   try {
     const res = await fetch(url, { ...rest, signal: controller.signal });
@@ -23,4 +20,3 @@ export async function fetchJson(
     if (t) clearTimeout(t);
   }
 }
-

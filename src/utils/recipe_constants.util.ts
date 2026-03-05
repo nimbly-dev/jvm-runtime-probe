@@ -4,10 +4,7 @@ export const LINE_TARGET_MISSING_NOTE =
 export const API_REQUEST_NOT_INFERRED_NOTE =
   "No endpoint candidate could be inferred for API execution. Refine classHint/methodHint/lineHint or provide explicit request context.";
 
-export type IntentMode =
-  | "regression_api_only"
-  | "single_line_probe"
-  | "regression_plus_line_probe";
+export type IntentMode = "regression_api_only" | "single_line_probe" | "regression_plus_line_probe";
 
 export type RecipeStatus =
   | "regression_api_only_ready"

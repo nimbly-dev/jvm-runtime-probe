@@ -15,14 +15,7 @@ export type DiscoveredProject = {
   };
 };
 
-const EXCLUDED_DIRS = new Set([
-  ".git",
-  "node_modules",
-  "target",
-  "build",
-  "out",
-  ".idea",
-]);
+const EXCLUDED_DIRS = new Set([".git", "node_modules", "target", "build", "out", ".idea"]);
 
 const JAVA_SCOPE_EXCLUDED_PREFIXES = [
   "java.",
@@ -241,10 +234,7 @@ export async function discoverProjects(
   }
 
   // Prefer shorter paths first (more "top-level" projects).
-  results.sort(
-    (a, b) =>
-      a.rootAbs.split(path.sep).length - b.rootAbs.split(path.sep).length,
-  );
+  results.sort((a, b) => a.rootAbs.split(path.sep).length - b.rootAbs.split(path.sep).length);
 
   return results;
 }

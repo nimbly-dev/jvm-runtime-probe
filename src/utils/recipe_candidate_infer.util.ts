@@ -233,7 +233,10 @@ function findMethodDeclarationLine(lines: string[], methodName: string): number 
   return undefined;
 }
 
-async function findJavaTypeFile(searchRootsAbs: string[], typeName: string): Promise<string | undefined> {
+async function findJavaTypeFile(
+  searchRootsAbs: string[],
+  typeName: string,
+): Promise<string | undefined> {
   for (const rootAbs of searchRootsAbs) {
     const index = await buildJavaIndex({
       rootAbs,
@@ -353,7 +356,9 @@ function parseControllerMethodParams(text: string, callLine: number): Controller
       }
     }
 
-    const withoutAnnotations = rawParam.replace(/@[A-Za-z_][A-Za-z0-9_$.]*(?:\s*\([^)]*\))?\s*/g, "").trim();
+    const withoutAnnotations = rawParam
+      .replace(/@[A-Za-z_][A-Za-z0-9_$.]*(?:\s*\([^)]*\))?\s*/g, "")
+      .trim();
     const cleaned = withoutAnnotations
       .replace(/\bfinal\b/g, "")
       .replace(/\bvolatile\b/g, "")
@@ -408,7 +413,8 @@ function sampleBodyForType(javaType?: string): string {
     return '{"Notification_Email_Preferences":{"Email_Notifications":true}}';
   }
   if (t.includes("string")) return '"value"';
-  if (t.includes("int") || t.includes("long") || t.includes("double") || t.includes("float")) return "1";
+  if (t.includes("int") || t.includes("long") || t.includes("double") || t.includes("float"))
+    return "1";
   if (t.includes("bool")) return "true";
   return '{"example":"value"}';
 }
@@ -425,7 +431,9 @@ async function findOpenApiOperationByOperationIds(args: {
   searchRootsAbs: string[];
   operationIds: string[];
 }): Promise<{ method: RecipeCandidate["method"]; path: string } | null> {
-  const operationIdSet = new Set(args.operationIds.map((v) => normalizeOperationId(v)).filter((v) => v.length > 0));
+  const operationIdSet = new Set(
+    args.operationIds.map((v) => normalizeOperationId(v)).filter((v) => v.length > 0),
+  );
   if (operationIdSet.size === 0) return null;
 
   for (const rootAbs of args.searchRootsAbs) {
@@ -605,15 +613,23 @@ async function buildRecipeCandidate(args: {
   if (requestParamName && mappedParam?.source !== "body") {
     queryParts.push(`${requestParamName}=${sampleValueForType(requestParamType)}`);
   }
-  if (controllerMethodParams.some((p) => p.name === "page" && p.source === "query")) queryParts.push("page=0");
-  if (controllerMethodParams.some((p) => p.name === "size" && p.source === "query")) queryParts.push("size=1");
+  if (controllerMethodParams.some((p) => p.name === "page" && p.source === "query"))
+    queryParts.push("page=0");
+  if (controllerMethodParams.some((p) => p.name === "size" && p.source === "query"))
+    queryParts.push("size=1");
 
   let pathHint = endpoint;
   if (mappedParam?.source === "path") {
     const requestName = mappedParam.requestName || mappedParam.name;
     const pathParamValue = sampleValueForType(mappedParam.javaType);
-    const withRequestName = pathHint.replace(new RegExp(`\\{${escapeRegExp(requestName)}\\}`, "g"), pathParamValue);
-    pathHint = withRequestName.replace(new RegExp(`\\{${escapeRegExp(mappedParam.name)}\\}`, "g"), pathParamValue);
+    const withRequestName = pathHint.replace(
+      new RegExp(`\\{${escapeRegExp(requestName)}\\}`, "g"),
+      pathParamValue,
+    );
+    pathHint = withRequestName.replace(
+      new RegExp(`\\{${escapeRegExp(mappedParam.name)}\\}`, "g"),
+      pathParamValue,
+    );
   }
 
   const ctx = args.call.contextLines.join("\n");
@@ -635,7 +651,8 @@ async function buildRecipeCandidate(args: {
   }
 
   // Avoid emitting fake "GET /" routes; treat unresolved entrypoint as no candidate.
-  const routeResolved = Boolean(endpointMapping) || Boolean(openapiPath) || Boolean(openApiOperation);
+  const routeResolved =
+    Boolean(endpointMapping) || Boolean(openapiPath) || Boolean(openApiOperation);
   if (!routeResolved && pathHint === "/") {
     const out: { recipe?: RecipeCandidate; branchCondition?: string } = {};
     if (branchCondition) out.branchCondition = branchCondition;
@@ -679,8 +696,7 @@ async function buildRecipeCandidate(args: {
         `Inferred endpoint path: ${pathHint}`,
         ...(openApiOperation ? ["Endpoint source: OpenAPI operationId match (preferred)."] : []),
         `Inferred request param: ${
-          requestParamName ??
-          (bodyParam ? `${bodyParam.name} (request body)` : "(unknown)")
+          requestParamName ?? (bodyParam ? `${bodyParam.name} (request body)` : "(unknown)")
         }`,
         ...(branchCondition ? [`Branch condition context: ${branchCondition}`] : []),
       ],
@@ -881,8 +897,7 @@ export async function findControllerRequestCandidate(args: {
         const built = await buildRecipeCandidate({
           text,
           call: indirectCall,
-          methodNameForRationale:
-            `${chainRationale} [via ${path.basename(candidate.callerFileAbs)}]`,
+          methodNameForRationale: `${chainRationale} [via ${path.basename(candidate.callerFileAbs)}]`,
           searchRootsAbs: [rootAbs, ...args.searchRootsAbs],
         });
         if (!built.recipe) continue;
@@ -914,9 +929,7 @@ export async function findControllerRequestCandidate(args: {
         fullUrlHint: openApiFallback.path,
         ...(bodyTemplate ? { bodyTemplate } : {}),
         confidence: 0.9,
-        needsConfirmation: [
-          "Resolved via OpenAPI fallback after controller chain ambiguity.",
-        ],
+        needsConfirmation: ["Resolved via OpenAPI fallback after controller chain ambiguity."],
         rationale: [
           `Recovered endpoint from OpenAPI operationId hint(s): ${Array.from(operationIdHints).join(", ")}`,
           "Controller-to-target call chain was ambiguous in static analysis.",

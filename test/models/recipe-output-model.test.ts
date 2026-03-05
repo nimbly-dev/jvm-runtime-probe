@@ -21,7 +21,11 @@ test("recipe template model always reports selected mode", () => {
         selectedMode: "regression_api_only",
         routingReason: "regression checks",
         steps: [
-          { phase: "execute", title: "Execute regression API check", instruction: "GET /api/items" },
+          {
+            phase: "execute",
+            title: "Execute regression API check",
+            instruction: "GET /api/items",
+          },
         ],
       },
       resultType: "recipe",
@@ -44,4 +48,3 @@ test("recipe template model always reports selected mode", () => {
   assert.match(model["recipe.steps"], /Selected mode: regression_api_only/);
   assert.equal(model["run.notes"].includes("selected_mode=regression_api_only"), true);
 });
-

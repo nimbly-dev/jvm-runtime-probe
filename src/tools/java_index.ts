@@ -99,7 +99,13 @@ export async function buildJavaIndex(args: {
       if (!m) continue;
       const name = m[1];
       if (!name) continue;
-      if (name === "if" || name === "for" || name === "while" || name === "switch" || name === "catch") {
+      if (
+        name === "if" ||
+        name === "for" ||
+        name === "while" ||
+        name === "switch" ||
+        name === "catch"
+      ) {
         continue;
       }
       methods.push({

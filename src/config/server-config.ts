@@ -11,7 +11,6 @@ export type ServerConfig = {
   probeStatusPath: string;
   probeResetPath: string;
   probeWaitMaxRetries: number;
-  recipeOutputTemplate?: string;
   authLoginDiscoveryEnabled: boolean;
 };
 
@@ -28,7 +27,8 @@ export class ServerConfigLoader {
     const sessionWorkspaceRoot = this.detectSessionWorkspaceRoot();
     const cwdWorkspaceRoot = process.cwd();
 
-    const workspaceRoot = argWorkspaceRoot ?? envWorkspaceRoot ?? sessionWorkspaceRoot ?? cwdWorkspaceRoot;
+    const workspaceRoot =
+      argWorkspaceRoot ?? envWorkspaceRoot ?? sessionWorkspaceRoot ?? cwdWorkspaceRoot;
     const workspaceRootSource: ServerConfig["workspaceRootSource"] = argWorkspaceRoot
       ? "arg"
       : envWorkspaceRoot
@@ -37,9 +37,7 @@ export class ServerConfigLoader {
           ? "session"
           : "cwd";
 
-    const probeBaseUrl =
-      this.args.get("--probe-base-url") ??
-      this.env(MCP_ENV.PROBE_BASE_URL);
+    const probeBaseUrl = this.args.get("--probe-base-url") ?? this.env(MCP_ENV.PROBE_BASE_URL);
 
     const probeStatusPath = this.resolveProbePath(
       this.args.get("--probe-status-path"),
@@ -53,13 +51,8 @@ export class ServerConfigLoader {
       CONFIG_DEFAULTS.PROBE_RESET_PATH,
     );
 
-    const recipeOutputTemplate =
-      this.args.get("--recipe-output-template") ??
-      this.env(MCP_ENV.RECIPE_OUTPUT_TEMPLATE);
-
     const probeWaitMaxRetries = this.parseIntFlag(
-      this.args.get("--probe-wait-max-retries") ??
-        this.env(MCP_ENV.PROBE_WAIT_MAX_RETRIES),
+      this.args.get("--probe-wait-max-retries") ?? this.env(MCP_ENV.PROBE_WAIT_MAX_RETRIES),
       CONFIG_DEFAULTS.PROBE_WAIT_MAX_RETRIES,
       CONFIG_DEFAULTS.PROBE_WAIT_MAX_RETRIES_MIN,
       CONFIG_DEFAULTS.PROBE_WAIT_MAX_RETRIES_MAX,
@@ -91,7 +84,6 @@ export class ServerConfigLoader {
       probeResetPath,
       probeWaitMaxRetries,
       authLoginDiscoveryEnabled,
-      ...(recipeOutputTemplate ? { recipeOutputTemplate } : {}),
     };
   }
 
@@ -107,7 +99,12 @@ export class ServerConfigLoader {
     return defaultValue;
   }
 
-  private parseIntFlag(raw: string | undefined, defaultValue: number, min: number, max: number): number {
+  private parseIntFlag(
+    raw: string | undefined,
+    defaultValue: number,
+    min: number,
+    max: number,
+  ): number {
     if (typeof raw !== "string") return defaultValue;
     const parsed = Number(raw.trim());
     if (!Number.isFinite(parsed)) return defaultValue;
@@ -117,7 +114,11 @@ export class ServerConfigLoader {
     return n;
   }
 
-  private resolveProbePath(argValue: string | undefined, envVar: McpEnvVar, defaultValue: string): string {
+  private resolveProbePath(
+    argValue: string | undefined,
+    envVar: McpEnvVar,
+    defaultValue: string,
+  ): string {
     const raw = this.firstNonEmpty(argValue, this.env(envVar)) ?? defaultValue;
     this.validateProbePath(raw, envVar);
     return raw;

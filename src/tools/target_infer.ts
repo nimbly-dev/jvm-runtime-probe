@@ -19,7 +19,9 @@ function escapeRegExp(value: string): string {
 }
 
 function inferReturnsBoolean(signature: string, methodName: string): boolean {
-  const rx = new RegExp(`\\b(?:boolean|Boolean|java\\.lang\\.Boolean)\\s+${escapeRegExp(methodName)}\\s*\\(`);
+  const rx = new RegExp(
+    `\\b(?:boolean|Boolean|java\\.lang\\.Boolean)\\s+${escapeRegExp(methodName)}\\s*\\(`,
+  );
   return rx.test(signature);
 }
 
@@ -125,8 +127,7 @@ export async function inferTargets(args: {
       if (f.className) scoreArgs.className = f.className;
       const scored = scoreCandidate(scoreArgs);
       if (scored.score <= 0) continue;
-      const fqcn =
-        f.packageName && f.className ? `${f.packageName}.${f.className}` : undefined;
+      const fqcn = f.packageName && f.className ? `${f.packageName}.${f.className}` : undefined;
       const candidate: InferredTarget = {
         file: f.fileAbs,
         methodName: m.name,
