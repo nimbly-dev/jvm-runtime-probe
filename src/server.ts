@@ -308,6 +308,9 @@ async function main() {
       authToken,
       authUsername,
       authPassword,
+      actuationEnabled,
+      actuationReturnBoolean,
+      actuationActuatorId,
       outputTemplate,
     }) => {
       if (!hasExplicitDiscovery && (!workspaceRoot || workspaceRoot.trim().length === 0)) {
@@ -356,6 +359,11 @@ async function main() {
       if (authToken) generateArgs.authToken = authToken;
       if (authUsername) generateArgs.authUsername = authUsername;
       if (authPassword) generateArgs.authPassword = authPassword;
+      if (typeof actuationEnabled === "boolean") generateArgs.actuationEnabled = actuationEnabled;
+      if (typeof actuationReturnBoolean === "boolean") {
+        generateArgs.actuationReturnBoolean = actuationReturnBoolean;
+      }
+      if (actuationActuatorId) generateArgs.actuationActuatorId = actuationActuatorId;
       const generated = await generateRecipe(generateArgs);
       const modelArgs: Parameters<typeof buildRecipeTemplateModel>[0] = {
         classHint,
@@ -374,7 +382,16 @@ async function main() {
       const structuredContent = {
         workspaceRoot: resolved.workspaceRootAbs,
         projectRoot: resolved.projectRootAbs,
-        hints: { classHint, methodHint, lineHint, serviceHint, projectId },
+        hints: {
+          classHint,
+          methodHint,
+          lineHint,
+          serviceHint,
+          projectId,
+          actuationEnabled,
+          actuationReturnBoolean,
+          actuationActuatorId,
+        },
         inferredTarget: generated.inferredTarget
           ? {
               ...generated.inferredTarget,
@@ -391,6 +408,8 @@ async function main() {
           : {}),
         lineTargetProvided: generated.lineTargetProvided,
         probeIntentRequested: generated.probeIntentRequested,
+        executionReadiness: generated.executionReadiness,
+        missingInputs: generated.missingInputs,
         ...(generated.routingNote ? { routingNote: generated.routingNote } : {}),
         ...(generated.nextAction ? { nextAction: generated.nextAction } : {}),
         auth: generated.auth,
@@ -406,6 +425,8 @@ async function main() {
           : {}),
         lineTargetProvided: generated.lineTargetProvided,
         probeIntentRequested: generated.probeIntentRequested,
+        executionReadiness: generated.executionReadiness,
+        missingInputs: generated.missingInputs,
         ...(generated.routingNote ? { routingNote: generated.routingNote } : {}),
         ...(generated.nextAction ? { nextAction: generated.nextAction } : {}),
         routingReason: generated.executionPlan.routingReason,

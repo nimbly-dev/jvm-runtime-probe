@@ -7,7 +7,13 @@ import {
 } from "../utils/recipe_intent_routing.util";
 import { buildRecipeExecutionPlan } from "../utils/recipe_execution_plan.util";
 import { buildSearchRoots, findControllerRequestCandidate } from "../utils/recipe_candidate_infer.util";
-import type { RecipeCandidate, RecipeExecutionPlan } from "../utils/recipe_types.util";
+import { buildExecutionReadiness } from "../utils/execution_readiness.util";
+import type {
+  ExecutionReadiness,
+  MissingExecutionInput,
+  RecipeCandidate,
+  RecipeExecutionPlan,
+} from "../utils/recipe_types.util";
 import { resolveAuthForRecipe } from "./auth_resolve";
 import { inferTargets } from "./target_infer";
 
@@ -25,6 +31,9 @@ type NormalizedRecipeGenerateInput = {
   authToken?: string;
   authUsername?: string;
   authPassword?: string;
+  actuationEnabled: boolean;
+  actuationReturnBoolean?: boolean;
+  actuationActuatorId?: string;
   authLoginDiscoveryEnabled: boolean;
 };
 
@@ -39,6 +48,9 @@ function normalizeRecipeGenerateInput(args: {
   authToken?: string;
   authUsername?: string;
   authPassword?: string;
+  actuationEnabled?: boolean;
+  actuationReturnBoolean?: boolean;
+  actuationActuatorId?: string;
   authLoginDiscoveryEnabled: boolean;
 }): NormalizedRecipeGenerateInput {
   return {
@@ -52,6 +64,11 @@ function normalizeRecipeGenerateInput(args: {
     ...(args.authToken ? { authToken: args.authToken } : {}),
     ...(args.authUsername ? { authUsername: args.authUsername } : {}),
     ...(args.authPassword ? { authPassword: args.authPassword } : {}),
+    actuationEnabled: args.actuationEnabled === true,
+    ...(typeof args.actuationReturnBoolean === "boolean"
+      ? { actuationReturnBoolean: args.actuationReturnBoolean }
+      : {}),
+    ...(args.actuationActuatorId ? { actuationActuatorId: args.actuationActuatorId } : {}),
     authLoginDiscoveryEnabled: args.authLoginDiscoveryEnabled,
   };
 }
@@ -83,6 +100,9 @@ export async function generateRecipe(args: {
   authToken?: string;
   authUsername?: string;
   authPassword?: string;
+  actuationEnabled?: boolean;
+  actuationReturnBoolean?: boolean;
+  actuationActuatorId?: string;
   authLoginDiscoveryEnabled: boolean;
 }): Promise<{
   inferredTarget?: {
@@ -99,6 +119,8 @@ export async function generateRecipe(args: {
   downgradedFrom?: IntentMode;
   lineTargetProvided: boolean;
   probeIntentRequested: boolean;
+  executionReadiness: ExecutionReadiness;
+  missingInputs: MissingExecutionInput[];
   routingNote?: string;
   nextAction?: string;
   auth: AuthResolution;
@@ -134,10 +156,30 @@ export async function generateRecipe(args: {
     const executionPlan = buildRecipeExecutionPlan({
       decision: routingDecision,
       auth: unresolvedAuth,
+      actuationEnabled: normalized.actuationEnabled,
+      ...(typeof normalized.actuationReturnBoolean === "boolean"
+        ? { actuationReturnBoolean: normalized.actuationReturnBoolean }
+        : {}),
+      ...(normalized.actuationActuatorId
+        ? { actuationActuatorId: normalized.actuationActuatorId }
+        : {}),
       ...(typeof normalized.lineHint === "number" ? { lineHint: normalized.lineHint } : {}),
+    });
+    const readiness = buildExecutionReadiness({
+      selectedMode: routingDecision.selectedMode,
+      lineTargetProvided: routingDecision.lineTargetProvided,
+      auth: unresolvedAuth,
+      actuationEnabled: normalized.actuationEnabled,
+      ...(typeof normalized.actuationReturnBoolean === "boolean"
+        ? { actuationReturnBoolean: normalized.actuationReturnBoolean }
+        : {}),
     });
     const notes = ["No matching method candidate inferred from current hints."];
     if (routingDecision.routingNote) notes.push(routingDecision.routingNote);
+    notes.push(
+      `probe_calls_total=${executionPlan.probeCallPlan.total} by_tool=${JSON.stringify(executionPlan.probeCallPlan.byTool)}`,
+    );
+    notes.push(`execution_readiness=${readiness.executionReadiness}`);
     return {
       requestCandidates: [],
       executionPlan,
@@ -149,6 +191,8 @@ export async function generateRecipe(args: {
         : {}),
       lineTargetProvided: routingDecision.lineTargetProvided,
       probeIntentRequested: routingDecision.probeIntentRequested,
+      executionReadiness: readiness.executionReadiness,
+      missingInputs: readiness.missingInputs,
       ...(routingDecision.routingNote ? { routingNote: routingDecision.routingNote } : {}),
       nextAction:
         "Refine classHint/methodHint/lineHint and rerun recipe_generate before attempting execution.",
@@ -209,6 +253,13 @@ export async function generateRecipe(args: {
     decision: routingDecision,
     auth,
     targetFile: inferredTarget.file,
+    actuationEnabled: normalized.actuationEnabled,
+    ...(typeof normalized.actuationReturnBoolean === "boolean"
+      ? { actuationReturnBoolean: normalized.actuationReturnBoolean }
+      : {}),
+    ...(normalized.actuationActuatorId
+      ? { actuationActuatorId: normalized.actuationActuatorId }
+      : {}),
     ...(typeof normalized.lineHint === "number" ? { lineHint: normalized.lineHint } : {}),
     ...(inferredTarget.key ? { inferredTargetKey: inferredTarget.key } : {}),
     ...(bestRequest ? { requestCandidate: bestRequest } : {}),
@@ -228,6 +279,23 @@ export async function generateRecipe(args: {
     nextAction =
       `Missing input: ${(auth.missing ?? ["authToken"]).join(", ")}. ` +
       "Provide missing auth inputs and execute the generated request steps.";
+  }
+  const readiness = buildExecutionReadiness({
+    selectedMode: routingDecision.selectedMode,
+    lineTargetProvided: routingDecision.lineTargetProvided,
+    auth,
+    actuationEnabled: normalized.actuationEnabled,
+    ...(typeof normalized.actuationReturnBoolean === "boolean"
+      ? { actuationReturnBoolean: normalized.actuationReturnBoolean }
+      : {}),
+    ...(bestRequest ? { requestCandidate: bestRequest } : {}),
+  });
+  if (readiness.executionReadiness === "needs_user_input") {
+    resultType = "report";
+    if (status !== "api_request_not_inferred") {
+      status = "execution_input_required";
+    }
+    if (!nextAction && readiness.nextAction) nextAction = readiness.nextAction;
   }
 
   const runNotes: string[] = [];
@@ -260,6 +328,10 @@ export async function generateRecipe(args: {
       `Missing input: ${(auth.missing ?? ["authToken"]).join(", ")}. Use the generated request skeleton after providing these values.`,
     );
   }
+  runNotes.push(
+    `probe_calls_total=${executionPlan.probeCallPlan.total} by_tool=${JSON.stringify(executionPlan.probeCallPlan.byTool)}`,
+  );
+  runNotes.push(`execution_readiness=${readiness.executionReadiness}`);
 
   return {
     inferredTarget,
@@ -273,6 +345,8 @@ export async function generateRecipe(args: {
       : {}),
     lineTargetProvided: routingDecision.lineTargetProvided,
     probeIntentRequested: routingDecision.probeIntentRequested,
+    executionReadiness: readiness.executionReadiness,
+    missingInputs: readiness.missingInputs,
     ...(routingDecision.routingNote ? { routingNote: routingDecision.routingNote } : {}),
     ...(nextAction ? { nextAction } : {}),
     auth,

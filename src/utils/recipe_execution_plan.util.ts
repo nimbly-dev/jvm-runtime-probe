@@ -2,6 +2,7 @@ import type { AuthResolution } from "../models/auth_resolution.model";
 import type { RoutingDecision } from "./recipe_intent_routing.util";
 import { redactSecret } from "./redaction.util";
 import type {
+  ProbeCallPlan,
   RecipeCandidate,
   RecipeExecutionPlan,
   RecipeExecutionStep,
@@ -47,6 +48,76 @@ function buildExecuteRequestStep(args: {
       `${request.method} ${request.fullUrlHint} (headers: ${formatAuthHeaderHint(args.auth)})` +
       (request.bodyTemplate ? ` body: ${request.bodyTemplate}` : "") +
       " On Windows PowerShell, use curl.exe (not curl alias) and pass payload via a file or variable to avoid quoting issues.",
+  };
+}
+
+function buildProbeCallPlan(args: {
+  selectedMode: RoutingDecision["selectedMode"];
+  hasLineTarget: boolean;
+  hasRequestCandidate: boolean;
+  actuationEnabled: boolean;
+  actuationConfigured: boolean;
+}): ProbeCallPlan {
+  const out: ProbeCallPlan = {
+    total: 0,
+    verificationMethod: "probe_wait_hit",
+    actuated: false,
+    byTool: {
+      probe_reset: 0,
+      probe_wait_hit: 0,
+      probe_status: 0,
+      probe_actuate: 0,
+    },
+  };
+
+  const shouldRunProbeFlow =
+    (args.selectedMode === "single_line_probe" ||
+      args.selectedMode === "regression_plus_line_probe") &&
+    args.hasLineTarget &&
+    args.hasRequestCandidate;
+  if (!shouldRunProbeFlow) return out;
+
+  out.byTool.probe_reset = 1;
+  out.byTool.probe_wait_hit = 1;
+  if (args.actuationEnabled && args.actuationConfigured) {
+    out.byTool.probe_actuate = 2;
+    out.actuated = true;
+  }
+
+  out.total =
+    out.byTool.probe_reset +
+    out.byTool.probe_wait_hit +
+    out.byTool.probe_status +
+    out.byTool.probe_actuate;
+  return out;
+}
+
+function buildActuateEnableStep(args: {
+  lineTarget: string;
+  returnBoolean: boolean;
+  actuatorId?: string;
+}): RecipeExecutionStep {
+  return {
+    phase: "prepare",
+    title: "Enable branch actuation",
+    instruction:
+      `Call probe_actuate with mode=actuate targetKey=${args.lineTarget} returnBoolean=${args.returnBoolean}` +
+      (args.actuatorId ? ` actuatorId=${args.actuatorId}` : "") +
+      ".",
+  };
+}
+
+function buildActuateDisableStep(args: {
+  lineTarget: string;
+  actuatorId?: string;
+}): RecipeExecutionStep {
+  return {
+    phase: "cleanup",
+    title: "Disable branch actuation",
+    instruction:
+      `Call probe_actuate with mode=observe targetKey=${args.lineTarget}` +
+      (args.actuatorId ? ` actuatorId=${args.actuatorId}` : "") +
+      " to clean up synthetic forcing.",
   };
 }
 
@@ -96,6 +167,10 @@ function buildSingleLineProbeSteps(args: {
   lineTarget?: string;
   lineHint?: number;
   targetFile?: string;
+  actuationEnabled: boolean;
+  actuationConfigured: boolean;
+  actuationReturnBoolean?: boolean;
+  actuationActuatorId?: string;
 }): RecipeExecutionStep[] {
   const steps: RecipeExecutionStep[] = [];
   const authStep = buildResolveAuthStep(args.auth);
@@ -116,6 +191,15 @@ function buildSingleLineProbeSteps(args: {
   }
   if (!args.requestCandidate) return steps.concat(buildMissingRequestSteps("trigger line probe verification"));
 
+  if (args.actuationEnabled && args.actuationConfigured && typeof args.actuationReturnBoolean === "boolean") {
+    steps.push(
+      buildActuateEnableStep({
+        lineTarget: args.lineTarget,
+        returnBoolean: args.actuationReturnBoolean,
+        ...(args.actuationActuatorId ? { actuatorId: args.actuationActuatorId } : {}),
+      }),
+    );
+  }
   steps.push({
     phase: "prepare",
     title: "Reset probe baseline",
@@ -132,11 +216,19 @@ function buildSingleLineProbeSteps(args: {
     phase: "verify",
     title: "Verify single-line probe hit",
     instruction:
-      `Require line_hit on ${args.lineTarget} using probe_wait_hit and confirm with probe_status.` +
+      `Require line_hit on ${args.lineTarget} using probe_wait_hit.` +
       (args.targetFile
         ? ` Correlate with ${args.targetFile}:${args.lineHint}.`
         : ""),
   });
+  if (args.actuationEnabled && args.actuationConfigured) {
+    steps.push(
+      buildActuateDisableStep({
+        lineTarget: args.lineTarget,
+        ...(args.actuationActuatorId ? { actuatorId: args.actuationActuatorId } : {}),
+      }),
+    );
+  }
   return steps;
 }
 
@@ -146,6 +238,10 @@ function buildCombinedSteps(args: {
   lineTarget?: string;
   lineHint?: number;
   targetFile?: string;
+  actuationEnabled: boolean;
+  actuationConfigured: boolean;
+  actuationReturnBoolean?: boolean;
+  actuationActuatorId?: string;
 }): RecipeExecutionStep[] {
   const steps: RecipeExecutionStep[] = [];
   const authStep = buildResolveAuthStep(args.auth);
@@ -166,6 +262,15 @@ function buildCombinedSteps(args: {
   }
   if (!args.requestCandidate) return steps.concat(buildMissingRequestSteps("run combined API + probe verification"));
 
+  if (args.actuationEnabled && args.actuationConfigured && typeof args.actuationReturnBoolean === "boolean") {
+    steps.push(
+      buildActuateEnableStep({
+        lineTarget: args.lineTarget,
+        returnBoolean: args.actuationReturnBoolean,
+        ...(args.actuationActuatorId ? { actuatorId: args.actuationActuatorId } : {}),
+      }),
+    );
+  }
   steps.push({
     phase: "prepare",
     title: "Reset probe baseline",
@@ -182,11 +287,19 @@ function buildCombinedSteps(args: {
     phase: "verify",
     title: "Verify API and line probe outcomes",
     instruction:
-      `Require line_hit on ${args.lineTarget} via probe_wait_hit/probe_status and validate API regression assertions in the same run.` +
+      `Require line_hit on ${args.lineTarget} via probe_wait_hit and validate API regression assertions in the same run.` +
       (args.targetFile
         ? ` Correlate with ${args.targetFile}:${args.lineHint}.`
         : ""),
   });
+  if (args.actuationEnabled && args.actuationConfigured) {
+    steps.push(
+      buildActuateDisableStep({
+        lineTarget: args.lineTarget,
+        ...(args.actuationActuatorId ? { actuatorId: args.actuationActuatorId } : {}),
+      }),
+    );
+  }
   return steps;
 }
 
@@ -197,11 +310,16 @@ export function buildRecipeExecutionPlan(args: {
   lineHint?: number;
   requestCandidate?: RecipeCandidate;
   auth: AuthResolution;
+  actuationEnabled?: boolean;
+  actuationReturnBoolean?: boolean;
+  actuationActuatorId?: string;
 }): RecipeExecutionPlan {
   const lineTarget = resolveLineTarget({
     ...(args.inferredTargetKey ? { inferredTargetKey: args.inferredTargetKey } : {}),
     ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
   });
+  const actuationEnabled = args.actuationEnabled === true;
+  const actuationConfigured = actuationEnabled && typeof args.actuationReturnBoolean === "boolean";
 
   if (args.decision.selectedMode === "regression_api_only") {
     return {
@@ -210,6 +328,13 @@ export function buildRecipeExecutionPlan(args: {
       steps: buildRegressionApiSteps({
         ...(args.requestCandidate ? { requestCandidate: args.requestCandidate } : {}),
         auth: args.auth,
+      }),
+      probeCallPlan: buildProbeCallPlan({
+        selectedMode: args.decision.selectedMode,
+        hasLineTarget: Boolean(lineTarget),
+        hasRequestCandidate: Boolean(args.requestCandidate),
+        actuationEnabled,
+        actuationConfigured,
       }),
     };
   }
@@ -224,6 +349,19 @@ export function buildRecipeExecutionPlan(args: {
         ...(lineTarget ? { lineTarget } : {}),
         ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
         ...(args.targetFile ? { targetFile: args.targetFile } : {}),
+        actuationEnabled,
+        actuationConfigured,
+        ...(typeof args.actuationReturnBoolean === "boolean"
+          ? { actuationReturnBoolean: args.actuationReturnBoolean }
+          : {}),
+        ...(args.actuationActuatorId ? { actuationActuatorId: args.actuationActuatorId } : {}),
+      }),
+      probeCallPlan: buildProbeCallPlan({
+        selectedMode: args.decision.selectedMode,
+        hasLineTarget: Boolean(lineTarget),
+        hasRequestCandidate: Boolean(args.requestCandidate),
+        actuationEnabled,
+        actuationConfigured,
       }),
     };
   }
@@ -237,6 +375,19 @@ export function buildRecipeExecutionPlan(args: {
       ...(lineTarget ? { lineTarget } : {}),
       ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
       ...(args.targetFile ? { targetFile: args.targetFile } : {}),
+      actuationEnabled,
+      actuationConfigured,
+      ...(typeof args.actuationReturnBoolean === "boolean"
+        ? { actuationReturnBoolean: args.actuationReturnBoolean }
+        : {}),
+      ...(args.actuationActuatorId ? { actuationActuatorId: args.actuationActuatorId } : {}),
+    }),
+    probeCallPlan: buildProbeCallPlan({
+      selectedMode: args.decision.selectedMode,
+      hasLineTarget: Boolean(lineTarget),
+      hasRequestCandidate: Boolean(args.requestCandidate),
+      actuationEnabled,
+      actuationConfigured,
     }),
   };
 }

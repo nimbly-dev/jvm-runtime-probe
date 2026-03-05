@@ -14,5 +14,6 @@ export type RecipeStatus =
   | "single_line_probe_ready"
   | "regression_plus_line_probe_ready"
   | "regression_api_only_downgraded_line_target_missing"
+  | "execution_input_required"
   | "api_request_not_inferred"
   | "target_not_inferred";

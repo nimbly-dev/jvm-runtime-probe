@@ -18,8 +18,30 @@ export type RecipeExecutionStep = {
   instruction: string;
 };
 
+export type ProbeCallPlan = {
+  total: number;
+  verificationMethod: "probe_wait_hit";
+  actuated: boolean;
+  byTool: {
+    probe_reset: number;
+    probe_wait_hit: number;
+    probe_status: number;
+    probe_actuate: number;
+  };
+};
+
+export type MissingExecutionInput = {
+  category: "auth" | "request" | "probe" | "actuation" | "confirmation";
+  field: string;
+  reason: string;
+  suggestedAction: string;
+};
+
+export type ExecutionReadiness = "ready" | "needs_user_input";
+
 export type RecipeExecutionPlan = {
   selectedMode: IntentMode;
   routingReason: string;
   steps: RecipeExecutionStep[];
+  probeCallPlan: ProbeCallPlan;
 };

@@ -22,6 +22,18 @@ export const RecipeGenerateInputSchema = {
     .string()
     .optional()
     .describe("Optional auth password for login discovery flows."),
+  actuationEnabled: z
+    .boolean()
+    .optional()
+    .describe("Optional flag to emit probe_actuate enable/disable steps around probe verification."),
+  actuationReturnBoolean: z
+    .boolean()
+    .optional()
+    .describe("Optional branch decision for actuated mode. Required when actuationEnabled=true."),
+  actuationActuatorId: z
+    .string()
+    .optional()
+    .describe("Optional actuator identifier to correlate enable/disable actuation calls."),
   outputTemplate: z
     .string()
     .optional()

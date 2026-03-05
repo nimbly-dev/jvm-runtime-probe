@@ -36,6 +36,17 @@ test("regression_api_only plan does not include probe calls", () => {
   assert.equal(plan.steps.length, 2);
   const instructions = plan.steps.map((s: any) => s.instruction).join(" ");
   assert.equal(instructions.includes("probe_"), false);
+  assert.deepEqual(plan.probeCallPlan, {
+    total: 0,
+    verificationMethod: "probe_wait_hit",
+    actuated: false,
+    byTool: {
+      probe_reset: 0,
+      probe_wait_hit: 0,
+      probe_status: 0,
+      probe_actuate: 0,
+    },
+  });
 });
 
 test("single_line_probe enforces reset -> execute -> verify order", () => {
@@ -59,7 +70,18 @@ test("single_line_probe enforces reset -> execute -> verify order", () => {
   assert.match(plan.steps[0].instruction, /probe_reset/);
   assert.match(plan.steps[1].instruction, /^GET /);
   assert.match(plan.steps[2].instruction, /probe_wait_hit/);
-  assert.match(plan.steps[2].instruction, /probe_status/);
+  assert.doesNotMatch(plan.steps[2].instruction, /probe_status/);
+  assert.deepEqual(plan.probeCallPlan, {
+    total: 2,
+    verificationMethod: "probe_wait_hit",
+    actuated: false,
+    byTool: {
+      probe_reset: 1,
+      probe_wait_hit: 1,
+      probe_status: 0,
+      probe_actuate: 0,
+    },
+  });
 });
 
 test("combined mode enforces reset -> API -> verify order", () => {
@@ -83,6 +105,58 @@ test("combined mode enforces reset -> API -> verify order", () => {
   assert.match(plan.steps[0].instruction, /probe_reset/);
   assert.match(plan.steps[1].title, /Execute regression API request/);
   assert.match(plan.steps[2].instruction, /probe_wait_hit/);
+  assert.doesNotMatch(plan.steps[2].instruction, /probe_status/);
   assert.match(plan.steps[2].instruction, /API regression assertions/);
+  assert.deepEqual(plan.probeCallPlan, {
+    total: 2,
+    verificationMethod: "probe_wait_hit",
+    actuated: false,
+    byTool: {
+      probe_reset: 1,
+      probe_wait_hit: 1,
+      probe_status: 0,
+      probe_actuate: 0,
+    },
+  });
+});
+
+test("single_line_probe actuated mode adds enable and disable cleanup calls", () => {
+  const plan = buildRecipeExecutionPlan({
+    decision: {
+      requestedMode: "single_line_probe",
+      selectedMode: "single_line_probe",
+      lineTargetProvided: true,
+      probeIntentRequested: true,
+      routingReason: "probe only",
+    },
+    requestCandidate,
+    inferredTargetKey: "com.example.Foo#bar",
+    lineHint: 42,
+    targetFile: "src/main/java/com/example/Foo.java",
+    actuationEnabled: true,
+    actuationReturnBoolean: true,
+    actuationActuatorId: "actuator-1",
+    auth,
+  });
+
+  assert.equal(plan.steps.length, 5);
+  assert.match(plan.steps[0].instruction, /probe_actuate/);
+  assert.match(plan.steps[1].instruction, /probe_reset/);
+  assert.match(plan.steps[2].instruction, /^GET /);
+  assert.match(plan.steps[3].instruction, /probe_wait_hit/);
+  assert.equal(plan.steps[4].phase, "cleanup");
+  assert.match(plan.steps[4].instruction, /probe_actuate/);
+  assert.match(plan.steps[4].instruction, /mode=observe/);
+  assert.deepEqual(plan.probeCallPlan, {
+    total: 4,
+    verificationMethod: "probe_wait_hit",
+    actuated: true,
+    byTool: {
+      probe_reset: 1,
+      probe_wait_hit: 1,
+      probe_status: 0,
+      probe_actuate: 2,
+    },
+  });
 });
 
