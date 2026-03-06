@@ -46,9 +46,17 @@ Rules:
 2. `single_line_probe`
    - run line verification flow:
      - `probe_reset` -> trigger request -> `probe_wait_hit` / `probe_status`
+   - if verifying multiple line targets in one run:
+     - prefer one `probe_reset` call with `keys[]` before trigger execution
+     - prefer one `probe_status` call with `keys[]` after trigger execution
+   - if setup/reset should target all known lines for one class:
+     - use `probe_reset` with `className`
 3. `regression_plus_line_probe`
    - run combined flow in one execution:
      - `probe_reset` -> API regression request -> probe verification
+   - for multi-target verification in combined mode:
+     - batch reset targets with `probe_reset(keys[])`
+     - batch verify targets with `probe_status(keys[])`
 
 ## Required Human Run Summary
 

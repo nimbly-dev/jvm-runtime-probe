@@ -848,15 +848,16 @@ async function main() {
     "probe_status",
     {
       description:
-        "Query line-level probe status for a key (fully.qualified.Class#method:line). Method-only keys are rejected in strict line mode.",
+        "Query line-level probe status for one key (`key`) or many keys (`keys`). Keys must be fully.qualified.Class#method:line in strict line mode.",
       inputSchema: ProbeStatusInputSchema,
     },
-    async ({ key, lineHint, baseUrl, timeoutMs }) => {
+    async ({ key, keys, lineHint, baseUrl, timeoutMs }) => {
       const args: Parameters<typeof probeStatus>[0] = {
-        key,
         baseUrl: baseUrl ?? cfg.probeBaseUrl,
         statusPath: PROBE_STATUS_PATH,
       };
+      if (typeof key === "string") args.key = key;
+      if (Array.isArray(keys)) args.keys = keys;
       if (typeof lineHint === "number") args.lineHint = lineHint;
       if (typeof timeoutMs !== "undefined") args.timeoutMs = timeoutMs;
       return await probeStatus(args);
@@ -867,15 +868,17 @@ async function main() {
     "probe_reset",
     {
       description:
-        "Reset probe counter/state for a line-level key (fully.qualified.Class#method:line). Method-only keys are rejected in strict line mode.",
+        "Reset probe counter/state for one key (`key`), many keys (`keys`), or all known line keys for a class (`className`).",
       inputSchema: ProbeResetInputSchema,
     },
-    async ({ key, lineHint, baseUrl, timeoutMs }) => {
+    async ({ key, keys, className, lineHint, baseUrl, timeoutMs }) => {
       const args: Parameters<typeof probeReset>[0] = {
-        key,
         baseUrl: baseUrl ?? cfg.probeBaseUrl,
         resetPath: PROBE_RESET_PATH,
       };
+      if (typeof key === "string") args.key = key;
+      if (Array.isArray(keys)) args.keys = keys;
+      if (typeof className === "string") args.className = className;
       if (typeof lineHint === "number") args.lineHint = lineHint;
       if (typeof timeoutMs !== "undefined") args.timeoutMs = timeoutMs;
       return await probeReset(args);

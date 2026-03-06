@@ -1,6 +1,10 @@
 package com.nimbly.mcpjvmdebugger.agent;
 
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -127,6 +131,22 @@ public final class ProbeRuntime {
     LAST_HIT_EPOCH_MS.computeIfAbsent(key, k -> new AtomicLong()).set(0L);
   }
 
+  static List<String> lineKeysForClass(String dottedClassName) {
+    if (dottedClassName == null || dottedClassName.isBlank()) return Collections.emptyList();
+    String classPrefix = dottedClassName.trim() + "#";
+    List<String> out = new ArrayList<>();
+    for (Map.Entry<String, LineTable> entry : RESOLVABLE_LINES_BY_METHOD.entrySet()) {
+      String methodKey = entry.getKey();
+      if (!methodKey.startsWith(classPrefix)) continue;
+      int[] lines = entry.getValue().snapshot();
+      for (int line : lines) {
+        out.add(methodKey + ":" + line);
+      }
+    }
+    Collections.sort(out);
+    return out;
+  }
+
   private static ParsedLineKey parseLineKey(String key) {
     if (key == null || key.isBlank()) return null;
     int hash = key.lastIndexOf('#');
@@ -171,6 +191,10 @@ public final class ProbeRuntime {
 
     boolean contains(int line) {
       return Arrays.binarySearch(lines, line) >= 0;
+    }
+
+    int[] snapshot() {
+      return Arrays.copyOf(lines, lines.length);
     }
   }
 }

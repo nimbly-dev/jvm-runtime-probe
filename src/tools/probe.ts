@@ -82,7 +82,75 @@ function invalidLineTargetProbeHitMessage(hitCount: number): string {
   );
 }
 
-export async function probeStatus(args: {
+function normalizeOptionalString(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed && trimmed.length > 0 ? trimmed : undefined;
+}
+
+function normalizeOptionalStringArray(values: string[] | undefined): string[] | undefined {
+  if (!Array.isArray(values)) return undefined;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of values) {
+    if (typeof raw !== "string") continue;
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    if (seen.has(trimmed)) continue;
+    seen.add(trimmed);
+    out.push(trimmed);
+  }
+  return out.length > 0 ? out : undefined;
+}
+
+function validateSelectorCount(
+  selectorName: "probe_status" | "probe_reset",
+  selectors: Array<{ enabled: boolean; name: string }>,
+): void {
+  const active = selectors.filter((s) => s.enabled).map((s) => s.name);
+  if (active.length === 1) return;
+  if (active.length === 0) {
+    throw new Error(
+      `${selectorName} requires exactly one selector: ` +
+        (selectorName === "probe_status" ? "`key` or `keys`." : "`key`, `keys`, or `className`."),
+    );
+  }
+  throw new Error(
+    `${selectorName} received conflicting selectors (${active.join(", ")}). ` +
+      "Provide exactly one selector.",
+  );
+}
+
+function buildBatchSummary(results: Array<{ apiOutcome: string }>): {
+  total: number;
+  ok: number;
+  failed: number;
+} {
+  let ok = 0;
+  for (const result of results) {
+    if (result.apiOutcome === "ok") ok += 1;
+  }
+  return { total: results.length, ok, failed: results.length - ok };
+}
+
+function buildBatchResponse(args: {
+  operation: "status" | "reset";
+  request: Record<string, unknown>;
+  results: Array<Record<string, unknown> & { apiOutcome: string }>;
+  response?: unknown;
+}): ToolTextResponse {
+  const summary = buildBatchSummary(args.results);
+  const payload = {
+    mode: "probe_batch",
+    operation: args.operation,
+    request: args.request,
+    summary,
+    results: args.results,
+    ...(typeof args.response !== "undefined" ? { response: args.response } : {}),
+  };
+  return buildTextResponse(payload, JSON.stringify(payload, null, 2));
+}
+
+async function probeStatusSingle(args: {
   key: string;
   lineHint?: number;
   baseUrl: string;
@@ -164,7 +232,153 @@ export async function probeStatus(args: {
   return buildTextResponse(structuredContent, text);
 }
 
-export async function probeReset(args: {
+async function probeStatusBatch(args: {
+  keys: string[];
+  baseUrl: string;
+  statusPath: string;
+  timeoutMs?: number;
+}): Promise<ToolTextResponse> {
+  const timeoutMs = clampInt(
+    args.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS,
+    1_000,
+    HARD_MAX_PROBE_TIMEOUT_MS,
+  );
+  const url = joinUrl(args.baseUrl, args.statusPath);
+  const keys = normalizeOptionalStringArray(args.keys) ?? [];
+
+  const localByKey = new Map<string, Record<string, unknown> & { apiOutcome: string }>();
+  const lineKeys: string[] = [];
+  for (const key of keys) {
+    if (!isLineKey(key)) {
+      localByKey.set(key, {
+        key,
+        executionHit: "not_hit",
+        apiOutcome: "error",
+        reproStatus: "line_key_required",
+        probeHit: "line probe key required (Class#method:<line>); method-only checks disabled",
+        httpCode: 400,
+        httpResponse: { hit: false, reason: "line_key_required" },
+      });
+      continue;
+    }
+    lineKeys.push(key);
+  }
+
+  let remoteResponse: { status: number; json: unknown; text: string | null } | undefined;
+  const remoteByKey = new Map<string, Record<string, unknown>>();
+  if (lineKeys.length > 0) {
+    try {
+      remoteResponse = await fetchJson(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ keys: lineKeys }),
+        timeoutMs,
+      });
+    } catch (err) {
+      throw new Error(probeUnreachableMessage(url, err));
+    }
+    const rawJson = remoteResponse.json as Record<string, unknown> | null;
+    const rawResults = Array.isArray(rawJson?.results)
+      ? (rawJson.results as Array<Record<string, unknown>>)
+      : [];
+    for (const row of rawResults) {
+      if (typeof row?.key !== "string") continue;
+      remoteByKey.set(row.key, row);
+    }
+  }
+
+  for (const key of lineKeys) {
+    const row = remoteByKey.get(key);
+    if (!row) {
+      localByKey.set(key, {
+        key,
+        executionHit: "not_hit",
+        apiOutcome: "error",
+        reproStatus: "status_failed",
+        probeHit: "missing batch status row for key",
+        httpCode: remoteResponse?.status ?? 500,
+        httpResponse: remoteResponse?.json ?? remoteResponse?.text ?? null,
+      });
+      continue;
+    }
+    const hitCount = typeof row.hitCount === "number" ? row.hitCount : 0;
+    const lineValidation = readLineValidation(row);
+    localByKey.set(key, {
+      key,
+      executionHit: lineValidation.invalidLineTarget
+        ? "not_hit"
+        : classifyExecutionHitStrictLine(key, hitCount > 0),
+      apiOutcome:
+        typeof row.ok === "boolean"
+          ? row.ok
+            ? "ok"
+            : "error"
+          : remoteResponse && remoteResponse.status >= 200 && remoteResponse.status < 300
+            ? "ok"
+            : "error",
+      reproStatus: lineValidation.invalidLineTarget ? "invalid_line_target" : "status_checked",
+      probeHit: lineValidation.invalidLineTarget
+        ? invalidLineTargetProbeHitMessage(hitCount)
+        : `hitCount=${hitCount}, lastHitEpochMs=${typeof row.lastHitEpochMs === "number" ? row.lastHitEpochMs : 0}`,
+      httpCode: remoteResponse?.status ?? 200,
+      httpResponse: row,
+      runtimeMode: typeof row.mode === "string" ? row.mode : undefined,
+    });
+  }
+  const orderedResults: Array<Record<string, unknown> & { apiOutcome: string }> = [];
+  for (const key of keys) {
+    const row = localByKey.get(key);
+    if (!row) continue;
+    orderedResults.push(row);
+  }
+
+  return buildBatchResponse({
+    operation: "status",
+    request: { keys, url, timeoutMs },
+    results: orderedResults,
+    response: remoteResponse
+      ? { status: remoteResponse.status, json: remoteResponse.json, text: remoteResponse.text }
+      : undefined,
+  });
+}
+
+export async function probeStatus(args: {
+  key?: string;
+  keys?: string[];
+  lineHint?: number;
+  baseUrl: string;
+  statusPath: string;
+  timeoutMs?: number;
+}): Promise<ToolTextResponse> {
+  const key = normalizeOptionalString(args.key);
+  const keys = normalizeOptionalStringArray(args.keys);
+  validateSelectorCount("probe_status", [
+    { enabled: typeof key === "string", name: "key" },
+    { enabled: Array.isArray(keys), name: "keys" },
+  ]);
+  if (keys) {
+    if (typeof args.lineHint === "number") {
+      throw new Error("probe_status does not allow lineHint with keys[]. Use explicit line keys.");
+    }
+    const batchArgs: Parameters<typeof probeStatusBatch>[0] = {
+      keys,
+      baseUrl: args.baseUrl,
+      statusPath: args.statusPath,
+    };
+    if (typeof args.timeoutMs === "number") batchArgs.timeoutMs = args.timeoutMs;
+    return probeStatusBatch(batchArgs);
+  }
+  const singleArgs: Parameters<typeof probeStatusSingle>[0] = {
+    key: key!,
+    baseUrl: args.baseUrl,
+    statusPath: args.statusPath,
+  };
+  if (typeof args.lineHint === "number") singleArgs.lineHint = args.lineHint;
+  if (typeof args.timeoutMs === "number") singleArgs.timeoutMs = args.timeoutMs;
+  return probeStatusSingle(singleArgs);
+}
+
+async function probeResetSingle(args: {
   key: string;
   lineHint?: number;
   baseUrl: string;
@@ -243,6 +457,177 @@ export async function probeReset(args: {
   });
 
   return buildTextResponse(structuredContent, text);
+}
+
+async function probeResetBatch(args: {
+  keys?: string[];
+  className?: string;
+  baseUrl: string;
+  resetPath: string;
+  timeoutMs?: number;
+}): Promise<ToolTextResponse> {
+  const timeoutMs = clampInt(
+    args.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS,
+    1_000,
+    HARD_MAX_PROBE_TIMEOUT_MS,
+  );
+  const url = joinUrl(args.baseUrl, args.resetPath);
+  const keys = normalizeOptionalStringArray(args.keys);
+  const className = normalizeOptionalString(args.className);
+  const requestedKeys = keys ? [...keys] : undefined;
+  let requestedLineKeys: string[] = [];
+
+  let requestBody: Record<string, unknown>;
+  const localByKey = new Map<string, Record<string, unknown> & { apiOutcome: string }>();
+
+  if (keys) {
+    const lineKeys: string[] = [];
+    for (const key of keys) {
+      if (!isLineKey(key)) {
+        localByKey.set(key, {
+          key,
+          executionHit: "not_applicable",
+          apiOutcome: "error",
+          reproStatus: "line_key_required",
+          probeHit: "line probe key required (Class#method:<line>); method-only checks disabled",
+          httpCode: 400,
+          httpResponse: { reset: false, reason: "line_key_required" },
+        });
+        continue;
+      }
+      lineKeys.push(key);
+    }
+    requestedLineKeys = [...lineKeys];
+    requestBody = { keys: lineKeys };
+  } else if (className) {
+    requestBody = { className };
+  } else {
+    requestBody = { keys: [] };
+  }
+
+  let res;
+  try {
+    res = await fetchJson(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(requestBody),
+      timeoutMs,
+    });
+  } catch (err) {
+    throw new Error(probeUnreachableMessage(url, err));
+  }
+
+  const json = res.json as Record<string, unknown> | null;
+  const rawResults = Array.isArray(json?.results)
+    ? (json.results as Array<Record<string, unknown>>)
+    : [];
+  const remoteByKey = new Map<string, Record<string, unknown>>();
+  for (const row of rawResults) {
+    if (typeof row?.key !== "string") continue;
+    remoteByKey.set(row.key, row);
+  }
+  const remoteResults: Array<Record<string, unknown> & { apiOutcome: string }> = [];
+  for (const row of rawResults) {
+    const key = typeof row?.key === "string" ? row.key : undefined;
+    if (!key) continue;
+    const lineValidation = readLineValidation(row);
+    const rowOk =
+      typeof row.ok === "boolean" ? row.ok : res.status >= 200 && res.status < 300;
+    if (rowOk) {
+      LAST_RESET_EPOCH_BY_KEY.set(key, Date.now());
+    }
+    remoteResults.push({
+      key,
+      executionHit: "not_applicable",
+      apiOutcome: rowOk ? "ok" : "error",
+      reproStatus: lineValidation.invalidLineTarget
+        ? "invalid_line_target"
+        : rowOk
+          ? "reset_done"
+          : "reset_failed",
+      probeHit: lineValidation.invalidLineTarget
+        ? `${invalidLineTargetProbeHitMessage(0)}; counter reset requested`
+        : "counter reset requested",
+      httpCode: res.status,
+      httpResponse: row,
+    });
+  }
+  for (const key of requestedLineKeys) {
+    if (remoteByKey.has(key)) continue;
+    remoteResults.push({
+      key,
+      executionHit: "not_applicable",
+      apiOutcome: "error",
+      reproStatus: "reset_failed",
+      probeHit: "missing batch reset row for key",
+      httpCode: res.status,
+      httpResponse: res.json ?? res.text,
+    });
+  }
+  const orderedResults: Array<Record<string, unknown> & { apiOutcome: string }> = [];
+  if (requestedKeys) {
+    const remoteResultByKey = new Map<string, Record<string, unknown> & { apiOutcome: string }>();
+    for (const row of remoteResults) {
+      if (typeof row.key !== "string") continue;
+      if (!remoteResultByKey.has(row.key)) remoteResultByKey.set(row.key, row);
+    }
+    for (const key of requestedKeys) {
+      if (localByKey.has(key)) orderedResults.push(localByKey.get(key)!);
+      const remote = remoteResultByKey.get(key);
+      if (remote) orderedResults.push(remote);
+    }
+  } else {
+    orderedResults.push(...remoteResults);
+  }
+
+  return buildBatchResponse({
+    operation: "reset",
+    request: { ...(keys ? { keys } : {}), ...(className ? { className } : {}), url, timeoutMs },
+    results: orderedResults,
+    response: { status: res.status, json: res.json, text: res.json ? undefined : res.text },
+  });
+}
+
+export async function probeReset(args: {
+  key?: string;
+  keys?: string[];
+  className?: string;
+  lineHint?: number;
+  baseUrl: string;
+  resetPath: string;
+  timeoutMs?: number;
+}): Promise<ToolTextResponse> {
+  const key = normalizeOptionalString(args.key);
+  const keys = normalizeOptionalStringArray(args.keys);
+  const className = normalizeOptionalString(args.className);
+  validateSelectorCount("probe_reset", [
+    { enabled: typeof key === "string", name: "key" },
+    { enabled: Array.isArray(keys), name: "keys" },
+    { enabled: typeof className === "string", name: "className" },
+  ]);
+  if (keys || className) {
+    if (typeof args.lineHint === "number") {
+      throw new Error(
+        "probe_reset does not allow lineHint with keys[] or className. Use explicit line keys.",
+      );
+    }
+    const batchArgs: Parameters<typeof probeResetBatch>[0] = {
+      ...(keys ? { keys } : {}),
+      ...(className ? { className } : {}),
+      baseUrl: args.baseUrl,
+      resetPath: args.resetPath,
+    };
+    if (typeof args.timeoutMs === "number") batchArgs.timeoutMs = args.timeoutMs;
+    return probeResetBatch(batchArgs);
+  }
+  const singleArgs: Parameters<typeof probeResetSingle>[0] = {
+    key: key!,
+    baseUrl: args.baseUrl,
+    resetPath: args.resetPath,
+  };
+  if (typeof args.lineHint === "number") singleArgs.lineHint = args.lineHint;
+  if (typeof args.timeoutMs === "number") singleArgs.timeoutMs = args.timeoutMs;
+  return probeResetSingle(singleArgs);
 }
 
 export async function probeWaitHit(args: {

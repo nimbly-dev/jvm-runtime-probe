@@ -128,3 +128,177 @@ test("probe_status remains backward-compatible when line validation fields are a
     assert.equal(parsed.executionHit, "not_hit");
   });
 });
+
+test("probe_status supports keys[] batch with partial success semantics", async () => {
+  let calls = 0;
+  let postedBody: any = null;
+  const lineKey = "com.example.Catalog#updateAndStageSynonymRule:122";
+  const nonLineKey = "com.example.Catalog#updateAndStageSynonymRule";
+
+  await withMockedFetch(async (_input, init) => {
+    calls += 1;
+    postedBody = init?.body ? JSON.parse(String(init.body)) : null;
+    return jsonResponse(200, {
+      ok: true,
+      count: 1,
+      results: [
+        {
+          ok: true,
+          key: lineKey,
+          hitCount: 2,
+          lastHitEpochMs: 1234567,
+          mode: "observe",
+          lineResolvable: true,
+          lineValidation: "resolvable",
+        },
+      ],
+    });
+  }, async () => {
+    const out = await probeStatus({
+      keys: [lineKey, nonLineKey],
+      baseUrl: "http://127.0.0.1:9191",
+      statusPath: "/__probe/status",
+    });
+    const parsed = parseProbeText(out);
+    const summary = parsed.summary as Record<string, unknown>;
+    assert.equal(parsed.mode, "probe_batch");
+    assert.equal(parsed.operation, "status");
+    assert.equal(summary.total, 2);
+    assert.equal(summary.ok, 1);
+    assert.equal(summary.failed, 1);
+  });
+
+  assert.equal(calls, 1);
+  assert.deepEqual(postedBody, { keys: [lineKey] });
+});
+
+test("probe_reset supports keys[] batch with partial success semantics", async () => {
+  let calls = 0;
+  let postedBody: any = null;
+  const lineKey = "com.example.Catalog#updateAndStageSynonymRule:122";
+  const nonLineKey = "com.example.Catalog#updateAndStageSynonymRule";
+
+  await withMockedFetch(async (_input, init) => {
+    calls += 1;
+    postedBody = init?.body ? JSON.parse(String(init.body)) : null;
+    return jsonResponse(200, {
+      ok: true,
+      selector: "keys",
+      count: 1,
+      results: [
+        {
+          ok: true,
+          key: lineKey,
+          lineResolvable: true,
+          lineValidation: "resolvable",
+        },
+      ],
+    });
+  }, async () => {
+    const out = await probeReset({
+      keys: [lineKey, nonLineKey, lineKey],
+      baseUrl: "http://127.0.0.1:9191",
+      resetPath: "/__probe/reset",
+    });
+    const parsed = parseProbeText(out);
+    const summary = parsed.summary as Record<string, unknown>;
+    assert.equal(parsed.mode, "probe_batch");
+    assert.equal(parsed.operation, "reset");
+    assert.equal(summary.total, 2);
+    assert.equal(summary.ok, 1);
+    assert.equal(summary.failed, 1);
+  });
+
+  assert.equal(calls, 1);
+  assert.deepEqual(postedBody, { keys: [lineKey] });
+});
+
+test("probe_reset supports className selector and class_not_found no-op response", async () => {
+  let calls = 0;
+  await withMockedFetch(async () => {
+    calls += 1;
+    return jsonResponse(200, {
+      ok: true,
+      selector: "className",
+      className: "com.example.Catalog",
+      count: 0,
+      reason: "class_not_found",
+      results: [],
+    });
+  }, async () => {
+    const out = await probeReset({
+      className: "com.example.Catalog",
+      baseUrl: "http://127.0.0.1:9191",
+      resetPath: "/__probe/reset",
+    });
+    const parsed = parseProbeText(out);
+    const summary = parsed.summary as Record<string, unknown>;
+    const response = parsed.response as Record<string, unknown>;
+    const responseJson = response.json as Record<string, unknown>;
+    assert.equal(parsed.mode, "probe_batch");
+    assert.equal(parsed.operation, "reset");
+    assert.equal(summary.total, 0);
+    assert.equal(responseJson.reason, "class_not_found");
+  });
+  assert.equal(calls, 1);
+});
+
+test("probe_status rejects conflicting or missing selectors", async () => {
+  await assert.rejects(
+    probeStatus({
+      key: "com.example.Catalog#updateAndStageSynonymRule:122",
+      keys: ["com.example.Catalog#updateAndStageSynonymRule:123"],
+      baseUrl: "http://127.0.0.1:9191",
+      statusPath: "/__probe/status",
+    }),
+    /conflicting selectors/i,
+  );
+
+  await assert.rejects(
+    probeStatus({
+      baseUrl: "http://127.0.0.1:9191",
+      statusPath: "/__probe/status",
+    } as any),
+    /requires exactly one selector/i,
+  );
+
+  await assert.rejects(
+    probeStatus({
+      keys: ["com.example.Catalog#updateAndStageSynonymRule:123"],
+      lineHint: 123,
+      baseUrl: "http://127.0.0.1:9191",
+      statusPath: "/__probe/status",
+    }),
+    /does not allow lineHint with keys\[\]/i,
+  );
+});
+
+test("probe_reset rejects conflicting or missing selectors", async () => {
+  await assert.rejects(
+    probeReset({
+      key: "com.example.Catalog#updateAndStageSynonymRule:122",
+      className: "com.example.Catalog",
+      baseUrl: "http://127.0.0.1:9191",
+      resetPath: "/__probe/reset",
+    }),
+    /conflicting selectors/i,
+  );
+
+  await assert.rejects(
+    probeReset({
+      baseUrl: "http://127.0.0.1:9191",
+      resetPath: "/__probe/reset",
+    } as any),
+    /requires exactly one selector/i,
+  );
+
+  await assert.rejects(
+    probeReset({
+      className: "com.example.Catalog",
+      lineHint: 88,
+      baseUrl: "http://127.0.0.1:9191",
+      resetPath: "/__probe/reset",
+    }),
+    /does not allow lineHint with keys\[\] or className/i,
+  );
+});
