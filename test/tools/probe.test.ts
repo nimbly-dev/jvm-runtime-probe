@@ -109,6 +109,86 @@ test("probe_wait_hit exits immediately for invalid_line_target", async () => {
   assert.equal(calls, 1);
 });
 
+test("probe_wait_hit returns structured service_unreachable by default", async () => {
+  let calls = 0;
+  await withMockedFetch(async () => {
+    calls += 1;
+    throw new Error("fetch failed");
+  }, async () => {
+    const out = await probeWaitHit({
+      key: "com.example.Catalog#updateAndStageSynonymRule:122",
+      baseUrl: "http://127.0.0.1:9191",
+      statusPath: "/__probe/status",
+      timeoutMs: 250,
+      pollIntervalMs: 100,
+      maxRetries: 3,
+    });
+    const parsed = parseProbeText(out);
+    assert.equal(parsed.reproStatus, "probe_unreachable");
+    assert.equal(parsed.httpCode, 503);
+    assert.equal(out.structuredContent.result.reason, "service_unreachable");
+    assert.equal(out.structuredContent.result.unreachableAttempts, 1);
+    assert.equal(out.structuredContent.result.unreachableRetryEnabled, false);
+  });
+  assert.equal(calls, 1);
+});
+
+test("probe_wait_hit retries unreachable status checks when enabled and can recover", async () => {
+  let calls = 0;
+  await withMockedFetch(async () => {
+    calls += 1;
+    if (calls === 1) throw new Error("fetch failed");
+    return jsonResponse(200, {
+      key: "com.example.Catalog#updateAndStageSynonymRule:122",
+      hitCount: 1,
+      lastHitEpochMs: Date.now(),
+      mode: "observe",
+      lineResolvable: true,
+      lineValidation: "resolvable",
+    });
+  }, async () => {
+    const out = await probeWaitHit({
+      key: "com.example.Catalog#updateAndStageSynonymRule:122",
+      baseUrl: "http://127.0.0.1:9191",
+      statusPath: "/__probe/status",
+      timeoutMs: 250,
+      pollIntervalMs: 100,
+      maxRetries: 3,
+      unreachableRetryEnabled: true,
+      unreachableMaxRetries: 3,
+    });
+    assert.equal(out.structuredContent.result.hit, true);
+    assert.equal(out.structuredContent.result.inline, true);
+  });
+  assert.equal(calls, 2);
+});
+
+test("probe_wait_hit returns structured service_unreachable after unreachable retries are exhausted", async () => {
+  let calls = 0;
+  await withMockedFetch(async () => {
+    calls += 1;
+    throw new Error("fetch failed");
+  }, async () => {
+    const out = await probeWaitHit({
+      key: "com.example.Catalog#updateAndStageSynonymRule:122",
+      baseUrl: "http://127.0.0.1:9191",
+      statusPath: "/__probe/status",
+      timeoutMs: 250,
+      pollIntervalMs: 100,
+      maxRetries: 3,
+      unreachableRetryEnabled: true,
+      unreachableMaxRetries: 2,
+    });
+    const parsed = parseProbeText(out);
+    assert.equal(parsed.reproStatus, "probe_unreachable");
+    assert.equal(parsed.httpCode, 503);
+    assert.equal(out.structuredContent.result.reason, "service_unreachable");
+    assert.equal(out.structuredContent.result.unreachableAttempts, 2);
+    assert.equal(out.structuredContent.result.unreachableRetryEnabled, true);
+  });
+  assert.equal(calls, 2);
+});
+
 test("probe_status remains backward-compatible when line validation fields are absent", async () => {
   await withMockedFetch(async () => {
     return jsonResponse(200, {
