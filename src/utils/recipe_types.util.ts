@@ -12,6 +12,28 @@ export type RecipeCandidate = {
   rationale: string[];
 };
 
+export type RequestInferenceSource =
+  | "spring_mvc"
+  | "jaxrs"
+  | "openapi"
+  | "controller_declaration_fallback";
+
+export type InferenceFailurePhase = "target_inference" | "request_inference" | "auth_resolution";
+
+export type InferenceDiagnostics = {
+  target: {
+    attempted: true;
+    matched: boolean;
+    candidateCount: number;
+    topConfidence?: number;
+  };
+  request: {
+    attempted: true;
+    matched: boolean;
+    source?: RequestInferenceSource;
+  };
+};
+
 export type RecipeExecutionStep = {
   phase: "prepare" | "execute" | "verify" | "cleanup";
   title: string;

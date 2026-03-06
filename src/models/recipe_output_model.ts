@@ -109,6 +109,13 @@ export function buildRecipeTemplateModel(args: {
         `status=${generated.status}`,
         `selected_mode=${generated.selectedMode}`,
         `routing_reason=${planReason}`,
+        generated.failurePhase ? `failure_phase=${generated.failurePhase}` : "",
+        generated.failureReasonCode ? `failure_reason=${generated.failureReasonCode}` : "",
+        `inference_target_matched=${String(generated.inferenceDiagnostics.target.matched)}`,
+        `inference_request_matched=${String(generated.inferenceDiagnostics.request.matched)}`,
+        generated.inferenceDiagnostics.request.source
+          ? `inference_request_source=${generated.inferenceDiagnostics.request.source}`
+          : "",
         generated.routingNote ? `routing_note=${generated.routingNote}` : "",
         `success_criterion=${successCriterion}`,
         ...generated.notes,

@@ -9,6 +9,8 @@ import {
 } from "../utils/recipe_candidate_infer.util";
 import type {
   ExecutionReadiness,
+  InferenceDiagnostics,
+  InferenceFailurePhase,
   MissingExecutionInput,
   RecipeCandidate,
   RecipeExecutionPlan,
@@ -22,93 +24,7 @@ import { inferTargets } from "./target_infer";
 export type { RecipeCandidate, RecipeExecutionPlan } from "../utils/recipe_types.util";
 export type RecipeResultType = "recipe" | "report";
 
-function buildNoTargetResult(args: {
-  routingDecision: ReturnType<typeof resolveSelectedMode>;
-  unresolvedAuth: AuthResolution;
-  actuationEnabled: boolean;
-  actuationReturnBoolean?: boolean;
-  actuationActuatorId?: string;
-  lineHint?: number;
-}): {
-  requestCandidates: RecipeCandidate[];
-  executionPlan: RecipeExecutionPlan;
-  resultType: RecipeResultType;
-  status: RecipeStatus;
-  selectedMode: IntentMode;
-  downgradedFrom?: IntentMode;
-  lineTargetProvided: boolean;
-  probeIntentRequested: boolean;
-  executionReadiness: ExecutionReadiness;
-  missingInputs: MissingExecutionInput[];
-  routingNote?: string;
-  nextAction?: string;
-  auth: AuthResolution;
-  notes: string[];
-} {
-  const executionPlan = buildRecipeExecutionPlan({
-    decision: args.routingDecision,
-    auth: args.unresolvedAuth,
-    actuationEnabled: args.actuationEnabled,
-    ...(typeof args.actuationReturnBoolean === "boolean"
-      ? { actuationReturnBoolean: args.actuationReturnBoolean }
-      : {}),
-    ...(args.actuationActuatorId ? { actuationActuatorId: args.actuationActuatorId } : {}),
-    ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
-  });
-  const readiness = buildExecutionReadiness({
-    selectedMode: args.routingDecision.selectedMode,
-    lineTargetProvided: args.routingDecision.lineTargetProvided,
-    auth: args.unresolvedAuth,
-    actuationEnabled: args.actuationEnabled,
-    ...(typeof args.actuationReturnBoolean === "boolean"
-      ? { actuationReturnBoolean: args.actuationReturnBoolean }
-      : {}),
-  });
-
-  const notes = ["No matching method candidate inferred from current hints."];
-  if (args.routingDecision.routingNote) notes.push(args.routingDecision.routingNote);
-  notes.push(
-    `probe_calls_total=${executionPlan.probeCallPlan.total} by_tool=${JSON.stringify(executionPlan.probeCallPlan.byTool)}`,
-  );
-  notes.push(`execution_readiness=${readiness.executionReadiness}`);
-
-  return {
-    requestCandidates: [],
-    executionPlan,
-    resultType: "report",
-    status: "target_not_inferred",
-    selectedMode: args.routingDecision.selectedMode,
-    ...(args.routingDecision.downgradedFrom
-      ? { downgradedFrom: args.routingDecision.downgradedFrom }
-      : {}),
-    lineTargetProvided: args.routingDecision.lineTargetProvided,
-    probeIntentRequested: args.routingDecision.probeIntentRequested,
-    executionReadiness: readiness.executionReadiness,
-    missingInputs: readiness.missingInputs,
-    ...(args.routingDecision.routingNote ? { routingNote: args.routingDecision.routingNote } : {}),
-    nextAction:
-      "Refine classHint/methodHint/lineHint and rerun recipe_generate before attempting execution.",
-    auth: args.unresolvedAuth,
-    notes,
-  };
-}
-
-export async function generateRecipe(args: {
-  rootAbs: string;
-  workspaceRootAbs: string;
-  classHint: string;
-  methodHint: string;
-  lineHint?: number;
-  intentMode: IntentMode;
-  maxCandidates?: number;
-  authToken?: string;
-  authUsername?: string;
-  authPassword?: string;
-  actuationEnabled?: boolean;
-  actuationReturnBoolean?: boolean;
-  actuationActuatorId?: string;
-  authLoginDiscoveryEnabled: boolean;
-}): Promise<{
+export type GenerateRecipeResult = {
   inferredTarget?: {
     key?: string;
     file: string;
@@ -127,9 +43,68 @@ export async function generateRecipe(args: {
   missingInputs: MissingExecutionInput[];
   routingNote?: string;
   nextAction?: string;
+  failurePhase?: InferenceFailurePhase;
+  failureReasonCode?: string;
+  inferenceDiagnostics: InferenceDiagnostics;
   auth: AuthResolution;
   notes: string[];
-}> {
+};
+
+export type GenerateRecipeDeps = {
+  inferTargetsFn?: typeof inferTargets;
+  findControllerRequestCandidateFn?: typeof findControllerRequestCandidate;
+  resolveAuthForRecipeFn?: typeof resolveAuthForRecipe;
+};
+
+function buildUnknownTargetAuth(): AuthResolution {
+  return {
+    required: "unknown",
+    status: "unknown",
+    strategy: "unknown",
+    nextAction: "No target inferred; cannot resolve auth strategy yet.",
+    notes: ["No method candidate matched current hints."],
+  };
+}
+
+function buildMissingRouteAuth(): AuthResolution {
+  return {
+    required: "unknown",
+    status: "needs_user_input",
+    strategy: "unknown",
+    missing: ["authToken"],
+    nextAction:
+      "Entrypoint/auth requirements could not be inferred. Ask user for authToken (Bearer) or confirm no auth is required.",
+    notes: [
+      "No controller->method mapping was inferred, so route-level auth inference is unavailable.",
+      "Automatic credential discovery is disabled; credentials must be provided explicitly.",
+    ],
+  };
+}
+
+export async function generateRecipe(
+  args: {
+    rootAbs: string;
+    workspaceRootAbs: string;
+    classHint: string;
+    methodHint: string;
+    lineHint?: number;
+    intentMode: IntentMode;
+    maxCandidates?: number;
+    authToken?: string;
+    authUsername?: string;
+    authPassword?: string;
+    actuationEnabled?: boolean;
+    actuationReturnBoolean?: boolean;
+    actuationActuatorId?: string;
+    authLoginDiscoveryEnabled: boolean;
+  },
+  deps: GenerateRecipeDeps = {},
+): Promise<GenerateRecipeResult> {
+  const inferTargetsFn = deps.inferTargetsFn ?? inferTargets;
+  const findControllerRequestCandidateFn =
+    deps.findControllerRequestCandidateFn ?? findControllerRequestCandidate;
+  const resolveAuthForRecipeFn = deps.resolveAuthForRecipeFn ?? resolveAuthForRecipe;
+
   const normalized = normalizeRecipeGenerateInput(args);
   const routingDecision = resolveSelectedMode(
     buildRoutingContext({
@@ -145,58 +120,46 @@ export async function generateRecipe(args: {
     maxCandidates: normalized.maxCandidates,
   };
   if (typeof normalized.lineHint === "number") inferArgs.lineHint = normalized.lineHint;
-  const inferred = await inferTargets(inferArgs);
+  const inferred = await inferTargetsFn(inferArgs);
   const top = inferred.candidates[0];
 
-  const unresolvedAuth: AuthResolution = {
-    required: "unknown",
-    status: "unknown",
-    strategy: "unknown",
-    nextAction: "No target inferred; cannot resolve auth strategy yet.",
-    notes: ["No method candidate matched current hints."],
-  };
-
-  if (!top) {
-    return buildNoTargetResult({
-      routingDecision,
-      unresolvedAuth,
-      actuationEnabled: normalized.actuationEnabled,
-      ...(typeof normalized.actuationReturnBoolean === "boolean"
-        ? { actuationReturnBoolean: normalized.actuationReturnBoolean }
-        : {}),
-      ...(normalized.actuationActuatorId
-        ? { actuationActuatorId: normalized.actuationActuatorId }
-        : {}),
-      ...(typeof normalized.lineHint === "number" ? { lineHint: normalized.lineHint } : {}),
-    });
-  }
-
   const searchRootsAbs = buildSearchRoots(normalized.rootAbs, normalized.workspaceRootAbs);
-  const controllerMatch = await findControllerRequestCandidate({
+  const controllerMatch = await findControllerRequestCandidateFn({
     searchRootsAbs,
     methodHint: normalized.methodHint,
-    inferredTargetFileAbs: top.file,
+    ...(top ? { inferredTargetFileAbs: top.file } : {}),
   });
   const bestRequest = controllerMatch.recipe;
   const matchedControllerFile = controllerMatch.matchedControllerFile;
   const matchedBranchCondition = controllerMatch.matchedBranchCondition;
   const authRootAbs = controllerMatch.matchedRootAbs ?? normalized.rootAbs;
 
-  const inferredTarget: {
-    key?: string;
-    file: string;
-    line?: number;
-    confidence: number;
-  } = {
-    file: top.file,
-    confidence: top.confidence,
+  const inferenceDiagnostics: InferenceDiagnostics = {
+    target: {
+      attempted: true,
+      matched: Boolean(top),
+      candidateCount: inferred.candidates.length,
+      ...(typeof top?.confidence === "number" ? { topConfidence: top.confidence } : {}),
+    },
+    request: {
+      attempted: true,
+      matched: Boolean(bestRequest),
+      ...(controllerMatch.requestSource ? { source: controllerMatch.requestSource } : {}),
+    },
   };
-  if (top.key) inferredTarget.key = top.key;
-  if (typeof top.line === "number") inferredTarget.line = top.line;
+
+  const inferredTarget: GenerateRecipeResult["inferredTarget"] = top
+    ? {
+        file: top.file,
+        confidence: top.confidence,
+        ...(top.key ? { key: top.key } : {}),
+        ...(typeof top.line === "number" ? { line: top.line } : {}),
+      }
+    : undefined;
 
   const auth: AuthResolution =
     bestRequest || matchedControllerFile
-      ? await resolveAuthForRecipe({
+      ? await resolveAuthForRecipeFn({
           projectRootAbs: authRootAbs,
           workspaceRootAbs: normalized.workspaceRootAbs,
           endpointPath: bestRequest?.path,
@@ -206,32 +169,21 @@ export async function generateRecipe(args: {
           authPassword: normalized.authPassword,
           loginDiscoveryEnabled: normalized.authLoginDiscoveryEnabled,
         })
-      : {
-          required: "unknown",
-          status: "needs_user_input",
-          strategy: "unknown",
-          missing: ["authToken"],
-          nextAction:
-            "Entrypoint/auth requirements could not be inferred. Ask user for authToken (Bearer) or confirm no auth is required.",
-          notes: [
-            "No controller->method mapping was inferred, so route-level auth inference is unavailable.",
-            "Automatic credential discovery is disabled; credentials must be provided explicitly.",
-          ],
-        };
+      : top
+        ? buildMissingRouteAuth()
+        : buildUnknownTargetAuth();
 
   const executionPlan = buildRecipeExecutionPlan({
     decision: routingDecision,
     auth,
-    targetFile: inferredTarget.file,
+    ...(inferredTarget?.file ? { targetFile: inferredTarget.file } : {}),
     actuationEnabled: normalized.actuationEnabled,
     ...(typeof normalized.actuationReturnBoolean === "boolean"
       ? { actuationReturnBoolean: normalized.actuationReturnBoolean }
       : {}),
-    ...(normalized.actuationActuatorId
-      ? { actuationActuatorId: normalized.actuationActuatorId }
-      : {}),
+    ...(normalized.actuationActuatorId ? { actuationActuatorId: normalized.actuationActuatorId } : {}),
     ...(typeof normalized.lineHint === "number" ? { lineHint: normalized.lineHint } : {}),
-    ...(inferredTarget.key ? { inferredTargetKey: inferredTarget.key } : {}),
+    ...(inferredTarget?.key ? { inferredTargetKey: inferredTarget.key } : {}),
     ...(bestRequest ? { requestCandidate: bestRequest } : {}),
   });
 
@@ -240,10 +192,28 @@ export async function generateRecipe(args: {
     ? "regression_api_only_downgraded_line_target_missing"
     : defaultStatusForMode(routingDecision.selectedMode);
   let nextAction: string | undefined;
+  let failurePhase: InferenceFailurePhase | undefined;
+  let failureReasonCode: string | undefined;
 
-  if (!bestRequest) {
+  if (!top) {
+    const fallbackAllowed =
+      routingDecision.selectedMode === "regression_api_only" && Boolean(bestRequest);
+    if (!fallbackAllowed) {
+      resultType = "report";
+      status = "target_not_inferred";
+      failurePhase = "target_inference";
+      failureReasonCode = bestRequest
+        ? "line_target_required_for_probe_mode"
+        : "target_candidate_missing";
+      nextAction = bestRequest
+        ? "Strict line target could not be inferred for probe verification. Refine classHint/methodHint/lineHint and rerun recipe_generate."
+        : "Refine classHint/methodHint/lineHint and rerun recipe_generate before attempting execution.";
+    }
+  } else if (!bestRequest) {
     resultType = "report";
     status = "api_request_not_inferred";
+    failurePhase = "request_inference";
+    failureReasonCode = "request_candidate_missing";
     nextAction = buildMissingRequestNextAction(routingDecision);
   } else if (auth.status === "needs_user_input") {
     nextAction =
@@ -263,8 +233,10 @@ export async function generateRecipe(args: {
   });
   if (readiness.executionReadiness === "needs_user_input") {
     resultType = "report";
-    if (status !== "api_request_not_inferred") {
+    if (status !== "api_request_not_inferred" && status !== "target_not_inferred") {
       status = "execution_input_required";
+      failurePhase = "auth_resolution";
+      failureReasonCode = "auth_input_required";
     }
     if (!nextAction && readiness.nextAction) nextAction = readiness.nextAction;
   }
@@ -272,17 +244,26 @@ export async function generateRecipe(args: {
   const runNotes = buildRunNotes({
     selectedMode: routingDecision.selectedMode,
     ...(typeof normalized.lineHint === "number" ? { lineHint: normalized.lineHint } : {}),
-    ...(typeof inferredTarget.line === "number" ? { inferredLine: inferredTarget.line } : {}),
+    ...(typeof inferredTarget?.line === "number" ? { inferredLine: inferredTarget.line } : {}),
     ...(bestRequest ? { bestRequest } : {}),
     ...(routingDecision.routingNote ? { routingNote: routingDecision.routingNote } : {}),
-    ...(matchedBranchCondition ? { matchedBranchCondition } : {}),
+    ...(matchedBranchCondition ? { matchedBranchCondition: matchedBranchCondition } : {}),
     auth,
     executionPlan,
     readiness: readiness.executionReadiness,
   });
+  runNotes.push(
+    `inference_target=matched:${String(inferenceDiagnostics.target.matched)} candidates:${inferenceDiagnostics.target.candidateCount}`,
+  );
+  runNotes.push(
+    `inference_request=matched:${String(inferenceDiagnostics.request.matched)}` +
+      (inferenceDiagnostics.request.source ? ` source:${inferenceDiagnostics.request.source}` : ""),
+  );
+  if (failurePhase) runNotes.push(`failure_phase=${failurePhase}`);
+  if (failureReasonCode) runNotes.push(`failure_reason=${failureReasonCode}`);
 
   return {
-    inferredTarget,
+    ...(inferredTarget ? { inferredTarget } : {}),
     requestCandidates: bestRequest ? [bestRequest] : [],
     executionPlan,
     resultType,
@@ -295,6 +276,9 @@ export async function generateRecipe(args: {
     missingInputs: readiness.missingInputs,
     ...(routingDecision.routingNote ? { routingNote: routingDecision.routingNote } : {}),
     ...(nextAction ? { nextAction } : {}),
+    ...(failurePhase ? { failurePhase } : {}),
+    ...(failureReasonCode ? { failureReasonCode } : {}),
+    inferenceDiagnostics,
     auth,
     notes: runNotes,
   };
