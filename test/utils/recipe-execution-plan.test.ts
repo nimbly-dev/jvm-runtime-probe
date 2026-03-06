@@ -71,6 +71,8 @@ test("single_line_probe enforces reset -> execute -> verify order", () => {
   assert.match(plan.steps[1].instruction, /^GET /);
   assert.match(plan.steps[2].instruction, /probe_wait_hit/);
   assert.doesNotMatch(plan.steps[2].instruction, /probe_status/);
+  assert.match(plan.steps[2].instruction, /invalid_line_target/i);
+  assert.match(plan.steps[2].instruction, /rebuild the app artifact and restart the JVM/i);
   assert.deepEqual(plan.probeCallPlan, {
     total: 2,
     verificationMethod: "probe_wait_hit",
@@ -107,6 +109,8 @@ test("combined mode enforces reset -> API -> verify order", () => {
   assert.match(plan.steps[2].instruction, /probe_wait_hit/);
   assert.doesNotMatch(plan.steps[2].instruction, /probe_status/);
   assert.match(plan.steps[2].instruction, /API regression assertions/);
+  assert.match(plan.steps[2].instruction, /invalid_line_target/i);
+  assert.match(plan.steps[2].instruction, /rebuild the app artifact and restart the JVM/i);
   assert.deepEqual(plan.probeCallPlan, {
     total: 2,
     verificationMethod: "probe_wait_hit",

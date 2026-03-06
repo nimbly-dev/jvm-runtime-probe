@@ -21,6 +21,9 @@ export function buildRunNotes(args: {
     notes.push("Probe tools are disabled for this route.");
   } else {
     notes.push("Probe verification requires strict line key Class#method:line.");
+    notes.push(
+      "Interpretation guide: invalid_line_target implies runtime/source mismatch (rebuild + restart JVM); timeout_no_inline_hit implies no observed execution in-window.",
+    );
   }
   if (
     typeof args.lineHint === "number" &&
