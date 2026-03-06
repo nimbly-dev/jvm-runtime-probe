@@ -22,7 +22,7 @@ import { clampInt } from "./lib/safety";
 import { discoverProjects } from "./tools/projects_discover";
 import { probeDiagnose } from "./tools/probe_diagnose";
 import { generateRecipe } from "./tools/recipe_generate";
-import { inferTargets } from "./tools/target_infer";
+import { inferTargets, discoverClassMethods } from "./tools/target_infer";
 import { probeReset, probeActuate, probeStatus, probeWaitHit } from "./tools/probe";
 import { buildRoutingContext, resolveSelectedMode } from "./utils/recipe_intent_routing.util";
 import { resolveProjectForInference } from "./utils/project_resolution.util";
@@ -210,10 +210,11 @@ async function main() {
     "target_infer",
     {
       description:
-        "Infer likely runtime probe keys (fully.qualified.Class#method) from class/method/line hints in project code.",
+        "Infer runtime probe keys (ranked_candidates mode) or return deterministic class method inventory with line spans (class_methods mode).",
       inputSchema: TargetInferInputSchema,
     },
     async ({
+      discoveryMode,
       classHint,
       methodHint,
       lineHint,
@@ -236,6 +237,227 @@ async function main() {
       }
       const workspaceRootAbs = path.resolve(workspaceRoot ?? cfg.workspaceRootAbs);
       const projects = await ensureProjects(workspaceRootAbs);
+      const selectedDiscoveryMode = discoveryMode ?? "ranked_candidates";
+
+      if (selectedDiscoveryMode === "class_methods") {
+        const classHintTrimmed = classHint?.trim();
+        if (!classHintTrimmed) {
+          const structuredContent = {
+            resultType: "report",
+            status: "class_hint_required",
+            workspaceRoot: workspaceRootAbs,
+            nextAction:
+              "Provide classHint and rerun target_infer with discoveryMode=class_methods.",
+          };
+          return {
+            content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+            structuredContent,
+          };
+        }
+
+        const scopedProjects: Array<{ projectId?: string; projectRootAbs: string }> = [];
+        let projectResolution:
+          | {
+              mode: "workspace_root" | "single_project" | "cross_project";
+              selectedProjectId?: string;
+              selectedProjectRoot?: string;
+            }
+          | {
+              mode: "project_id" | "service_hint";
+              selectorValue: string;
+              selectedProjectId?: string;
+              selectedProjectRoot?: string;
+            };
+
+        if (projectId) {
+          const found = projects.find((p) => p.id === projectId);
+          if (!found) {
+            const structuredContent = {
+              resultType: "report",
+              status: "project_resolution_failed",
+              workspaceRoot: workspaceRootAbs,
+              hints: { classHint, serviceHint, projectId },
+              projectResolution: {
+                mode: "project_id",
+                selectorValue: projectId,
+                availableProjects: projects.map((p) => ({ id: p.id, root: p.rootAbs })),
+              },
+              nextAction:
+                "Provide a valid projectId from projects_discover, or omit projectId to allow wider class discovery.",
+            };
+            return {
+              content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+              structuredContent,
+            };
+          }
+          scopedProjects.push({ projectId: found.id, projectRootAbs: found.rootAbs });
+          projectResolution = {
+            mode: "project_id",
+            selectorValue: projectId,
+            selectedProjectId: found.id,
+            selectedProjectRoot: found.rootAbs,
+          };
+        } else if (serviceHint) {
+          const needle = serviceHint.toLowerCase();
+          const found = projects.find((p) => p.rootAbs.toLowerCase().includes(needle));
+          if (!found) {
+            const structuredContent = {
+              resultType: "report",
+              status: "project_resolution_failed",
+              workspaceRoot: workspaceRootAbs,
+              hints: { classHint, serviceHint, projectId },
+              projectResolution: {
+                mode: "service_hint",
+                selectorValue: serviceHint,
+                availableProjects: projects.map((p) => ({ id: p.id, root: p.rootAbs })),
+              },
+              nextAction:
+                "Provide a valid serviceHint from projects_discover, or omit serviceHint to allow wider class discovery.",
+            };
+            return {
+              content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+              structuredContent,
+            };
+          }
+          scopedProjects.push({ projectId: found.id, projectRootAbs: found.rootAbs });
+          projectResolution = {
+            mode: "service_hint",
+            selectorValue: serviceHint,
+            selectedProjectId: found.id,
+            selectedProjectRoot: found.rootAbs,
+          };
+        } else if (projects.length === 0) {
+          scopedProjects.push({ projectRootAbs: workspaceRootAbs });
+          projectResolution = {
+            mode: "workspace_root",
+            selectedProjectRoot: workspaceRootAbs,
+          };
+        } else if (projects.length === 1) {
+          scopedProjects.push({
+            projectId: projects[0]!.id,
+            projectRootAbs: projects[0]!.rootAbs,
+          });
+          projectResolution = {
+            mode: "single_project",
+            selectedProjectId: projects[0]!.id,
+            selectedProjectRoot: projects[0]!.rootAbs,
+          };
+        } else {
+          for (const project of projects) {
+            scopedProjects.push({
+              projectId: project.id,
+              projectRootAbs: project.rootAbs,
+            });
+          }
+          projectResolution = {
+            mode: "cross_project",
+          };
+        }
+
+        const exactMatches: Array<{
+          file: string;
+          className: string;
+          fqcn?: string;
+          methods: Array<{
+            methodName: string;
+            signature: string;
+            startLine: number;
+            endLine: number;
+            probeKey?: string;
+          }>;
+          projectId?: string;
+          projectRootAbs: string;
+        }> = [];
+        const partialMatches: typeof exactMatches = [];
+        let scannedJavaFiles = 0;
+
+        for (const scoped of scopedProjects) {
+          const discovered = await discoverClassMethods({
+            rootAbs: scoped.projectRootAbs,
+            classHint: classHintTrimmed,
+          });
+          scannedJavaFiles += discovered.scannedJavaFiles;
+          for (const c of discovered.classes) {
+            const normalized = {
+              ...c,
+              projectRootAbs: scoped.projectRootAbs,
+              ...(scoped.projectId ? { projectId: scoped.projectId } : {}),
+            };
+            if (discovered.matchMode === "exact") exactMatches.push(normalized);
+            else if (discovered.matchMode === "partial") partialMatches.push(normalized);
+          }
+        }
+
+        const chosenMatches = exactMatches.length > 0 ? exactMatches : partialMatches;
+
+        if (chosenMatches.length === 0) {
+          const structuredContent = {
+            resultType: "class_methods",
+            status: "class_not_found",
+            workspaceRoot: workspaceRootAbs,
+            hints: { classHint, serviceHint, projectId },
+            scannedJavaFiles,
+            projectResolution,
+            nextAction:
+              "Refine classHint (prefer exact class name or fully qualified class name) and rerun target_infer.",
+          };
+          return {
+            content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+            structuredContent,
+          };
+        }
+
+        const matches = chosenMatches.map((match) => ({
+          className: match.className,
+          ...(match.fqcn ? { fqcn: match.fqcn } : {}),
+          file: path.relative(workspaceRootAbs, match.file) || match.file,
+          ...(match.projectId ? { projectId: match.projectId } : {}),
+          projectRoot:
+            path.relative(workspaceRootAbs, match.projectRootAbs) || match.projectRootAbs,
+        }));
+
+        if (matches.length > 1) {
+          const structuredContent = {
+            resultType: "disambiguation",
+            status: "class_ambiguous",
+            workspaceRoot: workspaceRootAbs,
+            hints: { classHint, serviceHint, projectId },
+            scannedJavaFiles,
+            projectResolution,
+            matches,
+            nextAction:
+              "Refine classHint to exact FQCN or provide projectId/serviceHint to resolve a single class.",
+          };
+          return {
+            content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+            structuredContent,
+          };
+        }
+
+        const selected = chosenMatches[0]!;
+        const structuredContent = {
+          resultType: "class_methods",
+          status: "ok",
+          workspaceRoot: workspaceRootAbs,
+          hints: { classHint, serviceHint, projectId },
+          scannedJavaFiles,
+          projectResolution,
+          class: {
+            className: selected.className,
+            ...(selected.fqcn ? { fqcn: selected.fqcn } : {}),
+            file: path.relative(workspaceRootAbs, selected.file) || selected.file,
+            ...(selected.projectId ? { projectId: selected.projectId } : {}),
+            projectRoot:
+              path.relative(workspaceRootAbs, selected.projectRootAbs) || selected.projectRootAbs,
+          },
+          methods: selected.methods,
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
+
       const resolution = await resolveProjectForInference(
         {
           workspaceRootAbs,
@@ -318,11 +540,11 @@ async function main() {
                   resolution.projectRootAbs,
               }))
             : resolution.candidates.map((c) => ({
-          ...c,
-          file: path.relative(resolution.workspaceRootAbs, c.file) || c.file,
-          projectRoot:
-            path.relative(resolution.workspaceRootAbs, c.projectRootAbs) || c.projectRootAbs,
-        })),
+                ...c,
+                file: path.relative(resolution.workspaceRootAbs, c.file) || c.file,
+                projectRoot:
+                  path.relative(resolution.workspaceRootAbs, c.projectRootAbs) || c.projectRootAbs,
+              })),
       };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
@@ -546,10 +768,7 @@ async function main() {
         inferredTarget: generated.inferredTarget
           ? {
               ...generated.inferredTarget,
-              file: path.relative(
-                resolvedProject.workspaceRootAbs,
-                generated.inferredTarget.file,
-              ),
+              file: path.relative(resolvedProject.workspaceRootAbs, generated.inferredTarget.file),
             }
           : undefined,
         requestCandidates: generated.requestCandidates,

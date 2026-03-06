@@ -15,6 +15,7 @@ const EXCLUDED_DIRS = new Set([
 export type JavaMethod = {
   name: string;
   line: number;
+  endLine: number;
   signature: string;
 };
 
@@ -25,6 +26,26 @@ export type JavaFileIndex = {
   methods: JavaMethod[];
   text: string;
 };
+
+function findMethodEndLine(lines: string[], startIndex: number): number {
+  let depth = 0;
+  let seenOpeningBrace = false;
+
+  for (let i = startIndex; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    for (let j = 0; j < line.length; j++) {
+      const ch = line[j];
+      if (ch === "{") {
+        depth += 1;
+        seenOpeningBrace = true;
+      } else if (ch === "}" && seenOpeningBrace) {
+        depth -= 1;
+        if (depth === 0) return i + 1;
+      }
+    }
+  }
+  return startIndex + 1;
+}
 
 async function walkJavaFiles(
   rootAbs: string,
@@ -113,6 +134,7 @@ export async function buildJavaIndex(args: {
       methods.push({
         name,
         line: i + 1,
+        endLine: findMethodEndLine(lines, i),
         signature: line.trim(),
       });
     }
