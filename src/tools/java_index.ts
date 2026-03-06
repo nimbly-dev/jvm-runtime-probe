@@ -31,11 +31,12 @@ async function walkJavaFiles(
   maxFiles: number,
   classHint?: string,
 ): Promise<string[]> {
-  const out: string[] = [];
+  const prioritized: string[] = [];
+  const fallback: string[] = [];
   const queue: string[] = [rootAbs];
   const classHintLower = classHint?.toLowerCase();
 
-  while (queue.length > 0 && out.length < maxFiles) {
+  while (queue.length > 0 && prioritized.length + fallback.length < maxFiles) {
     const dir = queue.shift()!;
     let entries: Dirent[];
     try {
@@ -45,7 +46,7 @@ async function walkJavaFiles(
     }
 
     for (const e of entries) {
-      if (out.length >= maxFiles) break;
+      if (prioritized.length + fallback.length >= maxFiles) break;
       const abs = path.join(dir, e.name);
       if (e.isDirectory()) {
         if (EXCLUDED_DIRS.has(e.name)) continue;
@@ -55,14 +56,15 @@ async function walkJavaFiles(
       if (!e.isFile() || !e.name.endsWith(".java")) continue;
       if (classHintLower) {
         const basenameLower = e.name.toLowerCase();
-        if (!basenameLower.includes(classHintLower)) {
-          // Keep scanning; we only down-rank class-mismatched files later.
+        if (basenameLower.includes(classHintLower)) {
+          prioritized.push(abs);
+          continue;
         }
       }
-      out.push(abs);
+      fallback.push(abs);
     }
   }
-  return out;
+  return [...prioritized, ...fallback];
 }
 
 export async function buildJavaIndex(args: {
