@@ -126,6 +126,17 @@ Optional:
 
 `probe_wait_hit` now returns a structured `service_unreachable`/`probe_unreachable` outcome when the probe endpoint is unreachable, distinct from `timeout_no_inline_hit` when the endpoint is reachable but no inline hit is observed.
 
+### Probe Outcome Semantics
+
+Use these outcomes to avoid mixing stale runtime mismatch with execution misses:
+
+- `invalid_line_target`: Requested line key is not resolvable in current runtime bytecode.  
+  Next action: rebuild app artifact and restart JVM, then rerun probe.
+- `timeout_no_inline_hit`: Probe endpoint reachable and line key resolvable, but no inline hit observed in the polling window.  
+  Next action: verify trigger path/branching and rerun `probe_wait_hit`.
+- `probe_unreachable`: Probe endpoint not reachable from MCP.  
+  Next action: verify `MCP_PROBE_BASE_URL`, agent process reachability, and network/path wiring.
+
 ---
 
 ## MCP Tools

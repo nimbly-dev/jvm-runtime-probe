@@ -44,6 +44,8 @@ export function formatProbeOutput(args: {
   syntheticWarning?: string | undefined;
   runDuration: string;
   runNotes?: string;
+  actionCode?: string;
+  nextAction?: string;
 }): string {
   const parsedRequest = parseHttpRequestLine(args.httpRequest);
   const requestMethod = args.requestMethod ?? parsedRequest.method;
@@ -70,6 +72,8 @@ export function formatProbeOutput(args: {
       apiOutcome: args.apiOutcome,
       reproStatus: args.reproStatus,
       probeHit: args.probeHit,
+      actionCode: args.actionCode ?? null,
+      nextAction: args.nextAction ?? null,
       runtime: {
         mode: runtimeMode,
         synthetic: runtimeMode === "actuate",

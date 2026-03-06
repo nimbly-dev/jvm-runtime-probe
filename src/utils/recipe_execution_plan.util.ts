@@ -222,7 +222,8 @@ function buildSingleLineProbeSteps(args: {
     title: "Verify single-line probe hit",
     instruction:
       `Require line_hit on ${args.lineTarget} using probe_wait_hit.` +
-      (args.targetFile ? ` Correlate with ${args.targetFile}:${args.lineHint}.` : ""),
+      (args.targetFile ? ` Correlate with ${args.targetFile}:${args.lineHint}.` : "") +
+      " If probe_wait_hit returns invalid_line_target, rebuild the app artifact and restart the JVM before rerun.",
   });
   if (args.actuationEnabled && args.actuationConfigured) {
     steps.push(
@@ -296,7 +297,8 @@ function buildCombinedSteps(args: {
     title: "Verify API and line probe outcomes",
     instruction:
       `Require line_hit on ${args.lineTarget} via probe_wait_hit and validate API regression assertions in the same run.` +
-      (args.targetFile ? ` Correlate with ${args.targetFile}:${args.lineHint}.` : ""),
+      (args.targetFile ? ` Correlate with ${args.targetFile}:${args.lineHint}.` : "") +
+      " If probe_wait_hit returns invalid_line_target, rebuild the app artifact and restart the JVM before rerun.",
   });
   if (args.actuationEnabled && args.actuationConfigured) {
     steps.push(

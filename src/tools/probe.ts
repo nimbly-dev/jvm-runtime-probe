@@ -24,6 +24,22 @@ const DEFAULT_PROBE_WAIT_UNREACHABLE_MAX_RETRIES =
   CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_MAX_RETRIES;
 const HARD_MAX_PROBE_WAIT_UNREACHABLE_MAX_RETRIES =
   CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_MAX_RETRIES_MAX;
+type ProbeGuidance = { actionCode: string; nextAction: string };
+
+const GUIDANCE_RUNTIME_NOT_ALIGNED: ProbeGuidance = {
+  actionCode: "runtime_not_aligned",
+  nextAction: "rebuild_app_artifact_and_restart_jvm_then_rerun_probe",
+};
+
+const GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW: ProbeGuidance = {
+  actionCode: "line_not_executed_in_window",
+  nextAction: "verify_trigger_path_or_branch_then_rerun_probe_wait_hit",
+};
+
+const GUIDANCE_PROBE_CONNECTIVITY_ISSUE: ProbeGuidance = {
+  actionCode: "probe_connectivity_issue",
+  nextAction: "verify_probe_base_url_and_agent_reachability_then_rerun",
+};
 
 function buildTextResponse(
   structuredContent: Record<string, unknown>,
@@ -203,6 +219,8 @@ function buildServiceUnreachableResponse(args: {
       hit: false,
       inline: false,
       reason: "service_unreachable",
+      actionCode: GUIDANCE_PROBE_CONNECTIVITY_ISSUE.actionCode,
+      nextAction: GUIDANCE_PROBE_CONNECTIVITY_ISSUE.nextAction,
       endpoint: args.details.endpoint,
       lastError: args.details.lastError,
       unreachableAttempts: args.details.unreachableAttempts,
@@ -240,6 +258,8 @@ function buildServiceUnreachableResponse(args: {
       `${args.details.unreachableMaxRetries}`,
     httpCode: 503,
     httpResponse: structuredContent.result,
+    actionCode: GUIDANCE_PROBE_CONNECTIVITY_ISSUE.actionCode,
+    nextAction: GUIDANCE_PROBE_CONNECTIVITY_ISSUE.nextAction,
     runDuration: `${Date.now() - args.waitStartEpochMs}ms`,
     runNotes: `probe_wait_hit service unreachable during ${args.stage}`,
   });
@@ -374,6 +394,14 @@ async function probeStatusSingle(args: {
     : json !== null
       ? `hitCount=${typeof json.hitCount === "number" ? json.hitCount : 0}, lastHitEpochMs=${typeof json.lastHitEpochMs === "number" ? json.lastHitEpochMs : 0}`
       : "No JSON probe payload";
+  const guidance = lineValidation.invalidLineTarget ? GUIDANCE_RUNTIME_NOT_ALIGNED : undefined;
+  if (guidance) {
+    structuredContent.result = {
+      reason: "invalid_line_target",
+      actionCode: guidance.actionCode,
+      nextAction: guidance.nextAction,
+    };
+  }
 
   const text = formatProbeOutput({
     probeKey: resolvedKey,
@@ -384,6 +412,7 @@ async function probeStatusSingle(args: {
     apiOutcome: res.status >= 200 && res.status < 300 ? "ok" : "error",
     reproStatus,
     probeHit,
+    ...(guidance ? { actionCode: guidance.actionCode, nextAction: guidance.nextAction } : {}),
     httpCode: res.status,
     httpResponse: res.json ?? res.text,
     runtimeMode: typeof json?.mode === "string" ? json.mode : undefined,
@@ -467,6 +496,7 @@ async function probeStatusBatch(args: {
     }
     const hitCount = typeof row.hitCount === "number" ? row.hitCount : 0;
     const lineValidation = readLineValidation(row);
+    const guidance = lineValidation.invalidLineTarget ? GUIDANCE_RUNTIME_NOT_ALIGNED : undefined;
     localByKey.set(key, {
       key,
       executionHit: lineValidation.invalidLineTarget
@@ -484,6 +514,9 @@ async function probeStatusBatch(args: {
       probeHit: lineValidation.invalidLineTarget
         ? invalidLineTargetProbeHitMessage(hitCount)
         : `hitCount=${hitCount}, lastHitEpochMs=${typeof row.lastHitEpochMs === "number" ? row.lastHitEpochMs : 0}`,
+      ...(guidance
+        ? { actionCode: guidance.actionCode, nextAction: guidance.nextAction }
+        : {}),
       httpCode: remoteResponse?.status ?? 200,
       httpResponse: row,
       runtimeMode: typeof row.mode === "string" ? row.mode : undefined,
@@ -612,6 +645,12 @@ async function probeResetSingle(args: {
     probeHit: lineValidation.invalidLineTarget
       ? `${invalidLineTargetProbeHitMessage(0)}; counter reset requested`
       : "counter reset requested",
+    ...(lineValidation.invalidLineTarget
+      ? {
+          actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
+          nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
+        }
+      : {}),
     httpCode: res.status,
     httpResponse: res.json ?? res.text,
     runDuration: "Not measured",
@@ -712,6 +751,12 @@ async function probeResetBatch(args: {
       probeHit: lineValidation.invalidLineTarget
         ? `${invalidLineTargetProbeHitMessage(0)}; counter reset requested`
         : "counter reset requested",
+      ...(lineValidation.invalidLineTarget
+        ? {
+            actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
+            nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
+          }
+        : {}),
       httpCode: res.status,
       httpResponse: row,
     });
@@ -914,6 +959,8 @@ export async function probeWaitHit(args: {
           hit: false,
           inline: false,
           reason: "invalid_line_target",
+          actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
+          nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
           lineValidation: baselineLineValidation.lineValidation ?? "invalid_line_target",
           lastStatus: baselineJson,
         },
@@ -928,6 +975,8 @@ export async function probeWaitHit(args: {
         apiOutcome: "error",
         reproStatus: "invalid_line_target",
         probeHit: invalidLineTargetProbeHitMessage(baselineHitCount),
+        actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
+        nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
         httpCode: 422,
         httpResponse: structuredContent.result,
         runtimeMode: typeof baselineJson?.mode === "string" ? baselineJson.mode : undefined,
@@ -1037,6 +1086,8 @@ export async function probeWaitHit(args: {
             hit: false,
             inline: false,
             reason: "invalid_line_target",
+            actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
+            nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
             lineValidation: lineValidation.lineValidation ?? "invalid_line_target",
             lastStatus: json ?? null,
           },
@@ -1051,6 +1102,8 @@ export async function probeWaitHit(args: {
           apiOutcome: "error",
           reproStatus: "invalid_line_target",
           probeHit: invalidLineTargetProbeHitMessage(baselineHitCount),
+          actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
+          nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
           httpCode: 422,
           httpResponse: structuredContent.result,
           runtimeMode: typeof json?.mode === "string" ? json.mode : undefined,
@@ -1123,7 +1176,15 @@ export async function probeWaitHit(args: {
       unreachableRetryEnabled,
       unreachableMaxRetries,
     },
-    result: { hit: false, inline: false, reason: "timeout_no_inline_hit", last, staleCandidate },
+    result: {
+      hit: false,
+      inline: false,
+      reason: "timeout_no_inline_hit",
+      actionCode: GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW.actionCode,
+      nextAction: GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW.nextAction,
+      last,
+      staleCandidate,
+    },
   };
   const text = formatProbeOutput({
     probeKey: resolvedKey,
@@ -1135,6 +1196,8 @@ export async function probeWaitHit(args: {
     apiOutcome: "timeout",
     reproStatus: classifyReproStatusStrictLine(resolvedKey, false),
     probeHit: "no inline line hit observed",
+    actionCode: GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW.actionCode,
+    nextAction: GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW.nextAction,
     httpCode: 408,
     httpResponse: structuredContent.result,
     runtimeMode:

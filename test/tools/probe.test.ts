@@ -54,7 +54,10 @@ test("probe_status returns invalid_line_target for unresolved runtime line", asy
     assert.equal(parsed.reproStatus, "invalid_line_target");
     assert.equal(parsed.executionHit, "not_hit");
     assert.match(parsed.probeHit, /cannot be resolved to executable bytecode/i);
+    assert.equal(parsed.actionCode, "runtime_not_aligned");
+    assert.equal(parsed.nextAction, "rebuild_app_artifact_and_restart_jvm_then_rerun_probe");
     assert.equal(out.structuredContent.response.json.lineValidation, "invalid_line_target");
+    assert.equal(out.structuredContent.result.actionCode, "runtime_not_aligned");
   });
   assert.equal(calls, 1);
 });
@@ -104,7 +107,10 @@ test("probe_wait_hit exits immediately for invalid_line_target", async () => {
     const parsed = parseProbeText(out);
     assert.equal(parsed.reproStatus, "invalid_line_target");
     assert.equal(parsed.httpCode, 422);
+    assert.equal(parsed.actionCode, "runtime_not_aligned");
+    assert.equal(parsed.nextAction, "rebuild_app_artifact_and_restart_jvm_then_rerun_probe");
     assert.equal(out.structuredContent.result.reason, "invalid_line_target");
+    assert.equal(out.structuredContent.result.actionCode, "runtime_not_aligned");
   });
   assert.equal(calls, 1);
 });
@@ -126,6 +132,8 @@ test("probe_wait_hit returns structured service_unreachable by default", async (
     const parsed = parseProbeText(out);
     assert.equal(parsed.reproStatus, "probe_unreachable");
     assert.equal(parsed.httpCode, 503);
+    assert.equal(parsed.actionCode, "probe_connectivity_issue");
+    assert.equal(parsed.nextAction, "verify_probe_base_url_and_agent_reachability_then_rerun");
     assert.equal(out.structuredContent.result.reason, "service_unreachable");
     assert.equal(out.structuredContent.result.unreachableAttempts, 1);
     assert.equal(out.structuredContent.result.unreachableRetryEnabled, false);
@@ -182,11 +190,44 @@ test("probe_wait_hit returns structured service_unreachable after unreachable re
     const parsed = parseProbeText(out);
     assert.equal(parsed.reproStatus, "probe_unreachable");
     assert.equal(parsed.httpCode, 503);
+    assert.equal(parsed.actionCode, "probe_connectivity_issue");
+    assert.equal(parsed.nextAction, "verify_probe_base_url_and_agent_reachability_then_rerun");
     assert.equal(out.structuredContent.result.reason, "service_unreachable");
     assert.equal(out.structuredContent.result.unreachableAttempts, 2);
     assert.equal(out.structuredContent.result.unreachableRetryEnabled, true);
   });
   assert.equal(calls, 2);
+});
+
+test("probe_wait_hit timeout_no_inline_hit returns line-not-executed guidance", async () => {
+  let calls = 0;
+  await withMockedFetch(async () => {
+    calls += 1;
+    return jsonResponse(200, {
+      key: "com.example.Catalog#updateAndStageSynonymRule:122",
+      hitCount: 0,
+      lastHitEpochMs: 0,
+      mode: "observe",
+      lineResolvable: true,
+      lineValidation: "resolvable",
+    });
+  }, async () => {
+    const out = await probeWaitHit({
+      key: "com.example.Catalog#updateAndStageSynonymRule:122",
+      baseUrl: "http://127.0.0.1:9191",
+      statusPath: "/__probe/status",
+      timeoutMs: 120,
+      pollIntervalMs: 60,
+      maxRetries: 1,
+    });
+    const parsed = parseProbeText(out);
+    assert.equal(parsed.httpCode, 408);
+    assert.equal(parsed.actionCode, "line_not_executed_in_window");
+    assert.equal(parsed.nextAction, "verify_trigger_path_or_branch_then_rerun_probe_wait_hit");
+    assert.equal(out.structuredContent.result.reason, "timeout_no_inline_hit");
+    assert.equal(out.structuredContent.result.actionCode, "line_not_executed_in_window");
+  });
+  assert.ok(calls >= 2);
 });
 
 test("probe_status remains backward-compatible when line validation fields are absent", async () => {
