@@ -1,4 +1,5 @@
 import { fetchJson } from "../lib/http";
+import { CONFIG_DEFAULTS } from "../config/defaults";
 import {
   clampInt,
   DEFAULT_PROBE_POLL_INTERVAL_MS,
@@ -19,6 +20,10 @@ import { formatProbeOutput } from "./probe/output.util";
 import type { ToolTextResponse } from "./probe/types.util";
 
 const LAST_RESET_EPOCH_BY_KEY = new Map<string, number>();
+const DEFAULT_PROBE_WAIT_UNREACHABLE_MAX_RETRIES =
+  CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_MAX_RETRIES;
+const HARD_MAX_PROBE_WAIT_UNREACHABLE_MAX_RETRIES =
+  CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_MAX_RETRIES_MAX;
 
 function buildTextResponse(
   structuredContent: Record<string, unknown>,
@@ -80,6 +85,165 @@ function invalidLineTargetProbeHitMessage(hitCount: number): string {
     "target line cannot be resolved to executable bytecode for this Class#method; " +
     `hitCount=${hitCount} is not evidence of method non-execution`
   );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function readProbeUnreachableErrorMessage(err: unknown): string | null {
+  const raw = err instanceof Error ? err.message : String(err);
+  return raw.includes("Probe endpoint unreachable:") ? raw : null;
+}
+
+async function probeStatusWithUnreachablePolicy(args: {
+  key: string;
+  baseUrl: string;
+  statusPath: string;
+  timeoutMs: number;
+  pollIntervalMs: number;
+  unreachableRetryEnabled: boolean;
+  unreachableMaxRetries: number;
+}): Promise<
+  | { kind: "status"; response: ToolTextResponse }
+  | {
+      kind: "unreachable";
+      details: {
+        endpoint: string;
+        lastError: string;
+        unreachableAttempts: number;
+        unreachableMaxRetries: number;
+        unreachableRetryEnabled: boolean;
+      };
+    }
+> {
+  const endpointUrl = new URL(joinUrl(args.baseUrl, args.statusPath));
+  endpointUrl.searchParams.set("key", args.key);
+  const maxAttempts = args.unreachableRetryEnabled ? args.unreachableMaxRetries : 1;
+  let lastError = "Probe endpoint unreachable";
+
+  for (let unreachableAttempt = 1; unreachableAttempt <= maxAttempts; unreachableAttempt++) {
+    try {
+      const response = await probeStatus({
+        key: args.key,
+        baseUrl: args.baseUrl,
+        statusPath: args.statusPath,
+        timeoutMs: args.timeoutMs,
+      });
+      return { kind: "status", response };
+    } catch (err) {
+      const unreachableError = readProbeUnreachableErrorMessage(err);
+      if (!unreachableError) throw err;
+      lastError = unreachableError;
+      if (unreachableAttempt >= maxAttempts) {
+        return {
+          kind: "unreachable",
+          details: {
+            endpoint: endpointUrl.toString(),
+            lastError,
+            unreachableAttempts: unreachableAttempt,
+            unreachableMaxRetries: maxAttempts,
+            unreachableRetryEnabled: args.unreachableRetryEnabled,
+          },
+        };
+      }
+      await sleep(args.pollIntervalMs);
+    }
+  }
+
+  return {
+    kind: "unreachable",
+    details: {
+      endpoint: endpointUrl.toString(),
+      lastError,
+      unreachableAttempts: maxAttempts,
+      unreachableMaxRetries: maxAttempts,
+      unreachableRetryEnabled: args.unreachableRetryEnabled,
+    },
+  };
+}
+
+function buildServiceUnreachableResponse(args: {
+  key: string;
+  resolvedKey: string;
+  timeoutMs: number;
+  pollIntervalMs: number;
+  maxRetries: number;
+  unreachableRetryEnabled: boolean;
+  unreachableMaxRetries: number;
+  attempt: number;
+  waitStartEpochMs: number;
+  inlineStartEpochMs: number;
+  stage: "baseline_status_check" | "poll_status_check";
+  baselineHitCount?: number;
+  baselineLastHitEpochMs?: number;
+  details: {
+    endpoint: string;
+    lastError: string;
+    unreachableAttempts: number;
+    unreachableMaxRetries: number;
+    unreachableRetryEnabled: boolean;
+  };
+}): ToolTextResponse {
+  const structuredContent: Record<string, unknown> = {
+    request: {
+      key: args.key,
+      resolvedKey: args.resolvedKey,
+      timeoutMs: args.timeoutMs,
+      pollIntervalMs: args.pollIntervalMs,
+      maxRetries: args.maxRetries,
+      unreachableRetryEnabled: args.unreachableRetryEnabled,
+      unreachableMaxRetries: args.unreachableMaxRetries,
+      attempt: args.attempt,
+      waitStartEpochMs: args.waitStartEpochMs,
+      inlineStartEpochMs: args.inlineStartEpochMs,
+      stage: args.stage,
+    },
+    result: {
+      hit: false,
+      inline: false,
+      reason: "service_unreachable",
+      endpoint: args.details.endpoint,
+      lastError: args.details.lastError,
+      unreachableAttempts: args.details.unreachableAttempts,
+      unreachableMaxRetries: args.details.unreachableMaxRetries,
+      unreachableRetryEnabled: args.details.unreachableRetryEnabled,
+    },
+  };
+  if (
+    typeof args.baselineHitCount === "number" &&
+    typeof args.baselineLastHitEpochMs === "number"
+  ) {
+    structuredContent.baseline = {
+      hitCount: args.baselineHitCount,
+      lastHitEpochMs: args.baselineLastHitEpochMs,
+    };
+  }
+  const text = formatProbeOutput({
+    probeKey: args.resolvedKey,
+    httpRequest: `POLL ${args.details.endpoint}`,
+    requestMethod: "POLL",
+    requestUrl: args.details.endpoint,
+    requestBody: {
+      key: args.resolvedKey,
+      timeoutMs: args.timeoutMs,
+      pollIntervalMs: args.pollIntervalMs,
+      maxRetries: args.maxRetries,
+      unreachableRetryEnabled: args.unreachableRetryEnabled,
+      unreachableMaxRetries: args.unreachableMaxRetries,
+    },
+    executionHit: "not_hit",
+    apiOutcome: "error",
+    reproStatus: "probe_unreachable",
+    probeHit:
+      `probe endpoint unreachable; attempts=${args.details.unreachableAttempts}/` +
+      `${args.details.unreachableMaxRetries}`,
+    httpCode: 503,
+    httpResponse: structuredContent.result,
+    runDuration: `${Date.now() - args.waitStartEpochMs}ms`,
+    runNotes: `probe_wait_hit service unreachable during ${args.stage}`,
+  });
+  return buildTextResponse(structuredContent, text);
 }
 
 function normalizeOptionalString(value: string | undefined): string | undefined {
@@ -638,6 +802,8 @@ export async function probeWaitHit(args: {
   timeoutMs?: number;
   pollIntervalMs?: number;
   maxRetries?: number;
+  unreachableRetryEnabled?: boolean;
+  unreachableMaxRetries?: number;
 }): Promise<ToolTextResponse> {
   const timeoutMs = clampInt(
     args.timeoutMs ?? DEFAULT_PROBE_TIMEOUT_MS,
@@ -654,17 +820,38 @@ export async function probeWaitHit(args: {
     1,
     HARD_MAX_PROBE_WAIT_MAX_RETRIES,
   );
+  const unreachableRetryEnabled = args.unreachableRetryEnabled === true;
+  const unreachableMaxRetries = clampInt(
+    args.unreachableMaxRetries ?? DEFAULT_PROBE_WAIT_UNREACHABLE_MAX_RETRIES,
+    1,
+    HARD_MAX_PROBE_WAIT_UNREACHABLE_MAX_RETRIES,
+  );
   const resolvedKey = resolveProbeKey(args.key, args.lineHint);
   const pollUrl = joinUrl(args.baseUrl, args.statusPath);
 
   if (!isLineKey(resolvedKey)) {
     return buildLineKeyRequiredResponse({
-      request: { key: args.key, resolvedKey, timeoutMs, pollIntervalMs, maxRetries },
+      request: {
+        key: args.key,
+        resolvedKey,
+        timeoutMs,
+        pollIntervalMs,
+        maxRetries,
+        unreachableRetryEnabled,
+        unreachableMaxRetries,
+      },
       targetPath: resolvedKey,
       httpRequest: `POLL ${pollUrl} (maxRetries=${maxRetries}, pollMs=${pollIntervalMs})`,
       requestMethod: "POLL",
       requestUrl: pollUrl,
-      requestBody: { key: resolvedKey, maxRetries, pollIntervalMs, timeoutMs },
+      requestBody: {
+        key: resolvedKey,
+        maxRetries,
+        pollIntervalMs,
+        timeoutMs,
+        unreachableRetryEnabled,
+        unreachableMaxRetries,
+      },
       result: { hit: false, inline: false, reason: "line_key_required" },
       runNotes: "probe_wait_hit strict line mode",
     });
@@ -677,12 +864,32 @@ export async function probeWaitHit(args: {
     const waitStartEpochMs = Date.now();
     const inlineStartEpochMs = LAST_RESET_EPOCH_BY_KEY.get(resolvedKey) ?? waitStartEpochMs;
 
-    const baselineRes = await probeStatus({
+    const baselineStatus = await probeStatusWithUnreachablePolicy({
       key: resolvedKey,
       baseUrl: args.baseUrl,
       statusPath: args.statusPath,
       timeoutMs: Math.min(5_000, timeoutMs),
+      pollIntervalMs,
+      unreachableRetryEnabled,
+      unreachableMaxRetries,
     });
+    if (baselineStatus.kind === "unreachable") {
+      return buildServiceUnreachableResponse({
+        key: args.key,
+        resolvedKey,
+        timeoutMs,
+        pollIntervalMs,
+        maxRetries,
+        unreachableRetryEnabled,
+        unreachableMaxRetries,
+        attempt,
+        waitStartEpochMs,
+        inlineStartEpochMs,
+        stage: "baseline_status_check",
+        details: baselineStatus.details,
+      });
+    }
+    const baselineRes = baselineStatus.response;
     const baselineJson = ((baselineRes.structuredContent as any)?.response?.json ??
       null) as Record<string, unknown> | null;
     const baselineLineValidation = readLineValidation(baselineJson);
@@ -697,6 +904,8 @@ export async function probeWaitHit(args: {
           timeoutMs,
           pollIntervalMs,
           maxRetries,
+          unreachableRetryEnabled,
+          unreachableMaxRetries,
           attempt,
           waitStartEpochMs,
           inlineStartEpochMs,
@@ -777,12 +986,34 @@ export async function probeWaitHit(args: {
 
     const start = waitStartEpochMs;
     while (Date.now() - start < timeoutMs) {
-      const res = await probeStatus({
+      const polledStatus = await probeStatusWithUnreachablePolicy({
         key: resolvedKey,
         baseUrl: args.baseUrl,
         statusPath: args.statusPath,
         timeoutMs: Math.min(5_000, timeoutMs),
+        pollIntervalMs,
+        unreachableRetryEnabled,
+        unreachableMaxRetries,
       });
+      if (polledStatus.kind === "unreachable") {
+        return buildServiceUnreachableResponse({
+          key: args.key,
+          resolvedKey,
+          timeoutMs,
+          pollIntervalMs,
+          maxRetries,
+          unreachableRetryEnabled,
+          unreachableMaxRetries,
+          attempt,
+          waitStartEpochMs,
+          inlineStartEpochMs,
+          stage: "poll_status_check",
+          baselineHitCount,
+          baselineLastHitEpochMs,
+          details: polledStatus.details,
+        });
+      }
+      const res = polledStatus.response;
       last = res.structuredContent;
 
       const json = (last as any)?.response?.json as Record<string, unknown> | undefined;
@@ -795,6 +1026,8 @@ export async function probeWaitHit(args: {
             timeoutMs,
             pollIntervalMs,
             maxRetries,
+            unreachableRetryEnabled,
+            unreachableMaxRetries,
             attempt,
             waitStartEpochMs,
             inlineStartEpochMs,
@@ -840,6 +1073,8 @@ export async function probeWaitHit(args: {
               timeoutMs,
               pollIntervalMs,
               maxRetries,
+              unreachableRetryEnabled,
+              unreachableMaxRetries,
               attempt,
               waitStartEpochMs,
               inlineStartEpochMs,
@@ -874,12 +1109,20 @@ export async function probeWaitHit(args: {
           };
         }
       }
-      await new Promise((r) => setTimeout(r, pollIntervalMs));
+      await sleep(pollIntervalMs);
     }
   }
 
   const structuredContent: Record<string, unknown> = {
-    request: { key: args.key, resolvedKey, timeoutMs, pollIntervalMs, maxRetries },
+    request: {
+      key: args.key,
+      resolvedKey,
+      timeoutMs,
+      pollIntervalMs,
+      maxRetries,
+      unreachableRetryEnabled,
+      unreachableMaxRetries,
+    },
     result: { hit: false, inline: false, reason: "timeout_no_inline_hit", last, staleCandidate },
   };
   const text = formatProbeOutput({

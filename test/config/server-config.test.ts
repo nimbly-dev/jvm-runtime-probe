@@ -9,6 +9,8 @@ const MANAGED_ENV_NAMES = [
   MCP_ENV.PROBE_BASE_URL,
   MCP_ENV.PROBE_STATUS_PATH,
   MCP_ENV.PROBE_RESET_PATH,
+  MCP_ENV.PROBE_WAIT_UNREACHABLE_RETRY_ENABLED,
+  MCP_ENV.PROBE_WAIT_UNREACHABLE_MAX_RETRIES,
 ] as const;
 
 function withEnv(
@@ -52,6 +54,14 @@ test("loads with only base URL and applies shared defaults for status/reset path
       const cfg = loadConfigFromEnvAndArgs(["node", "server"]);
       assert.equal(cfg.probeStatusPath, CONFIG_DEFAULTS.PROBE_STATUS_PATH);
       assert.equal(cfg.probeResetPath, CONFIG_DEFAULTS.PROBE_RESET_PATH);
+      assert.equal(
+        cfg.probeWaitUnreachableRetryEnabled,
+        CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_RETRY_ENABLED,
+      );
+      assert.equal(
+        cfg.probeWaitUnreachableMaxRetries,
+        CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_MAX_RETRIES,
+      );
     },
   );
 });
@@ -146,6 +156,51 @@ test("rejects invalid status path that does not start with slash", () => {
           assert.match(err.message, /must start with '\/'/);
           return true;
         },
+      );
+    },
+  );
+});
+
+test("parses probe wait unreachable retry settings from env", () => {
+  withEnv(
+    {
+      [MCP_ENV.PROBE_BASE_URL]: "http://127.0.0.1:9193",
+      [MCP_ENV.PROBE_WAIT_UNREACHABLE_RETRY_ENABLED]: "true",
+      [MCP_ENV.PROBE_WAIT_UNREACHABLE_MAX_RETRIES]: "7",
+    },
+    () => {
+      const cfg = loadConfigFromEnvAndArgs(["node", "server"]);
+      assert.equal(cfg.probeWaitUnreachableRetryEnabled, true);
+      assert.equal(cfg.probeWaitUnreachableMaxRetries, 7);
+    },
+  );
+});
+
+test("clamps probe wait unreachable max retries to configured bounds", () => {
+  withEnv(
+    {
+      [MCP_ENV.PROBE_BASE_URL]: "http://127.0.0.1:9193",
+      [MCP_ENV.PROBE_WAIT_UNREACHABLE_MAX_RETRIES]: "999",
+    },
+    () => {
+      const cfg = loadConfigFromEnvAndArgs(["node", "server"]);
+      assert.equal(
+        cfg.probeWaitUnreachableMaxRetries,
+        CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_MAX_RETRIES_MAX,
+      );
+    },
+  );
+
+  withEnv(
+    {
+      [MCP_ENV.PROBE_BASE_URL]: "http://127.0.0.1:9193",
+      [MCP_ENV.PROBE_WAIT_UNREACHABLE_MAX_RETRIES]: "-2",
+    },
+    () => {
+      const cfg = loadConfigFromEnvAndArgs(["node", "server"]);
+      assert.equal(
+        cfg.probeWaitUnreachableMaxRetries,
+        CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_MAX_RETRIES_MIN,
       );
     },
   );

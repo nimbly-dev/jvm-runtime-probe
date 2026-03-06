@@ -77,6 +77,8 @@ async function main() {
           resetPath: PROBE_RESET_PATH,
           actuatePath: PROBE_ACTUATE_PATH,
           waitMaxRetriesDefault: cfg.probeWaitMaxRetries,
+          waitUnreachableRetryEnabled: cfg.probeWaitUnreachableRetryEnabled,
+          waitUnreachableMaxRetries: cfg.probeWaitUnreachableMaxRetries,
         },
         recipe: {
           hasCustomTemplate: false,
@@ -902,6 +904,8 @@ async function main() {
       if (typeof timeoutMs !== "undefined") args.timeoutMs = timeoutMs;
       if (typeof pollIntervalMs !== "undefined") args.pollIntervalMs = pollIntervalMs;
       args.maxRetries = typeof maxRetries === "number" ? maxRetries : cfg.probeWaitMaxRetries;
+      args.unreachableRetryEnabled = cfg.probeWaitUnreachableRetryEnabled;
+      args.unreachableMaxRetries = cfg.probeWaitUnreachableMaxRetries;
       return await probeWaitHit(args);
     },
   );

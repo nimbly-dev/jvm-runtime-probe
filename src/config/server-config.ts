@@ -11,6 +11,8 @@ export type ServerConfig = {
   probeStatusPath: string;
   probeResetPath: string;
   probeWaitMaxRetries: number;
+  probeWaitUnreachableRetryEnabled: boolean;
+  probeWaitUnreachableMaxRetries: number;
   authLoginDiscoveryEnabled: boolean;
 };
 
@@ -57,6 +59,16 @@ export class ServerConfigLoader {
       CONFIG_DEFAULTS.PROBE_WAIT_MAX_RETRIES_MIN,
       CONFIG_DEFAULTS.PROBE_WAIT_MAX_RETRIES_MAX,
     );
+    const probeWaitUnreachableRetryEnabled = this.parseBooleanFlag(
+      this.env(MCP_ENV.PROBE_WAIT_UNREACHABLE_RETRY_ENABLED),
+      CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_RETRY_ENABLED,
+    );
+    const probeWaitUnreachableMaxRetries = this.parseIntFlag(
+      this.env(MCP_ENV.PROBE_WAIT_UNREACHABLE_MAX_RETRIES),
+      CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_MAX_RETRIES,
+      CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_MAX_RETRIES_MIN,
+      CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_MAX_RETRIES_MAX,
+    );
 
     const authLoginDiscoveryEnabled = this.parseBooleanFlag(
       this.args.get("--auth-login-discovery-enabled") ??
@@ -83,6 +95,8 @@ export class ServerConfigLoader {
       probeStatusPath,
       probeResetPath,
       probeWaitMaxRetries,
+      probeWaitUnreachableRetryEnabled,
+      probeWaitUnreachableMaxRetries,
       authLoginDiscoveryEnabled,
     };
   }
