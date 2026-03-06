@@ -25,6 +25,7 @@ import { generateRecipe } from "./tools/recipe_generate";
 import { inferTargets } from "./tools/target_infer";
 import { probeReset, probeActuate, probeStatus, probeWaitHit } from "./tools/probe";
 import { buildRoutingContext, resolveSelectedMode } from "./utils/recipe_intent_routing.util";
+import { resolveProjectForInference } from "./utils/project_resolution.util";
 
 async function main() {
   const cfg = loadConfigFromEnvAndArgs(process.argv);
@@ -56,35 +57,6 @@ async function main() {
 
   function isLikelyServerRepoRoot(rootAbs: string): boolean {
     return path.resolve(rootAbs) === SERVER_REPO_ROOT_ABS;
-  }
-
-  async function resolveProjectRoot(args: {
-    workspaceRoot?: string;
-    projectId?: string;
-    serviceHint?: string;
-  }): Promise<{ workspaceRootAbs: string; projectRootAbs: string }> {
-    const workspaceRootAbs = path.resolve(args.workspaceRoot ?? cfg.workspaceRootAbs);
-    const projects = await ensureProjects(workspaceRootAbs);
-    if (projects.length === 0) {
-      return { workspaceRootAbs, projectRootAbs: workspaceRootAbs };
-    }
-
-    if (args.projectId) {
-      const found = projects.find((p) => p.id === args.projectId);
-      if (found) return { workspaceRootAbs, projectRootAbs: found.rootAbs };
-    }
-
-    if (args.serviceHint) {
-      const needle = args.serviceHint.toLowerCase();
-      const found = projects.find((p) => p.rootAbs.toLowerCase().includes(needle));
-      if (found) return { workspaceRootAbs, projectRootAbs: found.rootAbs };
-    }
-
-    if (projects.length === 1) {
-      return { workspaceRootAbs, projectRootAbs: projects[0]!.rootAbs };
-    }
-
-    return { workspaceRootAbs, projectRootAbs: projects[0]!.rootAbs };
   }
 
   // Register at least one resource so Codex doesn't spam resources/list with "method not found".
@@ -262,29 +234,94 @@ async function main() {
           structuredContent,
         };
       }
-      const resolveArgs: Parameters<typeof resolveProjectRoot>[0] = {};
-      if (workspaceRoot) resolveArgs.workspaceRoot = workspaceRoot;
-      if (projectId) resolveArgs.projectId = projectId;
-      if (serviceHint) resolveArgs.serviceHint = serviceHint;
-      const resolved = await resolveProjectRoot(resolveArgs);
+      const workspaceRootAbs = path.resolve(workspaceRoot ?? cfg.workspaceRootAbs);
+      const projects = await ensureProjects(workspaceRootAbs);
+      const resolution = await resolveProjectForInference(
+        {
+          workspaceRootAbs,
+          projects,
+          ...(classHint ? { classHint } : {}),
+          ...(methodHint ? { methodHint } : {}),
+          ...(typeof lineHint === "number" ? { lineHint } : {}),
+          ...(serviceHint ? { serviceHint } : {}),
+          ...(projectId ? { projectId } : {}),
+          maxCandidates: clampInt(maxCandidates ?? 8, 1, 20),
+        },
+        { inferTargetsFn: inferTargets },
+      );
 
-      const inferArgs: Parameters<typeof inferTargets>[0] = {
-        rootAbs: resolved.projectRootAbs,
-        maxCandidates: clampInt(maxCandidates ?? 8, 1, 20),
-      };
-      if (classHint) inferArgs.classHint = classHint;
-      if (methodHint) inferArgs.methodHint = methodHint;
-      if (typeof lineHint === "number") inferArgs.lineHint = lineHint;
-      const inferred = await inferTargets(inferArgs);
+      if (resolution.kind === "selector_not_found") {
+        const structuredContent = {
+          resultType: "report",
+          status: "project_resolution_failed",
+          workspaceRoot: resolution.workspaceRootAbs,
+          hints: { classHint, methodHint, lineHint, serviceHint, projectId },
+          projectResolution: {
+            mode: resolution.resolutionMode,
+            selectorValue: resolution.selectorValue,
+            availableProjects: resolution.availableProjects.map((p) => ({
+              id: p.id,
+              root: p.rootAbs,
+            })),
+          },
+          nextAction: resolution.nextAction,
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
 
       const structuredContent = {
-        workspaceRoot: resolved.workspaceRootAbs,
-        projectRoot: resolved.projectRootAbs,
+        workspaceRoot: resolution.workspaceRootAbs,
         hints: { classHint, methodHint, lineHint, serviceHint, projectId },
-        scannedJavaFiles: inferred.scannedJavaFiles,
-        candidates: inferred.candidates.map((c) => ({
+        scannedJavaFiles:
+          resolution.kind === "cross_project_inference" ? resolution.scannedJavaFiles : undefined,
+        ...(resolution.kind === "resolved_project"
+          ? { projectRoot: resolution.projectRootAbs }
+          : {}),
+        projectResolution:
+          resolution.kind === "resolved_project"
+            ? {
+                mode: resolution.resolutionMode,
+                ...(resolution.projectId ? { selectedProjectId: resolution.projectId } : {}),
+                selectedProjectRoot: resolution.projectRootAbs,
+              }
+            : {
+                mode: resolution.resolutionMode,
+                topConfidence: resolution.topConfidence,
+                topProjectIds: resolution.topProjectIds,
+                isAmbiguous: resolution.isAmbiguous,
+                ...(resolution.selectedProjectId
+                  ? {
+                      selectedProjectId: resolution.selectedProjectId,
+                      selectedProjectRoot: resolution.selectedProjectRootAbs,
+                    }
+                  : {}),
+              },
+        candidates:
+          resolution.kind === "resolved_project"
+            ? (
+                await inferTargets({
+                  rootAbs: resolution.projectRootAbs,
+                  maxCandidates: clampInt(maxCandidates ?? 8, 1, 20),
+                  ...(classHint ? { classHint } : {}),
+                  ...(methodHint ? { methodHint } : {}),
+                  ...(typeof lineHint === "number" ? { lineHint } : {}),
+                })
+              ).candidates.map((c) => ({
+                ...c,
+                file: path.relative(resolution.workspaceRootAbs, c.file) || c.file,
+                ...(resolution.projectId ? { projectId: resolution.projectId } : {}),
+                projectRoot:
+                  path.relative(resolution.workspaceRootAbs, resolution.projectRootAbs) ||
+                  resolution.projectRootAbs,
+              }))
+            : resolution.candidates.map((c) => ({
           ...c,
-          file: path.relative(resolved.workspaceRootAbs, c.file) || c.file,
+          file: path.relative(resolution.workspaceRootAbs, c.file) || c.file,
+          projectRoot:
+            path.relative(resolution.workspaceRootAbs, c.projectRootAbs) || c.projectRootAbs,
         })),
       };
       return {
@@ -344,16 +381,109 @@ async function main() {
           structuredContent,
         };
       }
-
-      const resolveArgs: Parameters<typeof resolveProjectRoot>[0] = {};
-      if (workspaceRoot) resolveArgs.workspaceRoot = workspaceRoot;
-      if (projectId) resolveArgs.projectId = projectId;
-      if (serviceHint) resolveArgs.serviceHint = serviceHint;
-      const resolved = await resolveProjectRoot(resolveArgs);
+      const workspaceRootAbs = path.resolve(workspaceRoot ?? cfg.workspaceRootAbs);
+      const projects = await ensureProjects(workspaceRootAbs);
+      // Future runtime-assisted issue can extend the agent/MCP contract with service/class identity.
+      // For now, project selection remains repo-side and uses discovered projects plus source inference.
+      const resolution = await resolveProjectForInference(
+        {
+          workspaceRootAbs,
+          projects,
+          classHint,
+          methodHint,
+          ...(typeof lineHint === "number" ? { lineHint } : {}),
+          ...(serviceHint ? { serviceHint } : {}),
+          ...(projectId ? { projectId } : {}),
+        },
+        { inferTargetsFn: inferTargets },
+      );
+      if (resolution.kind === "selector_not_found") {
+        const routingDecision = resolveSelectedMode(
+          buildRoutingContext({
+            intentMode,
+            ...(typeof lineHint === "number" ? { lineHint } : {}),
+          }),
+        );
+        const structuredContent = {
+          resultType: "report",
+          status: "project_resolution_failed",
+          selectedMode: routingDecision.selectedMode,
+          ...(routingDecision.downgradedFrom
+            ? { downgradedFrom: routingDecision.downgradedFrom }
+            : {}),
+          ...(routingDecision.routingNote ? { routingNote: routingDecision.routingNote } : {}),
+          workspaceRoot: resolution.workspaceRootAbs,
+          hints: { classHint, methodHint, lineHint, serviceHint, projectId },
+          projectResolution: {
+            mode: resolution.resolutionMode,
+            selectorValue: resolution.selectorValue,
+            availableProjects: resolution.availableProjects.map((p) => ({
+              id: p.id,
+              root: p.rootAbs,
+            })),
+          },
+          nextAction: resolution.nextAction,
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
+      if (resolution.kind === "cross_project_inference" && resolution.isAmbiguous) {
+        const routingDecision = resolveSelectedMode(
+          buildRoutingContext({
+            intentMode,
+            ...(typeof lineHint === "number" ? { lineHint } : {}),
+          }),
+        );
+        const structuredContent = {
+          resultType: "report",
+          status: "ambiguous_project_match",
+          selectedMode: routingDecision.selectedMode,
+          ...(routingDecision.downgradedFrom
+            ? { downgradedFrom: routingDecision.downgradedFrom }
+            : {}),
+          ...(routingDecision.routingNote ? { routingNote: routingDecision.routingNote } : {}),
+          workspaceRoot: resolution.workspaceRootAbs,
+          hints: { classHint, methodHint, lineHint, serviceHint, projectId },
+          scannedJavaFiles: resolution.scannedJavaFiles,
+          projectResolution: {
+            mode: resolution.resolutionMode,
+            topConfidence: resolution.topConfidence,
+            topProjectIds: resolution.topProjectIds,
+            isAmbiguous: true,
+          },
+          candidates: resolution.candidates.map((c) => ({
+            ...c,
+            file: path.relative(resolution.workspaceRootAbs, c.file) || c.file,
+            projectRoot:
+              path.relative(resolution.workspaceRootAbs, c.projectRootAbs) || c.projectRootAbs,
+          })),
+          nextAction:
+            "Provide projectId or serviceHint to disambiguate the target project, then rerun recipe_generate.",
+          notes: [
+            "Multiple discovered projects produced equally strong top target matches.",
+            "Automatic project selection is blocked to avoid generating a recipe for the wrong service.",
+          ],
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
+      const resolvedProject =
+        resolution.kind === "resolved_project"
+          ? resolution
+          : {
+              workspaceRootAbs: resolution.workspaceRootAbs,
+              projectRootAbs: resolution.selectedProjectRootAbs ?? resolution.workspaceRootAbs,
+              projectId: resolution.selectedProjectId,
+              resolutionMode: resolution.resolutionMode,
+            };
 
       const generateArgs: Parameters<typeof generateRecipe>[0] = {
-        rootAbs: resolved.projectRootAbs,
-        workspaceRootAbs: resolved.workspaceRootAbs,
+        rootAbs: resolvedProject.projectRootAbs,
+        workspaceRootAbs: resolvedProject.workspaceRootAbs,
         classHint,
         methodHint,
         intentMode,
@@ -382,8 +512,8 @@ async function main() {
       const rendered = template ? renderRecipeTemplate(template, model) : undefined;
 
       const structuredContent = {
-        workspaceRoot: resolved.workspaceRootAbs,
-        projectRoot: resolved.projectRootAbs,
+        workspaceRoot: resolvedProject.workspaceRootAbs,
+        projectRoot: resolvedProject.projectRootAbs,
         hints: {
           classHint,
           methodHint,
@@ -394,10 +524,32 @@ async function main() {
           actuationReturnBoolean,
           actuationActuatorId,
         },
+        projectResolution:
+          resolution.kind === "resolved_project"
+            ? {
+                mode: resolution.resolutionMode,
+                ...(resolution.projectId ? { selectedProjectId: resolution.projectId } : {}),
+                selectedProjectRoot: resolution.projectRootAbs,
+              }
+            : {
+                mode: resolution.resolutionMode,
+                topConfidence: resolution.topConfidence,
+                topProjectIds: resolution.topProjectIds,
+                isAmbiguous: false,
+                ...(resolution.selectedProjectId
+                  ? {
+                      selectedProjectId: resolution.selectedProjectId,
+                      selectedProjectRoot: resolution.selectedProjectRootAbs,
+                    }
+                  : {}),
+              },
         inferredTarget: generated.inferredTarget
           ? {
               ...generated.inferredTarget,
-              file: path.relative(resolved.workspaceRootAbs, generated.inferredTarget.file),
+              file: path.relative(
+                resolvedProject.workspaceRootAbs,
+                generated.inferredTarget.file,
+              ),
             }
           : undefined,
         requestCandidates: generated.requestCandidates,
