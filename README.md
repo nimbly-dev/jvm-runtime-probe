@@ -120,7 +120,11 @@ Optional:
 - `MCP_PROBE_STATUS_PATH` (default `"/__probe/status"`)
 - `MCP_PROBE_RESET_PATH` (default `"/__probe/reset"`)
 - `MCP_PROBE_WAIT_MAX_RETRIES` (default `1`, max `10`)
+- `MCP_PROBE_WAIT_UNREACHABLE_RETRY_ENABLED` (default `false`)
+- `MCP_PROBE_WAIT_UNREACHABLE_MAX_RETRIES` (default `3`, max `10`)
 - `MCP_AUTH_LOGIN_DISCOVERY_ENABLED` (default `true`)
+
+`probe_wait_hit` now returns a structured `service_unreachable`/`probe_unreachable` outcome when the probe endpoint is unreachable, distinct from `timeout_no_inline_hit` when the endpoint is reachable but no inline hit is observed.
 
 ---
 
