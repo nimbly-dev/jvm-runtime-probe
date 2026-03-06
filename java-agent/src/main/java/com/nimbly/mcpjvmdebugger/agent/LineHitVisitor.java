@@ -105,6 +105,7 @@ final class LineHitVisitor extends AsmVisitorWrapper.AbstractBase {
             super.visitLineNumber(line, start);
             if (line <= 0) return;
             currentLine = line;
+            ProbeRuntime.registerResolvableLine(dottedClassName, name, line);
             super.visitLdcInsn(dottedClassName);
             super.visitLdcInsn(name);
             super.visitLdcInsn(line);

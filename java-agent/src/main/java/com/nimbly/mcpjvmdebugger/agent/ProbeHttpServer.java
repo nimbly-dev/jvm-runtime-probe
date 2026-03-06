@@ -53,6 +53,8 @@ final class ProbeHttpServer {
       String actuatorId = ProbeRuntime.getActuatorId();
       String actuateTargetKey = ProbeRuntime.getActuateTargetKey();
       boolean actuateReturnBoolean = ProbeRuntime.getActuateReturnBoolean();
+      boolean includeLineValidation = ProbeRuntime.isLineKey(key);
+      boolean lineResolvable = includeLineValidation && ProbeRuntime.isLineResolvableKey(key);
       String body =
           "{"
               + "\"key\":\"" + esc(key) + "\","
@@ -62,6 +64,10 @@ final class ProbeHttpServer {
               + "\"actuatorId\":\"" + esc(actuatorId) + "\","
               + "\"actuateTargetKey\":\"" + esc(actuateTargetKey) + "\","
               + "\"actuateReturnBoolean\":" + actuateReturnBoolean
+              + (includeLineValidation
+              ? ",\"lineResolvable\":" + lineResolvable
+              + ",\"lineValidation\":\"" + (lineResolvable ? "resolvable" : "invalid_line_target") + "\""
+              : "")
               + "}";
       writeJson(exchange, 200, body);
     }
@@ -82,8 +88,18 @@ final class ProbeHttpServer {
         writeJson(exchange, 400, "{\"error\":\"missing_key\"}");
         return;
       }
+      boolean includeLineValidation = ProbeRuntime.isLineKey(key);
+      boolean lineResolvable = includeLineValidation && ProbeRuntime.isLineResolvableKey(key);
       ProbeRuntime.reset(key);
-      String body = "{\"ok\":true,\"key\":\"" + esc(key) + "\"}";
+      String body =
+          "{"
+              + "\"ok\":true,"
+              + "\"key\":\"" + esc(key) + "\""
+              + (includeLineValidation
+              ? ",\"lineResolvable\":" + lineResolvable
+              + ",\"lineValidation\":\"" + (lineResolvable ? "resolvable" : "invalid_line_target") + "\""
+              : "")
+              + "}";
       writeJson(exchange, 200, body);
     }
   }
