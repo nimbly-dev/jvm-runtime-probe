@@ -14,6 +14,21 @@ export type InferredTarget = {
   reasons: string[];
 };
 
+export type ClassMethodSpan = {
+  methodName: string;
+  signature: string;
+  startLine: number;
+  endLine: number;
+  probeKey?: string;
+};
+
+export type ClassDiscoveryCandidate = {
+  file: string;
+  className: string;
+  fqcn?: string;
+  methods: ClassMethodSpan[];
+};
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -27,6 +42,22 @@ function inferReturnsBoolean(signature: string, methodName: string): boolean {
 
 function normalize(s?: string): string {
   return (s ?? "").trim().toLowerCase();
+}
+
+function sortClassMethodsByStartLine(methods: ClassMethodSpan[]): ClassMethodSpan[] {
+  return [...methods].sort((a, b) => {
+    if (a.startLine !== b.startLine) return a.startLine - b.startLine;
+    return a.methodName.localeCompare(b.methodName);
+  });
+}
+
+function sortClassCandidates(classes: ClassDiscoveryCandidate[]): ClassDiscoveryCandidate[] {
+  return [...classes].sort((a, b) => {
+    const left = (a.fqcn ?? a.className).toLowerCase();
+    const right = (b.fqcn ?? b.className).toLowerCase();
+    if (left !== right) return left.localeCompare(right);
+    return a.file.localeCompare(b.file);
+  });
 }
 
 function scoreCandidate(args: {
@@ -156,5 +187,90 @@ export async function inferTargets(args: {
   return {
     scannedJavaFiles: index.length,
     candidates: out.slice(0, Math.max(1, Math.min(args.maxCandidates ?? 8, 20))),
+  };
+}
+
+export async function discoverClassMethods(args: {
+  rootAbs: string;
+  classHint: string;
+  maxFiles?: number;
+}): Promise<{
+  scannedJavaFiles: number;
+  matchMode: "exact" | "partial" | "none";
+  classes: ClassDiscoveryCandidate[];
+}> {
+  const classNeedle = normalize(args.classHint);
+  if (!classNeedle) {
+    return { scannedJavaFiles: 0, matchMode: "none", classes: [] };
+  }
+
+  const index = await buildJavaIndex({
+    rootAbs: args.rootAbs,
+    maxFiles: args.maxFiles ?? 1500,
+    classHint: args.classHint,
+  });
+
+  const exactMatches: ClassDiscoveryCandidate[] = [];
+  const partialMatches: ClassDiscoveryCandidate[] = [];
+
+  for (const f of index) {
+    if (!f.className) continue;
+
+    const classNameLower = normalize(f.className);
+    const fileBaseLower = path.basename(f.fileAbs, ".java").toLowerCase();
+    const fqcn = f.packageName ? `${f.packageName}.${f.className}` : undefined;
+    const fqcnLower = normalize(fqcn);
+    const isExact = classNameLower === classNeedle || fqcnLower === classNeedle;
+    const isPartial =
+      classNameLower.includes(classNeedle) ||
+      fileBaseLower.includes(classNeedle) ||
+      fqcnLower.includes(classNeedle);
+
+    if (!isExact && !isPartial) continue;
+
+    const methods = sortClassMethodsByStartLine(
+      f.methods.map((m) => {
+        const method: ClassMethodSpan = {
+          methodName: m.name,
+          signature: m.signature,
+          startLine: m.line,
+          endLine: m.endLine,
+        };
+        if (fqcn) method.probeKey = `${fqcn}#${m.name}`;
+        return method;
+      }),
+    );
+
+    const candidate: ClassDiscoveryCandidate = {
+      file: f.fileAbs,
+      className: f.className,
+      methods,
+    };
+    if (fqcn) candidate.fqcn = fqcn;
+
+    if (isExact) exactMatches.push(candidate);
+    else partialMatches.push(candidate);
+  }
+
+  if (exactMatches.length > 0) {
+    return {
+      scannedJavaFiles: index.length,
+      matchMode: "exact",
+      classes: sortClassCandidates(exactMatches),
+    };
+  }
+
+  if (partialMatches.length > 0) {
+    return {
+      scannedJavaFiles: index.length,
+      matchMode: "partial",
+      classes: sortClassCandidates(partialMatches),
+    };
+  }
+
+  return {
+    scannedJavaFiles: index.length,
+    matchMode: "none",
+    classes: [],
   };
 }
