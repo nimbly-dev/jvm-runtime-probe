@@ -377,13 +377,23 @@ function parseControllerMethodParams(text: string, callLine: number): Controller
   if (methodLineIndex < 0 || methodLineIndex >= lines.length) return [];
 
   const chunks: string[] = [];
-  let started = false;
+  let parenDepth = 0;
+  let seenOpenParen = false;
   for (let i = methodLineIndex; i < Math.min(lines.length, methodLineIndex + 24); i++) {
     const line = lines[i] ?? "";
-    if (!started && !line.includes("(")) continue;
-    started = true;
+    if (!seenOpenParen && !line.includes("(")) continue;
     chunks.push(line.trim());
-    if (line.includes(")")) break;
+    for (const ch of line) {
+      if (ch === "(") {
+        parenDepth += 1;
+        seenOpenParen = true;
+        continue;
+      }
+      if (ch === ")" && parenDepth > 0) {
+        parenDepth -= 1;
+      }
+    }
+    if (seenOpenParen && parenDepth === 0) break;
   }
   const signature = chunks.join(" ");
   const openIdx = signature.indexOf("(");
@@ -902,10 +912,26 @@ export async function findControllerRequestCandidate(args: {
       classHint: "Controller",
       maxCandidates: 120,
     });
-    const chosenControllers = controllerFiles.candidates
+    const inferredControllers = controllerFiles.candidates
       .map((c) => c.file)
       .filter((v, i, arr) => arr.indexOf(v) === i)
       .slice(0, 120);
+    const chosenControllers = [...inferredControllers];
+    if (chosenControllers.length === 0) {
+      const rawIndex = await buildJavaIndex({
+        rootAbs,
+        classHint: "Controller",
+        maxFiles: 2500,
+      });
+      for (const entry of rawIndex) {
+        const base = path.basename(entry.fileAbs).toLowerCase();
+        const className = (entry.className ?? "").toLowerCase();
+        if (!base.includes("controller") && !className.includes("controller")) continue;
+        if (chosenControllers.includes(entry.fileAbs)) continue;
+        chosenControllers.push(entry.fileAbs);
+        if (chosenControllers.length >= 120) break;
+      }
+    }
     const controllerSet = new Set(chosenControllers);
 
     for (const file of chosenControllers) {

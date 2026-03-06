@@ -61,6 +61,27 @@ function buildLineKeyRequiredResponse(args: {
   return buildTextResponse(structuredContent, text);
 }
 
+function readLineValidation(json: Record<string, unknown> | null): {
+  lineValidation?: string;
+  lineResolvable?: boolean;
+  invalidLineTarget: boolean;
+} {
+  const out: { lineValidation?: string; lineResolvable?: boolean; invalidLineTarget: boolean } = {
+    invalidLineTarget: false,
+  };
+  if (typeof json?.lineValidation === "string") out.lineValidation = json.lineValidation;
+  if (typeof json?.lineResolvable === "boolean") out.lineResolvable = json.lineResolvable;
+  out.invalidLineTarget = out.lineValidation === "invalid_line_target" || out.lineResolvable === false;
+  return out;
+}
+
+function invalidLineTargetProbeHitMessage(hitCount: number): string {
+  return (
+    "target line cannot be resolved to executable bytecode for this Class#method; " +
+    `hitCount=${hitCount} is not evidence of method non-execution`
+  );
+}
+
 export async function probeStatus(args: {
   key: string;
   lineHint?: number;
@@ -111,23 +132,33 @@ export async function probeStatus(args: {
 
   const json = res.json as Record<string, unknown> | null;
   const hitCount = typeof json?.hitCount === "number" ? json.hitCount : 0;
+  const lineValidation = readLineValidation(json);
+  const reproStatus = lineValidation.invalidLineTarget ? "invalid_line_target" : "status_checked";
+  const executionHit = lineValidation.invalidLineTarget
+    ? "not_hit"
+    : classifyExecutionHitStrictLine(resolvedKey, hitCount > 0);
+  const probeHit = lineValidation.invalidLineTarget
+    ? invalidLineTargetProbeHitMessage(hitCount)
+    : json !== null
+      ? `hitCount=${typeof json.hitCount === "number" ? json.hitCount : 0}, lastHitEpochMs=${typeof json.lastHitEpochMs === "number" ? json.lastHitEpochMs : 0}`
+      : "No JSON probe payload";
+
   const text = formatProbeOutput({
     probeKey: resolvedKey,
     httpRequest: `GET ${url.toString()}`,
     requestMethod: "GET",
     requestUrl: url.toString(),
-    executionHit: classifyExecutionHitStrictLine(resolvedKey, hitCount > 0),
+    executionHit,
     apiOutcome: res.status >= 200 && res.status < 300 ? "ok" : "error",
-    reproStatus: "status_checked",
-    probeHit:
-      json !== null
-        ? `hitCount=${typeof json.hitCount === "number" ? json.hitCount : 0}, lastHitEpochMs=${typeof json.lastHitEpochMs === "number" ? json.lastHitEpochMs : 0}`
-        : "No JSON probe payload",
+    reproStatus,
+    probeHit,
     httpCode: res.status,
     httpResponse: res.json ?? res.text,
     runtimeMode: typeof json?.mode === "string" ? json.mode : undefined,
     runDuration: "Not measured",
-    runNotes: "probe_status executed",
+    runNotes: lineValidation.invalidLineTarget
+      ? "probe_status executed with invalid line target"
+      : "probe_status executed",
   });
 
   return buildTextResponse(structuredContent, text);
@@ -178,8 +209,11 @@ export async function probeReset(args: {
     request: { key: args.key, resolvedKey, lineHint: args.lineHint, url, timeoutMs },
     response: { status: res.status, json: res.json, text: res.json ? undefined : res.text },
   };
+  const json = res.json as Record<string, unknown> | null;
+  const lineValidation = readLineValidation(json);
+  const isOk = res.status >= 200 && res.status < 300;
 
-  if (res.status >= 200 && res.status < 300) {
+  if (isOk) {
     LAST_RESET_EPOCH_BY_KEY.set(resolvedKey, Date.now());
   }
 
@@ -191,13 +225,21 @@ export async function probeReset(args: {
     requestHeaders: { "content-type": "application/json" },
     requestBody: { key: resolvedKey },
     executionHit: "not_applicable",
-    apiOutcome: res.status >= 200 && res.status < 300 ? "ok" : "error",
-    reproStatus: res.status >= 200 && res.status < 300 ? "reset_done" : "reset_failed",
-    probeHit: "counter reset requested",
+    apiOutcome: isOk ? "ok" : "error",
+    reproStatus: lineValidation.invalidLineTarget
+      ? "invalid_line_target"
+      : isOk
+        ? "reset_done"
+        : "reset_failed",
+    probeHit: lineValidation.invalidLineTarget
+      ? `${invalidLineTargetProbeHitMessage(0)}; counter reset requested`
+      : "counter reset requested",
     httpCode: res.status,
     httpResponse: res.json ?? res.text,
     runDuration: "Not measured",
-    runNotes: "probe_reset executed",
+    runNotes: lineValidation.invalidLineTarget
+      ? "probe_reset executed with invalid line target"
+      : "probe_reset executed",
   });
 
   return buildTextResponse(structuredContent, text);
@@ -256,19 +298,57 @@ export async function probeWaitHit(args: {
       statusPath: args.statusPath,
       timeoutMs: Math.min(5_000, timeoutMs),
     });
+    const baselineJson = ((baselineRes.structuredContent as any)?.response?.json ??
+      null) as Record<string, unknown> | null;
+    const baselineLineValidation = readLineValidation(baselineJson);
     const baseline = parseProbeSnapshot(baselineRes.structuredContent);
     const baselineHitCount = baseline.hitCount ?? 0;
     const baselineLastHitEpochMs = baseline.lastHitEpochMs ?? 0;
+    if (baselineLineValidation.invalidLineTarget) {
+      const structuredContent: Record<string, unknown> = {
+        request: {
+          key: args.key,
+          resolvedKey,
+          timeoutMs,
+          pollIntervalMs,
+          maxRetries,
+          attempt,
+          waitStartEpochMs,
+          inlineStartEpochMs,
+        },
+        result: {
+          hit: false,
+          inline: false,
+          reason: "invalid_line_target",
+          lineValidation: baselineLineValidation.lineValidation ?? "invalid_line_target",
+          lastStatus: baselineJson,
+        },
+      };
+      const text = formatProbeOutput({
+        probeKey: resolvedKey,
+        httpRequest: `POLL ${pollUrl} (maxRetries=${maxRetries}, pollMs=${pollIntervalMs})`,
+        requestMethod: "POLL",
+        requestUrl: pollUrl,
+        requestBody: { key: resolvedKey, maxRetries, pollIntervalMs, timeoutMs },
+        executionHit: "not_hit",
+        apiOutcome: "error",
+        reproStatus: "invalid_line_target",
+        probeHit: invalidLineTargetProbeHitMessage(baselineHitCount),
+        httpCode: 422,
+        httpResponse: structuredContent.result,
+        runtimeMode: typeof baselineJson?.mode === "string" ? baselineJson.mode : undefined,
+        runDuration: `${Date.now() - waitStartEpochMs}ms`,
+        runNotes: "probe_wait_hit invalid line target detected at baseline status",
+      });
+      return buildTextResponse(structuredContent, text);
+    }
 
     if (
       baselineHitCount > 0 &&
       baselineLastHitEpochMs > 0 &&
       baselineLastHitEpochMs >= inlineStartEpochMs
     ) {
-      const baselineJson = ((baselineRes.structuredContent as any)?.response?.json ?? {}) as Record<
-        string,
-        unknown
-      >;
+      const baselineJsonForHit = (baselineJson ?? {}) as Record<string, unknown>;
       const structuredContent: Record<string, unknown> = {
         request: {
           key: args.key,
@@ -287,7 +367,7 @@ export async function probeWaitHit(args: {
           source: "already_hit_since_inline_start",
           hitCount: baselineHitCount,
           hitDelta: 0,
-          lastStatus: baselineJson,
+          lastStatus: baselineJsonForHit,
         },
       };
       const text = formatProbeOutput({
@@ -302,7 +382,8 @@ export async function probeWaitHit(args: {
         probeHit: `inline line hit confirmed; hitCount=${baselineHitCount}`,
         httpCode: 200,
         httpResponse: structuredContent.result,
-        runtimeMode: typeof baselineJson?.mode === "string" ? baselineJson.mode : undefined,
+        runtimeMode:
+          typeof baselineJsonForHit?.mode === "string" ? baselineJsonForHit.mode : undefined,
         runDuration: `${Date.now() - waitStartEpochMs}ms`,
         runNotes: "probe_wait_hit detected baseline inline hit",
       });
@@ -320,6 +401,46 @@ export async function probeWaitHit(args: {
       last = res.structuredContent;
 
       const json = (last as any)?.response?.json as Record<string, unknown> | undefined;
+      const lineValidation = readLineValidation(json ?? null);
+      if (lineValidation.invalidLineTarget) {
+        const structuredContent: Record<string, unknown> = {
+          request: {
+            key: args.key,
+            resolvedKey,
+            timeoutMs,
+            pollIntervalMs,
+            maxRetries,
+            attempt,
+            waitStartEpochMs,
+            inlineStartEpochMs,
+          },
+          baseline: { hitCount: baselineHitCount, lastHitEpochMs: baselineLastHitEpochMs },
+          result: {
+            hit: false,
+            inline: false,
+            reason: "invalid_line_target",
+            lineValidation: lineValidation.lineValidation ?? "invalid_line_target",
+            lastStatus: json ?? null,
+          },
+        };
+        const text = formatProbeOutput({
+          probeKey: resolvedKey,
+          httpRequest: `POLL ${pollUrl} (maxRetries=${maxRetries}, pollMs=${pollIntervalMs})`,
+          requestMethod: "POLL",
+          requestUrl: pollUrl,
+          requestBody: { key: resolvedKey, maxRetries, pollIntervalMs, timeoutMs },
+          executionHit: "not_hit",
+          apiOutcome: "error",
+          reproStatus: "invalid_line_target",
+          probeHit: invalidLineTargetProbeHitMessage(baselineHitCount),
+          httpCode: 422,
+          httpResponse: structuredContent.result,
+          runtimeMode: typeof json?.mode === "string" ? json.mode : undefined,
+          runDuration: `${Date.now() - waitStartEpochMs}ms`,
+          runNotes: "probe_wait_hit invalid line target detected during poll",
+        });
+        return buildTextResponse(structuredContent, text);
+      }
       const hitCount = typeof json?.hitCount === "number" ? json.hitCount : null;
       const lastHitEpochMs = typeof json?.lastHitEpochMs === "number" ? json.lastHitEpochMs : null;
       if (hitCount !== null) {
