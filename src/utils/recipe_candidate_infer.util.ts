@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { inferBranchCondition } from "./recipe.util";
 import { buildJavaIndex } from "../tools/java_index";
 import { inferTargets } from "../tools/target_infer";
-import type { RecipeCandidate } from "./recipe_types.util";
+import type { RecipeCandidate, RequestInferenceSource } from "./recipe_types.util";
 
 type ParamType = {
   name: string;
@@ -24,6 +24,7 @@ type MethodCallContext = {
 
 export type ControllerRequestMatch = {
   recipe?: RecipeCandidate;
+  requestSource?: RequestInferenceSource;
   matchedControllerFile?: string;
   matchedBranchCondition?: string;
   matchedRootAbs?: string;
@@ -117,16 +118,50 @@ function extractAnnotationPath(annotationArgs: string): string | undefined {
   return undefined;
 }
 
-function inferClassBasePath(text: string): string {
-  const classReq = text.match(/@RequestMapping\s*\(([\s\S]*?)\)/);
-  if (!classReq?.[1]) return "/";
-  return normalizePath(extractAnnotationPath(classReq[1]) ?? "/");
+function extractClassAnnotationBlock(text: string): string {
+  const lines = text.split(/\r?\n/);
+  const classLine = lines.findIndex((line) =>
+    /\b(?:class|interface|enum|record)\s+[A-Za-z_$][A-Za-z0-9_$]*/.test(line),
+  );
+  if (classLine <= 0) return "";
+
+  const collected: string[] = [];
+  for (let i = classLine - 1; i >= Math.max(0, classLine - 24); i--) {
+    const trimmed = (lines[i] ?? "").trim();
+    if (!trimmed) break;
+    if (
+      trimmed.startsWith("@") ||
+      trimmed.startsWith(")") ||
+      trimmed.startsWith("(") ||
+      trimmed.startsWith(",") ||
+      trimmed.startsWith("value") ||
+      trimmed.startsWith("path")
+    ) {
+      collected.unshift(trimmed);
+      continue;
+    }
+    break;
+  }
+  return collected.join(" ");
+}
+
+function inferClassBasePathWithJaxRs(text: string): string {
+  const classAnnotations = extractClassAnnotationBlock(text);
+  const springReq = classAnnotations.match(/@RequestMapping\s*\(([\s\S]*?)\)/);
+  if (springReq?.[1]) {
+    return normalizePath(extractAnnotationPath(springReq[1]) ?? "/");
+  }
+  const jaxPath = classAnnotations.match(/@(?:[A-Za-z_][A-Za-z0-9_$.]*\.)?Path\s*\(([\s\S]*?)\)/);
+  if (jaxPath?.[1]) {
+    return normalizePath(extractAnnotationPath(jaxPath[1]) ?? "/");
+  }
+  return "/";
 }
 
 function parseEndpointFromAnnotationBlock(
   annotationBlock: string,
   classBase: string,
-): { method: RecipeCandidate["method"]; path: string } | null {
+): { method: RecipeCandidate["method"]; path: string; source: RequestInferenceSource } | null {
   const directMappings: Array<{ rx: RegExp; method: RecipeCandidate["method"] }> = [
     { rx: /@GetMapping(?:\(([\s\S]*?)\))?/, method: "GET" },
     { rx: /@PostMapping(?:\(([\s\S]*?)\))?/, method: "POST" },
@@ -142,6 +177,7 @@ function parseEndpointFromAnnotationBlock(
     return {
       method: m.method,
       path: joinHttpPaths(classBase, subPath),
+      source: "spring_mvc",
     };
   }
 
@@ -156,8 +192,27 @@ function parseEndpointFromAnnotationBlock(
       return {
         method,
         path: joinHttpPaths(classBase, subPath),
+        source: "spring_mvc",
       };
     }
+  }
+
+  const jaxrsMappings: Array<{ rx: RegExp; method: RecipeCandidate["method"] }> = [
+    { rx: /@(?:[A-Za-z_][A-Za-z0-9_$.]*\.)?GET\b/, method: "GET" },
+    { rx: /@(?:[A-Za-z_][A-Za-z0-9_$.]*\.)?POST\b/, method: "POST" },
+    { rx: /@(?:[A-Za-z_][A-Za-z0-9_$.]*\.)?PUT\b/, method: "PUT" },
+    { rx: /@(?:[A-Za-z_][A-Za-z0-9_$.]*\.)?PATCH\b/, method: "PATCH" },
+    { rx: /@(?:[A-Za-z_][A-Za-z0-9_$.]*\.)?DELETE\b/, method: "DELETE" },
+  ];
+  for (const m of jaxrsMappings) {
+    if (!m.rx.test(annotationBlock)) continue;
+    const jaxPath = annotationBlock.match(/@(?:[A-Za-z_][A-Za-z0-9_$.]*\.)?Path\s*\(([\s\S]*?)\)/);
+    const subPath = jaxPath?.[1] ? extractAnnotationPath(jaxPath[1]) ?? "" : "";
+    return {
+      method: m.method,
+      path: joinHttpPaths(classBase, subPath),
+      source: "jaxrs",
+    };
   }
 
   return null;
@@ -190,12 +245,12 @@ function collectMethodAnnotationBlock(lines: string[], methodLineIndex: number):
 function inferEndpointMappingForCall(
   text: string,
   callLine: number,
-): { method: RecipeCandidate["method"]; path: string } | null {
+): { method: RecipeCandidate["method"]; path: string; source: RequestInferenceSource } | null {
   const lines = text.split(/\r?\n/);
   const methodLineIndex =
     findEnclosingMethodStartLine(lines, Math.max(0, callLine - 1)) ?? Math.max(0, callLine - 1);
   const annotationBlock = collectMethodAnnotationBlock(lines, methodLineIndex);
-  const classBase = inferClassBasePath(text);
+  const classBase = inferClassBasePathWithJaxRs(text);
   return parseEndpointFromAnnotationBlock(annotationBlock, classBase);
 }
 
@@ -253,7 +308,7 @@ async function inferEndpointMappingFromInterface(args: {
   controllerText: string;
   controllerMethodName?: string;
   searchRootsAbs: string[];
-}): Promise<{ method: RecipeCandidate["method"]; path: string } | null> {
+}): Promise<{ method: RecipeCandidate["method"]; path: string; source: RequestInferenceSource } | null> {
   if (!args.controllerMethodName) return null;
   const interfaceNames = extractImplementedInterfaces(args.controllerText);
   if (interfaceNames.length === 0) return null;
@@ -271,7 +326,7 @@ async function inferEndpointMappingFromInterface(args: {
     const methodLine = findMethodDeclarationLine(lines, args.controllerMethodName);
     if (typeof methodLine !== "number") continue;
     const annotationBlock = collectMethodAnnotationBlock(lines, methodLine);
-    const classBase = inferClassBasePath(text);
+    const classBase = inferClassBasePathWithJaxRs(text);
     const mapped = parseEndpointFromAnnotationBlock(annotationBlock, classBase);
     if (mapped) return mapped;
   }
@@ -281,12 +336,12 @@ async function inferEndpointMappingFromInterface(args: {
 function parseRequestParamsFromController(text: string): ParamType[] {
   const out: ParamType[] = [];
   const rx =
-    /@RequestParam(?:\s*\(\s*([^)]*)\s*\))?\s*(?:final\s+)?([A-Za-z0-9_<>\[\].?]+)\s+([A-Za-z_][A-Za-z0-9_]*)/g;
+    /@(RequestParam|QueryParam)(?:\s*\(\s*([^)]*)\s*\))?\s*(?:final\s+)?([A-Za-z0-9_<>\[\].?]+)\s+([A-Za-z_][A-Za-z0-9_]*)/g;
   let m: RegExpExecArray | null;
   while ((m = rx.exec(text)) !== null) {
-    const annotationArgs = m[1];
-    const javaType = m[2];
-    const name = m[3];
+    const annotationArgs = m[2];
+    const javaType = m[3];
+    const name = m[4];
     if (!name) continue;
     if (out.some((p) => p.name === name)) continue;
     let requestName = name;
@@ -378,12 +433,27 @@ function parseControllerMethodParams(text: string, callLine: number): Controller
         requestName = extractNamedValueFromAnnotationArgs(pair.args) ?? requestName;
         break;
       }
+      if (annName === "QueryParam") {
+        source = "query";
+        requestName = extractNamedValueFromAnnotationArgs(pair.args) ?? requestName;
+        break;
+      }
       if (annName === "PathVariable") {
         source = "path";
         requestName = extractNamedValueFromAnnotationArgs(pair.args) ?? requestName;
         break;
       }
+      if (annName === "PathParam") {
+        source = "path";
+        requestName = extractNamedValueFromAnnotationArgs(pair.args) ?? requestName;
+        break;
+      }
       if (annName === "RequestHeader") {
+        source = "header";
+        requestName = extractNamedValueFromAnnotationArgs(pair.args) ?? requestName;
+        break;
+      }
+      if (annName === "HeaderParam") {
         source = "header";
         requestName = extractNamedValueFromAnnotationArgs(pair.args) ?? requestName;
         break;
@@ -572,7 +642,11 @@ async function buildRecipeCandidate(args: {
   call: MethodCallContext;
   methodNameForRationale: string;
   searchRootsAbs: string[];
-}): Promise<{ recipe?: RecipeCandidate; branchCondition?: string }> {
+}): Promise<{
+  recipe?: RecipeCandidate;
+  branchCondition?: string;
+  requestSource?: RequestInferenceSource;
+}> {
   const controllerMethodParams = parseControllerMethodParams(args.text, args.call.line);
   const legacyRequestParams = parseRequestParamsFromController(args.text);
   const endpointMapping =
@@ -584,7 +658,7 @@ async function buildRecipeCandidate(args: {
         : {}),
       searchRootsAbs: args.searchRootsAbs,
     }));
-  const endpoint = endpointMapping?.path ?? inferClassBasePath(args.text);
+  const endpoint = endpointMapping?.path ?? inferClassBasePathWithJaxRs(args.text);
   const openApiOperationHints = uniqueStrings([
     args.call.enclosingMethodName ?? "",
     (args.methodNameForRationale.split("(")[0] ?? "").split(" ").at(-1) ?? "",
@@ -594,23 +668,30 @@ async function buildRecipeCandidate(args: {
     operationIds: openApiOperationHints,
   });
 
-  const mappedParam = args.call.argNames
+  const mappedParams = args.call.argNames
     .map((argName) => controllerMethodParams.find((p) => p.name === argName))
-    .find((p): p is ControllerParam => typeof p !== "undefined");
+    .filter((p): p is ControllerParam => typeof p !== "undefined");
+  const queryMappedParams = mappedParams.filter((p) => p.source === "query");
+  const pathMappedParams = mappedParams.filter((p) => p.source === "path");
+  const legacyMatchedParams = args.call.argNames
+    .map((argName) => legacyRequestParams.find((p) => p.name === argName))
+    .filter((p): p is ParamType => typeof p !== "undefined");
   const requestParamName =
-    mappedParam?.source === "query"
-      ? mappedParam.requestName
-      : args.call.argNames
-          .map((argName) => legacyRequestParams.find((p) => p.name === argName)?.requestName)
-          .find((value): value is string => typeof value === "string");
+    queryMappedParams[0]?.requestName ??
+    legacyMatchedParams[0]?.requestName ??
+    pathMappedParams[0]?.requestName;
   const requestParamType =
-    mappedParam?.javaType ??
-    args.call.argNames
-      .map((argName) => legacyRequestParams.find((p) => p.name === argName)?.javaType)
-      .find((value) => !!value);
+    queryMappedParams[0]?.javaType ?? legacyMatchedParams[0]?.javaType ?? pathMappedParams[0]?.javaType;
 
   const queryParts: string[] = [];
-  if (requestParamName && mappedParam?.source !== "body") {
+  const queryNameSet = new Set<string>();
+  for (const queryParam of queryMappedParams) {
+    const qName = queryParam.requestName || queryParam.name;
+    if (queryNameSet.has(qName)) continue;
+    queryNameSet.add(qName);
+    queryParts.push(`${qName}=${sampleValueForType(queryParam.javaType)}`);
+  }
+  if (queryParts.length === 0 && requestParamName) {
     queryParts.push(`${requestParamName}=${sampleValueForType(requestParamType)}`);
   }
   if (controllerMethodParams.some((p) => p.name === "page" && p.source === "query"))
@@ -619,17 +700,22 @@ async function buildRecipeCandidate(args: {
     queryParts.push("size=1");
 
   let pathHint = endpoint;
-  if (mappedParam?.source === "path") {
-    const requestName = mappedParam.requestName || mappedParam.name;
-    const pathParamValue = sampleValueForType(mappedParam.javaType);
+  for (const pathParam of pathMappedParams) {
+    const requestName = pathParam.requestName || pathParam.name;
+    const pathParamValue = sampleValueForType(pathParam.javaType);
     const withRequestName = pathHint.replace(
       new RegExp(`\\{${escapeRegExp(requestName)}\\}`, "g"),
       pathParamValue,
     );
     pathHint = withRequestName.replace(
-      new RegExp(`\\{${escapeRegExp(mappedParam.name)}\\}`, "g"),
+      new RegExp(`\\{${escapeRegExp(pathParam.name)}\\}`, "g"),
       pathParamValue,
     );
+    pathHint = pathHint.replace(
+      new RegExp(`\\:${escapeRegExp(requestName)}\\b`, "g"),
+      pathParamValue,
+    );
+    pathHint = pathHint.replace(new RegExp(`\\:${escapeRegExp(pathParam.name)}\\b`, "g"), pathParamValue);
   }
 
   const ctx = args.call.contextLines.join("\n");
@@ -642,30 +728,35 @@ async function buildRecipeCandidate(args: {
     ? await findOpenApiPathHint(args.searchRootsAbs, requestParamName)
     : null;
   let method: RecipeCandidate["method"] = endpointMapping?.method ?? "GET";
+  let requestSource: RequestInferenceSource | undefined = endpointMapping?.source;
   // OpenAPI is authoritative when available to avoid context/base-path drift.
   if (openApiOperation) {
     pathHint = openApiOperation.path;
     method = openApiOperation.method;
+    requestSource = "openapi";
   } else if (openapiPath) {
     pathHint = openapiPath;
+    requestSource = "openapi";
   }
 
   // Avoid emitting fake "GET /" routes; treat unresolved entrypoint as no candidate.
   const routeResolved =
     Boolean(endpointMapping) || Boolean(openapiPath) || Boolean(openApiOperation);
   if (!routeResolved && pathHint === "/") {
-    const out: { recipe?: RecipeCandidate; branchCondition?: string } = {};
+    const out: {
+      recipe?: RecipeCandidate;
+      branchCondition?: string;
+      requestSource?: RequestInferenceSource;
+    } = {};
     if (branchCondition) out.branchCondition = branchCondition;
+    if (requestSource) out.requestSource = requestSource;
     return out;
   }
 
   const filteredQuery = queryParts.filter((q) => !q.endsWith("<omit>"));
   const fullUrlHint =
     filteredQuery.length > 0 ? `${pathHint}?${filteredQuery.join("&")}` : pathHint;
-  const bodyParam =
-    mappedParam?.source === "body"
-      ? mappedParam
-      : controllerMethodParams.find((p) => p.source === "body");
+  const bodyParam = mappedParams.find((p) => p.source === "body") ?? controllerMethodParams.find((p) => p.source === "body");
   let confidence = 0.65;
   const assumptions: string[] = [];
   const needsConfirmation: string[] = [];
@@ -681,7 +772,11 @@ async function buildRecipeCandidate(args: {
     assumptions.push("Method/path inferred from static code patterns.");
     needsConfirmation.push("Confirm endpoint mapping before execution.");
   }
-  const out: { recipe?: RecipeCandidate; branchCondition?: string } = {
+  const out: {
+    recipe?: RecipeCandidate;
+    branchCondition?: string;
+    requestSource?: RequestInferenceSource;
+  } = {
     recipe: {
       method,
       path: pathHint,
@@ -695,6 +790,7 @@ async function buildRecipeCandidate(args: {
         `Controller call matched: ${args.methodNameForRationale}`,
         `Inferred endpoint path: ${pathHint}`,
         ...(openApiOperation ? ["Endpoint source: OpenAPI operationId match (preferred)."] : []),
+        ...(!openApiOperation && requestSource ? [`Endpoint source: ${requestSource}.`] : []),
         `Inferred request param: ${
           requestParamName ?? (bodyParam ? `${bodyParam.name} (request body)` : "(unknown)")
         }`,
@@ -703,6 +799,7 @@ async function buildRecipeCandidate(args: {
     },
   };
   if (branchCondition) out.branchCondition = branchCondition;
+  if (requestSource) out.requestSource = requestSource;
   return out;
 }
 
@@ -750,6 +847,7 @@ async function buildBestEffortCandidateFromControllerDeclaration(args: {
   };
   return {
     recipe: updated,
+    requestSource: "controller_declaration_fallback",
     matchedControllerFile: args.controllerFileAbs,
     ...(built.branchCondition ? { matchedBranchCondition: built.branchCondition } : {}),
   };
@@ -783,6 +881,7 @@ export async function findControllerRequestCandidate(args: {
           "Controller lookup is used as fallback when OpenAPI mapping is unavailable.",
         ],
       },
+      requestSource: "openapi",
     };
   }
 
@@ -810,6 +909,19 @@ export async function findControllerRequestCandidate(args: {
     const controllerSet = new Set(chosenControllers);
 
     for (const file of chosenControllers) {
+      const declarationFirst = await buildBestEffortCandidateFromControllerDeclaration({
+        controllerFileAbs: file,
+        methodHint: args.methodHint,
+        searchRootsAbs: [rootAbs, ...args.searchRootsAbs],
+      });
+      if (declarationFirst.recipe) {
+        const out: ControllerRequestMatch = {
+          ...declarationFirst,
+          matchedRootAbs: rootAbs,
+        };
+        return out;
+      }
+
       let text = "";
       try {
         text = await fs.readFile(file, "utf8");
@@ -827,6 +939,7 @@ export async function findControllerRequestCandidate(args: {
       if (!built.recipe) continue;
       const out: ControllerRequestMatch = {
         recipe: built.recipe,
+        ...(built.requestSource ? { requestSource: built.requestSource } : {}),
         matchedControllerFile: file,
         matchedRootAbs: rootAbs,
       };
@@ -903,12 +1016,27 @@ export async function findControllerRequestCandidate(args: {
         if (!built.recipe) continue;
         const out: ControllerRequestMatch = {
           recipe: built.recipe,
+          ...(built.requestSource ? { requestSource: built.requestSource } : {}),
           matchedControllerFile: file,
           matchedRootAbs: rootAbs,
         };
         if (built.branchCondition) out.matchedBranchCondition = built.branchCondition;
         return out;
       }
+    }
+
+    for (const file of chosenControllers) {
+      const bestEffort = await buildBestEffortCandidateFromControllerDeclaration({
+        controllerFileAbs: file,
+        methodHint: args.methodHint,
+        searchRootsAbs: [rootAbs, ...args.searchRootsAbs],
+      });
+      if (!bestEffort.recipe) continue;
+      const out: ControllerRequestMatch = {
+        ...bestEffort,
+        matchedRootAbs: rootAbs,
+      };
+      return out;
     }
   }
 
@@ -935,6 +1063,7 @@ export async function findControllerRequestCandidate(args: {
           "Controller-to-target call chain was ambiguous in static analysis.",
         ],
       },
+      requestSource: "openapi",
     };
   }
 

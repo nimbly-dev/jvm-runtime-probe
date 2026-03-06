@@ -33,6 +33,10 @@ test("recipe template model always reports selected mode", () => {
       selectedMode: "regression_api_only",
       lineTargetProvided: false,
       probeIntentRequested: false,
+      inferenceDiagnostics: {
+        target: { attempted: true, matched: true, candidateCount: 1, topConfidence: 45 },
+        request: { attempted: true, matched: true, source: "spring_mvc" },
+      },
       auth: {
         required: "unknown",
         status: "ok",
