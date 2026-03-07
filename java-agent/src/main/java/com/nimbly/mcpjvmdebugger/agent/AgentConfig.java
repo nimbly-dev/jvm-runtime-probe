@@ -20,6 +20,7 @@ final class AgentConfig {
   final boolean captureEnabled;
   final int captureMaxKeys;
   final int captureMaxArgs;
+  final int captureMethodBufferSize;
   final int capturePreviewMaxChars;
   final int captureStoredMaxChars;
   final String captureRedactionMode;
@@ -38,6 +39,7 @@ final class AgentConfig {
       boolean captureEnabled,
       int captureMaxKeys,
       int captureMaxArgs,
+      int captureMethodBufferSize,
       int capturePreviewMaxChars,
       int captureStoredMaxChars,
       String captureRedactionMode,
@@ -53,6 +55,7 @@ final class AgentConfig {
     this.captureEnabled = captureEnabled;
     this.captureMaxKeys = captureMaxKeys;
     this.captureMaxArgs = captureMaxArgs;
+    this.captureMethodBufferSize = captureMethodBufferSize;
     this.capturePreviewMaxChars = capturePreviewMaxChars;
     this.captureStoredMaxChars = captureStoredMaxChars;
     this.captureRedactionMode = captureRedactionMode;
@@ -74,6 +77,7 @@ final class AgentConfig {
     boolean captureEnabled = readDefaultCaptureEnabled();
     int captureMaxKeys = readDefaultCaptureMaxKeys();
     int captureMaxArgs = readDefaultCaptureMaxArgs();
+    int captureMethodBufferSize = readDefaultCaptureMethodBufferSize();
     int capturePreviewMaxChars = readDefaultCapturePreviewMaxChars();
     int captureStoredMaxChars = readDefaultCaptureStoredMaxChars();
     String captureRedactionMode = readDefaultCaptureRedactionMode();
@@ -118,6 +122,11 @@ final class AgentConfig {
           captureMaxKeys = parseInt(v, 1000, 10, 20_000);
         } else if ("captureMaxArgs".equalsIgnoreCase(k)) {
           captureMaxArgs = parseInt(v, 32, 1, 512);
+        } else if (
+            "captureMethodBufferSize".equalsIgnoreCase(k)
+                || "captureBufferSize".equalsIgnoreCase(k)
+        ) {
+          captureMethodBufferSize = parseInt(v, 3, 1, 32);
         } else if ("capturePreviewMaxChars".equalsIgnoreCase(k)) {
           capturePreviewMaxChars = parseInt(v, 1024, 64, 65_536);
         } else if ("captureStoredMaxChars".equalsIgnoreCase(k)) {
@@ -149,6 +158,7 @@ final class AgentConfig {
     actuateTargetKey = normalizeTargetKey(actuateTargetKey);
     captureMaxKeys = parseInt(String.valueOf(captureMaxKeys), 1000, 10, 20_000);
     captureMaxArgs = parseInt(String.valueOf(captureMaxArgs), 32, 1, 512);
+    captureMethodBufferSize = parseInt(String.valueOf(captureMethodBufferSize), 3, 1, 32);
     capturePreviewMaxChars = parseInt(String.valueOf(capturePreviewMaxChars), 1024, 64, 65_536);
     captureStoredMaxChars = parseInt(String.valueOf(captureStoredMaxChars), 16_384, 256, 524_288);
     captureRedactionMode = normalizeCaptureRedactionMode(captureRedactionMode);
@@ -169,6 +179,7 @@ final class AgentConfig {
         captureEnabled,
         captureMaxKeys,
         captureMaxArgs,
+        captureMethodBufferSize,
         capturePreviewMaxChars,
         captureStoredMaxChars,
         captureRedactionMode,
@@ -247,6 +258,16 @@ final class AgentConfig {
     if (fromEnv != null && !fromEnv.trim().isEmpty()) return parseInt(fromEnv, 32, 1, 512);
 
     return 32;
+  }
+
+  private static int readDefaultCaptureMethodBufferSize() {
+    String fromProp = System.getProperty("mcp.probe.capture.method.buffer.size");
+    if (fromProp != null && !fromProp.trim().isEmpty()) return parseInt(fromProp, 3, 1, 32);
+
+    String fromEnv = System.getenv("MCP_PROBE_CAPTURE_METHOD_BUFFER_SIZE");
+    if (fromEnv != null && !fromEnv.trim().isEmpty()) return parseInt(fromEnv, 3, 1, 32);
+
+    return 3;
   }
 
   private static int readDefaultCapturePreviewMaxChars() {

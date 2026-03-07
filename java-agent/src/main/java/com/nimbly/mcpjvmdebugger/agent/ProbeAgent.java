@@ -23,6 +23,7 @@ public final class ProbeAgent {
         cfg.captureEnabled,
         cfg.captureMaxKeys,
         cfg.captureMaxArgs,
+        cfg.captureMethodBufferSize,
         cfg.capturePreviewMaxChars,
         cfg.captureStoredMaxChars,
         cfg.captureRedactionMode
@@ -42,6 +43,7 @@ public final class ProbeAgent {
       System.err.println("[probe-agent] captureEnabled: " + cfg.captureEnabled);
       System.err.println("[probe-agent] captureMaxKeys: " + cfg.captureMaxKeys);
       System.err.println("[probe-agent] captureMaxArgs: " + cfg.captureMaxArgs);
+      System.err.println("[probe-agent] captureMethodBufferSize: " + cfg.captureMethodBufferSize);
       System.err.println("[probe-agent] capturePreviewMaxChars: " + cfg.capturePreviewMaxChars);
       System.err.println("[probe-agent] captureStoredMaxChars: " + cfg.captureStoredMaxChars);
       System.err.println("[probe-agent] captureRedactionMode: " + cfg.captureRedactionMode);

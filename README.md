@@ -37,6 +37,12 @@ mvn -f java-agent\pom.xml -DskipTests package
 -javaagent:C:\Users\Altheo\repository\mcp-jvm-debugger\java-agent\target\mcp-jvm-probe-agent-0.1.0-all.jar=host=0.0.0.0;port=9191;include=com.nimbly.phshoesbackend.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
 ```
 
+Optional Java agent capture history tuning:
+
+- Agent arg: `captureMethodBufferSize=<1..32>` (default `3`)
+- JVM property: `-Dmcp.probe.capture.method.buffer.size=<1..32>`
+- Environment variable: `MCP_PROBE_CAPTURE_METHOD_BUFFER_SIZE=<1..32>`
+
 ---
 
 ## Install MCP
