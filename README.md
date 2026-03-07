@@ -134,13 +134,14 @@ Probe endpoint paths are fixed and non-overridable:
 
 ## MCP Tools
 
-- `debug_ping`
-- `projects_discover`
-- `probe_diagnose`
-- `target_infer`
-- `recipe_generate`
-- `probe_status`
-- `probe_capture_get`
+- `debug_check`
+- `project_list`
+- `probe_check`
+- `probe_target_infer`
+- `probe_recipe_create`
+- `probe_get_status`
+- `probe_get_capture`
 - `probe_reset`
-- `probe_wait_hit`
-- `probe_actuate`
+- `probe_wait_for_hit`
+- `probe_enable`
+

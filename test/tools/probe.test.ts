@@ -32,7 +32,7 @@ function parseProbeText(result: { content: Array<{ text: string }> }): Record<st
   return JSON.parse(first.text);
 }
 
-test("probe_status returns invalid_line_target for unresolved runtime line", async () => {
+test("probe_get_status returns invalid_line_target for unresolved runtime line", async () => {
   let calls = 0;
   await withMockedFetch(async () => {
     calls += 1;
@@ -62,7 +62,7 @@ test("probe_status returns invalid_line_target for unresolved runtime line", asy
   assert.equal(calls, 1);
 });
 
-test("probe_status supports 0.1.0v nested envelope", async () => {
+test("probe_get_status supports 0.1.0v nested envelope", async () => {
   await withMockedFetch(async () => {
     return jsonResponse(200, {
       contractVersion: "0.1.0v",
@@ -121,7 +121,7 @@ test("probe_reset returns invalid_line_target semantics when runtime line is unr
   });
 });
 
-test("probe_wait_hit exits immediately for invalid_line_target", async () => {
+test("probe_wait_for_hit exits immediately for invalid_line_target", async () => {
   let calls = 0;
   await withMockedFetch(async () => {
     calls += 1;
@@ -153,7 +153,7 @@ test("probe_wait_hit exits immediately for invalid_line_target", async () => {
   assert.equal(calls, 1);
 });
 
-test("probe_wait_hit returns structured service_unreachable by default", async () => {
+test("probe_wait_for_hit returns structured service_unreachable by default", async () => {
   let calls = 0;
   await withMockedFetch(async () => {
     calls += 1;
@@ -179,7 +179,7 @@ test("probe_wait_hit returns structured service_unreachable by default", async (
   assert.equal(calls, 1);
 });
 
-test("probe_wait_hit retries unreachable status checks when enabled and can recover", async () => {
+test("probe_wait_for_hit retries unreachable status checks when enabled and can recover", async () => {
   let calls = 0;
   await withMockedFetch(async () => {
     calls += 1;
@@ -209,7 +209,7 @@ test("probe_wait_hit retries unreachable status checks when enabled and can reco
   assert.equal(calls, 2);
 });
 
-test("probe_wait_hit returns structured service_unreachable after unreachable retries are exhausted", async () => {
+test("probe_wait_for_hit returns structured service_unreachable after unreachable retries are exhausted", async () => {
   let calls = 0;
   await withMockedFetch(async () => {
     calls += 1;
@@ -237,7 +237,7 @@ test("probe_wait_hit returns structured service_unreachable after unreachable re
   assert.equal(calls, 2);
 });
 
-test("probe_wait_hit timeout_no_inline_hit returns line-not-executed guidance", async () => {
+test("probe_wait_for_hit timeout_no_inline_hit returns line-not-executed guidance", async () => {
   let calls = 0;
   await withMockedFetch(async () => {
     calls += 1;
@@ -261,14 +261,14 @@ test("probe_wait_hit timeout_no_inline_hit returns line-not-executed guidance", 
     const parsed = parseProbeText(out);
     assert.equal(parsed.httpCode, 408);
     assert.equal(parsed.actionCode, "line_not_executed_in_window");
-    assert.equal(parsed.nextAction, "verify_trigger_path_or_branch_then_rerun_probe_wait_hit");
+    assert.equal(parsed.nextAction, "verify_trigger_path_or_branch_then_rerun_probe_wait_for_hit");
     assert.equal(out.structuredContent.result.reason, "timeout_no_inline_hit");
     assert.equal(out.structuredContent.result.actionCode, "line_not_executed_in_window");
   });
   assert.ok(calls >= 2);
 });
 
-test("probe_status remains backward-compatible when line validation fields are absent", async () => {
+test("probe_get_status remains backward-compatible when line validation fields are absent", async () => {
   await withMockedFetch(async () => {
     return jsonResponse(200, {
       key: "com.example.Catalog#updateAndStageSynonymRule:122",
@@ -288,7 +288,7 @@ test("probe_status remains backward-compatible when line validation fields are a
   });
 });
 
-test("probe_status supports keys[] batch with partial success semantics", async () => {
+test("probe_get_status supports keys[] batch with partial success semantics", async () => {
   let calls = 0;
   let postedBody: any = null;
   const lineKey = "com.example.Catalog#updateAndStageSynonymRule:122";
@@ -331,7 +331,7 @@ test("probe_status supports keys[] batch with partial success semantics", async 
   assert.deepEqual(postedBody, { keys: [lineKey] });
 });
 
-test("probe_status supports 0.1.0v batch rows with nested probe payload", async () => {
+test("probe_get_status supports 0.1.0v batch rows with nested probe payload", async () => {
   const lineKey = "com.example.Catalog#updateAndStageSynonymRule:122";
   await withMockedFetch(async () => {
     return jsonResponse(200, {
@@ -377,7 +377,7 @@ test("probe_status supports 0.1.0v batch rows with nested probe payload", async 
   });
 });
 
-test("probe_capture_get returns capture payload when available", async () => {
+test("probe_get_capture returns capture payload when available", async () => {
   await withMockedFetch(async () => {
     return jsonResponse(200, {
       contractVersion: "0.1.0v",
@@ -403,7 +403,7 @@ test("probe_capture_get returns capture payload when available", async () => {
   });
 });
 
-test("probe_capture_get returns not found state when capture is missing", async () => {
+test("probe_get_capture returns not found state when capture is missing", async () => {
   await withMockedFetch(async () => {
     return jsonResponse(404, {
       contractVersion: "0.1.0v",
@@ -504,7 +504,7 @@ test("probe_reset supports className selector and class_not_found no-op response
   assert.equal(calls, 1);
 });
 
-test("probe_status rejects conflicting or missing selectors", async () => {
+test("probe_get_status rejects conflicting or missing selectors", async () => {
   await assert.rejects(
     probeStatus({
       key: "com.example.Catalog#updateAndStageSynonymRule:122",
@@ -563,3 +563,4 @@ test("probe_reset rejects conflicting or missing selectors", async () => {
     /does not allow lineHint with keys\[\] or className/i,
   );
 });
+

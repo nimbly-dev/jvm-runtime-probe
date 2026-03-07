@@ -204,8 +204,8 @@ export async function generateRecipe(
         ? "line_target_required_for_probe_mode"
         : "target_candidate_missing";
       nextAction = bestRequest
-        ? "Strict line target could not be inferred for probe verification. Refine classHint/methodHint/lineHint and rerun recipe_generate."
-        : "Refine classHint/methodHint/lineHint and rerun recipe_generate before attempting execution.";
+            ? "Strict line target could not be inferred for probe verification. Refine classHint/methodHint/lineHint and rerun probe_recipe_create."
+            : "Refine classHint/methodHint/lineHint and rerun probe_recipe_create before attempting execution.";
     }
   } else if (!bestRequest) {
     resultType = "report";

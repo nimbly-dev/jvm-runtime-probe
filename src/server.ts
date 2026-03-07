@@ -42,7 +42,7 @@ async function main() {
     version: "0.1.0",
   });
 
-  // Cache discovery results; refreshable by calling projects_discover again.
+  // Cache discovery results; refreshable by calling project_list again.
   // Important: keep startup fast; do discovery lazily (large workspaces can be slow to scan).
   let discoveredProjects: Awaited<ReturnType<typeof discoverProjects>> = [];
   let lastDiscoveryRootAbs = cfg.workspaceRootAbs;
@@ -104,7 +104,7 @@ async function main() {
   );
 
   server.registerTool(
-    "debug_ping",
+    "debug_check",
     {
       description: "Sanity check: confirms the MCP server is reachable.",
       inputSchema: {},
@@ -123,7 +123,7 @@ async function main() {
   );
 
   server.registerTool(
-    "projects_discover",
+    "project_list",
     {
       description:
         "Discover Maven/Gradle Java projects under the workspace root (pom.xml / build.gradle*) and infer probe include scope from Java package declarations.",
@@ -148,7 +148,7 @@ async function main() {
           warning:
             "Resolved workspace points to the mcp-jvm-debugger tool repository, which is likely not your active project workspace.",
           nextAction:
-            "Call projects_discover again with workspaceRoot=<active project root>, or set MCP_WORKSPACE_ROOT explicitly.",
+            "Call project_list again with workspaceRoot=<active project root>, or set MCP_WORKSPACE_ROOT explicitly.",
         };
         return {
           content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
@@ -194,7 +194,7 @@ async function main() {
   );
 
   server.registerTool(
-    "probe_diagnose",
+    "probe_check",
     {
       description:
         "Diagnose probe wiring quickly: reset/status reachability, key decoding health, and actionable next steps.",
@@ -212,7 +212,7 @@ async function main() {
   );
 
   server.registerTool(
-    "target_infer",
+    "probe_target_infer",
     {
       description:
         "Infer runtime probe keys (ranked_candidates mode) or return deterministic class method inventory with line spans (class_methods mode).",
@@ -233,7 +233,7 @@ async function main() {
           resultType: "report",
           status: "workspace_discovery_required",
           nextAction:
-            "Call projects_discover first (preferably with workspaceRoot set to the active project root), then rerun target_infer.",
+            "Call project_list first (preferably with workspaceRoot set to the active project root), then rerun probe_target_infer.",
         };
         return {
           content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
@@ -252,7 +252,7 @@ async function main() {
             status: "class_hint_required",
             workspaceRoot: workspaceRootAbs,
             nextAction:
-              "Provide classHint and rerun target_infer with discoveryMode=class_methods.",
+              "Provide classHint and rerun probe_target_infer with discoveryMode=class_methods.",
           };
           return {
             content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
@@ -288,7 +288,7 @@ async function main() {
                 availableProjects: projects.map((p) => ({ id: p.id, root: p.rootAbs })),
               },
               nextAction:
-                "Provide a valid projectId from projects_discover, or omit projectId to allow wider class discovery.",
+                "Provide a valid projectId from project_list, or omit projectId to allow wider class discovery.",
             };
             return {
               content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
@@ -317,7 +317,7 @@ async function main() {
                 availableProjects: projects.map((p) => ({ id: p.id, root: p.rootAbs })),
               },
               nextAction:
-                "Provide a valid serviceHint from projects_discover, or omit serviceHint to allow wider class discovery.",
+                "Provide a valid serviceHint from project_list, or omit serviceHint to allow wider class discovery.",
             };
             return {
               content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
@@ -404,7 +404,7 @@ async function main() {
             scannedJavaFiles,
             projectResolution,
             nextAction:
-              "Refine classHint (prefer exact class name or fully qualified class name) and rerun target_infer.",
+              "Refine classHint (prefer exact class name or fully qualified class name) and rerun probe_target_infer.",
           };
           return {
             content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
@@ -559,7 +559,7 @@ async function main() {
   );
 
   server.registerTool(
-    "recipe_generate",
+    "probe_recipe_create",
     {
       description:
         "Generate a reproducible request recipe for hitting a target method, inferred from code hints and optional local OpenAPI schema files. Includes auth/login hints when available.",
@@ -590,16 +590,16 @@ async function main() {
         );
         const structuredContent = {
           resultType: "report",
-          status: "projects_discover_required",
+          status: "project_list_required",
           selectedMode: routingDecision.selectedMode,
           ...(routingDecision.downgradedFrom
             ? { downgradedFrom: routingDecision.downgradedFrom }
             : {}),
           ...(routingDecision.routingNote ? { routingNote: routingDecision.routingNote } : {}),
           nextAction:
-            "Call projects_discover first, then rerun recipe_generate. Discovery is required before endpoint/route inference.",
+            "Call project_list first, then rerun probe_recipe_create. Discovery is required before endpoint/route inference.",
           notes: [
-            "recipe_generate is blocked until projects_discover is completed at least once.",
+            "probe_recipe_create is blocked until project_list is completed at least once.",
             "This guard prevents endpoint guessing and reduces false negatives from wrong base/context paths.",
           ],
         };
@@ -687,7 +687,7 @@ async function main() {
               path.relative(resolution.workspaceRootAbs, c.projectRootAbs) || c.projectRootAbs,
           })),
           nextAction:
-            "Provide projectId or serviceHint to disambiguate the target project, then rerun recipe_generate.",
+            "Provide projectId or serviceHint to disambiguate the target project, then rerun probe_recipe_create.",
           notes: [
             "Multiple discovered projects produced equally strong top target matches.",
             "Automatic project selection is blocked to avoid generating a recipe for the wrong service.",
@@ -844,7 +844,7 @@ async function main() {
   );
 
   server.registerTool(
-    "probe_actuate",
+    "probe_enable",
     {
       description:
         "Dynamically arm/disarm line-branch actuation without JVM restart. In actuate mode, targetKey must be fully.qualified.Class#method:line and returnBoolean controls branch decision (true=taken, false=fallthrough). Use mode=observe to disarm.",
@@ -865,10 +865,10 @@ async function main() {
   );
 
   server.registerTool(
-    "probe_capture_get",
+    "probe_get_capture",
     {
       description:
-        "Fetch full runtime capture payload by captureId emitted by probe_status capturePreview.",
+        "Fetch full runtime capture payload by captureId emitted by probe_get_status capturePreview.",
       inputSchema: ProbeCaptureGetInputSchema,
     },
     async ({ captureId, baseUrl, timeoutMs }) => {
@@ -883,7 +883,7 @@ async function main() {
   );
 
   server.registerTool(
-    "probe_status",
+    "probe_get_status",
     {
       description:
         "Query line-level probe status for one key (`key`) or many keys (`keys`). Keys must be fully.qualified.Class#method:line in strict line mode.",
@@ -924,10 +924,10 @@ async function main() {
   );
 
   server.registerTool(
-    "probe_wait_hit",
+    "probe_wait_for_hit",
     {
       description:
-        "Poll probe_status until an inline line hit is observed for key fully.qualified.Class#method:line. Method-only keys are rejected in strict line mode.",
+        "Poll probe_get_status until an inline line hit is observed for key fully.qualified.Class#method:line. Method-only keys are rejected in strict line mode.",
       inputSchema: ProbeWaitHitInputSchema,
     },
     async ({ key, lineHint, baseUrl, timeoutMs, pollIntervalMs, maxRetries }) => {

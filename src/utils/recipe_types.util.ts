@@ -42,13 +42,13 @@ export type RecipeExecutionStep = {
 
 export type ProbeCallPlan = {
   total: number;
-  verificationMethod: "probe_wait_hit";
+  verificationMethod: "probe_wait_for_hit";
   actuated: boolean;
   byTool: {
     probe_reset: number;
-    probe_wait_hit: number;
-    probe_status: number;
-    probe_actuate: number;
+    probe_wait_for_hit: number;
+    probe_get_status: number;
+    probe_enable: number;
   };
 };
 

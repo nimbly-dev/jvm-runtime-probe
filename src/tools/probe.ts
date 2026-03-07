@@ -33,7 +33,7 @@ const GUIDANCE_RUNTIME_NOT_ALIGNED: ProbeGuidance = {
 
 const GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW: ProbeGuidance = {
   actionCode: "line_not_executed_in_window",
-  nextAction: "verify_trigger_path_or_branch_then_rerun_probe_wait_hit",
+  nextAction: "verify_trigger_path_or_branch_then_rerun_probe_wait_for_hit",
 };
 
 const GUIDANCE_PROBE_CONNECTIVITY_ISSUE: ProbeGuidance = {
@@ -316,7 +316,7 @@ function buildServiceUnreachableResponse(args: {
     actionCode: GUIDANCE_PROBE_CONNECTIVITY_ISSUE.actionCode,
     nextAction: GUIDANCE_PROBE_CONNECTIVITY_ISSUE.nextAction,
     runDuration: `${Date.now() - args.waitStartEpochMs}ms`,
-    runNotes: `probe_wait_hit service unreachable during ${args.stage}`,
+    runNotes: `probe_wait_for_hit service unreachable during ${args.stage}`,
   });
   return buildTextResponse(structuredContent, text);
 }
@@ -342,7 +342,7 @@ function normalizeOptionalStringArray(values: string[] | undefined): string[] | 
 }
 
 function validateSelectorCount(
-  selectorName: "probe_status" | "probe_reset",
+  selectorName: "probe_get_status" | "probe_reset",
   selectors: Array<{ enabled: boolean; name: string }>,
 ): void {
   const active = selectors.filter((s) => s.enabled).map((s) => s.name);
@@ -350,7 +350,7 @@ function validateSelectorCount(
   if (active.length === 0) {
     throw new Error(
       `${selectorName} requires exactly one selector: ` +
-        (selectorName === "probe_status" ? "`key` or `keys`." : "`key`, `keys`, or `className`."),
+        (selectorName === "probe_get_status" ? "`key` or `keys`." : "`key`, `keys`, or `className`."),
     );
   }
   throw new Error(
@@ -412,7 +412,7 @@ async function probeStatusSingle(args: {
       requestMethod: "GET",
       requestUrl: urlString,
       result: { hit: false, reason: "line_key_required" },
-      runNotes: "probe_status strict line mode",
+      runNotes: "probe_get_status strict line mode",
     });
   }
 
@@ -474,8 +474,8 @@ async function probeStatusSingle(args: {
     runtimeMode: typeof json?.mode === "string" ? json.mode : undefined,
     runDuration: "Not measured",
     runNotes: lineValidation.invalidLineTarget
-      ? "probe_status executed with invalid line target"
-      : "probe_status executed",
+      ? "probe_get_status executed with invalid line target"
+      : "probe_get_status executed",
   });
 
   return buildTextResponse(structuredContent, text);
@@ -610,13 +610,13 @@ export async function probeStatus(args: {
 }): Promise<ToolTextResponse> {
   const key = normalizeOptionalString(args.key);
   const keys = normalizeOptionalStringArray(args.keys);
-  validateSelectorCount("probe_status", [
+  validateSelectorCount("probe_get_status", [
     { enabled: typeof key === "string", name: "key" },
     { enabled: Array.isArray(keys), name: "keys" },
   ]);
   if (keys) {
     if (typeof args.lineHint === "number") {
-      throw new Error("probe_status does not allow lineHint with keys[]. Use explicit line keys.");
+      throw new Error("probe_get_status does not allow lineHint with keys[]. Use explicit line keys.");
     }
     const batchArgs: Parameters<typeof probeStatusBatch>[0] = {
       keys,
@@ -649,7 +649,7 @@ export async function probeCaptureGet(args: {
   );
   const captureId = args.captureId.trim();
   if (!captureId) {
-    throw new Error("probe_capture_get requires captureId.");
+    throw new Error("probe_get_capture requires captureId.");
   }
   const url = new URL(joinUrl(args.baseUrl, args.capturePath));
   url.searchParams.set("captureId", captureId);
@@ -687,7 +687,7 @@ export async function probeCaptureGet(args: {
   };
 
   const textPayload = {
-    mode: "probe_capture_get",
+    mode: "probe_get_capture",
     request: structuredContent.request,
     response: structuredContent.response,
     result: structuredContent.result,
@@ -1027,7 +1027,7 @@ export async function probeWaitHit(args: {
         unreachableMaxRetries,
       },
       result: { hit: false, inline: false, reason: "line_key_required" },
-      runNotes: "probe_wait_hit strict line mode",
+      runNotes: "probe_wait_for_hit strict line mode",
     });
   }
 
@@ -1110,7 +1110,7 @@ export async function probeWaitHit(args: {
         httpResponse: structuredContent.result,
         runtimeMode: typeof baselineJson?.mode === "string" ? baselineJson.mode : undefined,
         runDuration: `${Date.now() - waitStartEpochMs}ms`,
-        runNotes: "probe_wait_hit invalid line target detected at baseline status",
+        runNotes: "probe_wait_for_hit invalid line target detected at baseline status",
       });
       return buildTextResponse(structuredContent, text);
     }
@@ -1157,7 +1157,7 @@ export async function probeWaitHit(args: {
         runtimeMode:
           typeof baselineJsonForHit?.mode === "string" ? baselineJsonForHit.mode : undefined,
         runDuration: `${Date.now() - waitStartEpochMs}ms`,
-        runNotes: "probe_wait_hit detected baseline inline hit",
+        runNotes: "probe_wait_for_hit detected baseline inline hit",
       });
       return buildTextResponse(structuredContent, text);
     }
@@ -1237,7 +1237,7 @@ export async function probeWaitHit(args: {
           httpResponse: structuredContent.result,
           runtimeMode: typeof json?.mode === "string" ? json.mode : undefined,
           runDuration: `${Date.now() - waitStartEpochMs}ms`,
-          runNotes: "probe_wait_hit invalid line target detected during poll",
+          runNotes: "probe_wait_for_hit invalid line target detected during poll",
         });
         return buildTextResponse(structuredContent, text);
       }
@@ -1278,7 +1278,7 @@ export async function probeWaitHit(args: {
             httpResponse: structuredContent.result,
             runtimeMode: typeof json?.mode === "string" ? json.mode : undefined,
             runDuration: `${Date.now() - waitStartEpochMs}ms`,
-            runNotes: "probe_wait_hit detected inline hit during poll",
+            runNotes: "probe_wait_for_hit detected inline hit during poll",
           });
           return buildTextResponse(structuredContent, text);
         }
@@ -1334,7 +1334,7 @@ export async function probeWaitHit(args: {
         ? (last as any).response.json.mode
         : undefined,
     runDuration: `${timeoutMs}ms x ${maxRetries}`,
-    runNotes: "probe_wait_hit timeout",
+    runNotes: "probe_wait_for_hit timeout",
   });
   return buildTextResponse(structuredContent, text);
 }
@@ -1385,7 +1385,7 @@ export async function probeActuate(args: {
       httpResponse: structuredContent.result,
       runtimeMode: args.mode,
       runDuration: "Not measured",
-      runNotes: "probe_actuate strict line mode",
+      runNotes: "probe_enable strict line mode",
     });
     return buildTextResponse(structuredContent, text);
   }
@@ -1445,8 +1445,9 @@ export async function probeActuate(args: {
     runtimeMode: effectiveMode,
     runDuration: "Not measured",
     runNotes:
-      "probe_actuate executed (branch forcing applies only to conditional jump opcodes encountered on targetKey line)",
+      "probe_enable executed (branch forcing applies only to conditional jump opcodes encountered on targetKey line)",
   });
 
   return buildTextResponse(structuredContent, text);
 }
+

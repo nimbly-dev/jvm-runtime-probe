@@ -53,7 +53,7 @@ function buildAvailableProjects(projects: DiscoveredProject[]): Array<{ id: stri
 }
 
 function buildSelectorNotFoundNextAction(selectorName: "projectId" | "serviceHint"): string {
-  return `Provide a valid ${selectorName} from projects_discover, or omit it to allow cross-project inference.`;
+  return `Provide a valid ${selectorName} from project_list, or omit it to allow cross-project inference.`;
 }
 
 function sortProjectCandidates(
