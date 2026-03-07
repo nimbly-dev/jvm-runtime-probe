@@ -16,6 +16,7 @@ buildNumber.properties
 # JDT-specific (Eclipse Java Development Tools)
 .classpath
 .ai_notes/
+.dev/
 node_modules
 package-lock.json
 dist/
