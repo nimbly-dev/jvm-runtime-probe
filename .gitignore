@@ -22,7 +22,6 @@ dist/
 java-agent/target/
 java-agent/probe-rules.txt
 /logs
-/docs
 test/*.test.js
 test/*.test.js.map
 test/*.test.d.ts
