@@ -623,9 +623,17 @@ async function probeResetSingle(args: {
   const json = res.json as Record<string, unknown> | null;
   const lineValidation = readLineValidation(json);
   const isOk = res.status >= 200 && res.status < 300;
+  const semanticOk = isOk && !lineValidation.invalidLineTarget;
 
-  if (isOk) {
+  if (semanticOk) {
     LAST_RESET_EPOCH_BY_KEY.set(resolvedKey, Date.now());
+  }
+  if (lineValidation.invalidLineTarget) {
+    structuredContent.result = {
+      reason: "invalid_line_target",
+      actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
+      nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
+    };
   }
 
   const text = formatProbeOutput({
@@ -636,7 +644,7 @@ async function probeResetSingle(args: {
     requestHeaders: { "content-type": "application/json" },
     requestBody: { key: resolvedKey },
     executionHit: "not_applicable",
-    apiOutcome: isOk ? "ok" : "error",
+    apiOutcome: semanticOk ? "ok" : "error",
     reproStatus: lineValidation.invalidLineTarget
       ? "invalid_line_target"
       : isOk
@@ -736,13 +744,14 @@ async function probeResetBatch(args: {
     const lineValidation = readLineValidation(row);
     const rowOk =
       typeof row.ok === "boolean" ? row.ok : res.status >= 200 && res.status < 300;
-    if (rowOk) {
+    const rowSemanticOk = rowOk && !lineValidation.invalidLineTarget;
+    if (rowSemanticOk) {
       LAST_RESET_EPOCH_BY_KEY.set(key, Date.now());
     }
     remoteResults.push({
       key,
       executionHit: "not_applicable",
-      apiOutcome: rowOk ? "ok" : "error",
+      apiOutcome: rowSemanticOk ? "ok" : "error",
       reproStatus: lineValidation.invalidLineTarget
         ? "invalid_line_target"
         : rowOk
