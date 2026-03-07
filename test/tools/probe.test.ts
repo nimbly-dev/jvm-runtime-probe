@@ -78,8 +78,10 @@ test("probe_reset returns invalid_line_target semantics when runtime line is unr
     });
     const parsed = parseProbeText(out);
     assert.equal(parsed.reproStatus, "invalid_line_target");
-    assert.equal(parsed.apiOutcome, "ok");
+    assert.equal(parsed.apiOutcome, "error");
     assert.match(parsed.probeHit, /counter reset requested/i);
+    assert.equal(out.structuredContent.result.reason, "invalid_line_target");
+    assert.equal(out.structuredContent.result.actionCode, "runtime_not_aligned");
   });
 });
 
@@ -296,7 +298,8 @@ test("probe_status supports keys[] batch with partial success semantics", async 
 test("probe_reset supports keys[] batch with partial success semantics", async () => {
   let calls = 0;
   let postedBody: any = null;
-  const lineKey = "com.example.Catalog#updateAndStageSynonymRule:122";
+  const validLineKey = "com.example.Catalog#updateAndStageSynonymRule:122";
+  const invalidLineKey = "com.example.Catalog#updateAndStageSynonymRule:123";
   const nonLineKey = "com.example.Catalog#updateAndStageSynonymRule";
 
   await withMockedFetch(async (_input, init) => {
@@ -305,19 +308,25 @@ test("probe_reset supports keys[] batch with partial success semantics", async (
     return jsonResponse(200, {
       ok: true,
       selector: "keys",
-      count: 1,
+      count: 2,
       results: [
         {
           ok: true,
-          key: lineKey,
+          key: validLineKey,
           lineResolvable: true,
           lineValidation: "resolvable",
+        },
+        {
+          ok: true,
+          key: invalidLineKey,
+          lineResolvable: false,
+          lineValidation: "invalid_line_target",
         },
       ],
     });
   }, async () => {
     const out = await probeReset({
-      keys: [lineKey, nonLineKey, lineKey],
+      keys: [validLineKey, invalidLineKey, nonLineKey, validLineKey],
       baseUrl: "http://127.0.0.1:9191",
       resetPath: "/__probe/reset",
     });
@@ -325,13 +334,18 @@ test("probe_reset supports keys[] batch with partial success semantics", async (
     const summary = parsed.summary as Record<string, unknown>;
     assert.equal(parsed.mode, "probe_batch");
     assert.equal(parsed.operation, "reset");
-    assert.equal(summary.total, 2);
+    assert.equal(summary.total, 3);
     assert.equal(summary.ok, 1);
-    assert.equal(summary.failed, 1);
+    assert.equal(summary.failed, 2);
+    const results = parsed.results as Array<Record<string, unknown>>;
+    const invalidRow = results.find((row) => row.key === invalidLineKey);
+    if (!invalidRow) throw new Error("expected invalid line row in batch response");
+    assert.equal(invalidRow.apiOutcome, "error");
+    assert.equal(invalidRow.reproStatus, "invalid_line_target");
   });
 
   assert.equal(calls, 1);
-  assert.deepEqual(postedBody, { keys: [lineKey] });
+  assert.deepEqual(postedBody, { keys: [validLineKey, invalidLineKey] });
 });
 
 test("probe_reset supports className selector and class_not_found no-op response", async () => {
