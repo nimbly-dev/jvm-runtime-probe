@@ -38,13 +38,13 @@ test("regression_api_only plan does not include probe calls", () => {
   assert.equal(instructions.includes("probe_"), false);
   assert.deepEqual(plan.probeCallPlan, {
     total: 0,
-    verificationMethod: "probe_wait_hit",
+    verificationMethod: "probe_wait_for_hit",
     actuated: false,
     byTool: {
       probe_reset: 0,
-      probe_wait_hit: 0,
-      probe_status: 0,
-      probe_actuate: 0,
+      probe_wait_for_hit: 0,
+      probe_get_status: 0,
+      probe_enable: 0,
     },
   });
 });
@@ -69,19 +69,19 @@ test("single_line_probe enforces reset -> execute -> verify order", () => {
   assert.equal(plan.steps.length, 3);
   assert.match(plan.steps[0].instruction, /probe_reset/);
   assert.match(plan.steps[1].instruction, /^GET /);
-  assert.match(plan.steps[2].instruction, /probe_wait_hit/);
-  assert.doesNotMatch(plan.steps[2].instruction, /probe_status/);
+  assert.match(plan.steps[2].instruction, /probe_wait_for_hit/);
+  assert.doesNotMatch(plan.steps[2].instruction, /probe_get_status/);
   assert.match(plan.steps[2].instruction, /invalid_line_target/i);
   assert.match(plan.steps[2].instruction, /rebuild the app artifact and restart the JVM/i);
   assert.deepEqual(plan.probeCallPlan, {
     total: 2,
-    verificationMethod: "probe_wait_hit",
+    verificationMethod: "probe_wait_for_hit",
     actuated: false,
     byTool: {
       probe_reset: 1,
-      probe_wait_hit: 1,
-      probe_status: 0,
-      probe_actuate: 0,
+      probe_wait_for_hit: 1,
+      probe_get_status: 0,
+      probe_enable: 0,
     },
   });
 });
@@ -106,20 +106,20 @@ test("combined mode enforces reset -> API -> verify order", () => {
   assert.equal(plan.steps.length, 3);
   assert.match(plan.steps[0].instruction, /probe_reset/);
   assert.match(plan.steps[1].title, /Execute regression API request/);
-  assert.match(plan.steps[2].instruction, /probe_wait_hit/);
-  assert.doesNotMatch(plan.steps[2].instruction, /probe_status/);
+  assert.match(plan.steps[2].instruction, /probe_wait_for_hit/);
+  assert.doesNotMatch(plan.steps[2].instruction, /probe_get_status/);
   assert.match(plan.steps[2].instruction, /API regression assertions/);
   assert.match(plan.steps[2].instruction, /invalid_line_target/i);
   assert.match(plan.steps[2].instruction, /rebuild the app artifact and restart the JVM/i);
   assert.deepEqual(plan.probeCallPlan, {
     total: 2,
-    verificationMethod: "probe_wait_hit",
+    verificationMethod: "probe_wait_for_hit",
     actuated: false,
     byTool: {
       probe_reset: 1,
-      probe_wait_hit: 1,
-      probe_status: 0,
-      probe_actuate: 0,
+      probe_wait_for_hit: 1,
+      probe_get_status: 0,
+      probe_enable: 0,
     },
   });
 });
@@ -144,22 +144,23 @@ test("single_line_probe actuated mode adds enable and disable cleanup calls", ()
   });
 
   assert.equal(plan.steps.length, 5);
-  assert.match(plan.steps[0].instruction, /probe_actuate/);
+  assert.match(plan.steps[0].instruction, /probe_enable/);
   assert.match(plan.steps[1].instruction, /probe_reset/);
   assert.match(plan.steps[2].instruction, /^GET /);
-  assert.match(plan.steps[3].instruction, /probe_wait_hit/);
+  assert.match(plan.steps[3].instruction, /probe_wait_for_hit/);
   assert.equal(plan.steps[4].phase, "cleanup");
-  assert.match(plan.steps[4].instruction, /probe_actuate/);
+  assert.match(plan.steps[4].instruction, /probe_enable/);
   assert.match(plan.steps[4].instruction, /mode=observe/);
   assert.deepEqual(plan.probeCallPlan, {
     total: 4,
-    verificationMethod: "probe_wait_hit",
+    verificationMethod: "probe_wait_for_hit",
     actuated: true,
     byTool: {
       probe_reset: 1,
-      probe_wait_hit: 1,
-      probe_status: 0,
-      probe_actuate: 2,
+      probe_wait_for_hit: 1,
+      probe_get_status: 0,
+      probe_enable: 2,
     },
   });
 });
+

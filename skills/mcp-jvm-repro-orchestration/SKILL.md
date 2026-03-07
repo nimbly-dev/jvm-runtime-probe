@@ -20,14 +20,14 @@ Rules:
 1. Probe-capable modes (`single_line_probe`, `regression_plus_line_probe`) require an explicit line target (`Class#method:line` or `lineHint`).
 2. If probe intent exists but no line target is provided:
    - downgrade to `regression_api_only`
-   - do not call `probe_reset`, `probe_status`, `probe_wait_hit`, or `probe_actuate`
+   - do not call `probe_reset`, `probe_get_status`, `probe_wait_for_hit`, or `probe_enable`
    - include exact note:
      - `Line target missing; provide Class#method: to enable line verification.`
 
 ## Tool Sequence
 
-1. Call `projects_discover`.
-2. Call `recipe_generate` with:
+1. Call `project_list`.
+2. Call `probe_recipe_create` with:
    - `intentMode`
    - `classHint`, `methodHint`, optional `lineHint`
    - auth fields when available
@@ -45,10 +45,10 @@ Rules:
    - zero probe tool calls
 2. `single_line_probe`
    - run line verification flow:
-     - `probe_reset` -> trigger request -> `probe_wait_hit` / `probe_status`
+     - `probe_reset` -> trigger request -> `probe_wait_for_hit` / `probe_get_status`
    - if verifying multiple line targets in one run:
      - prefer one `probe_reset` call with `keys[]` before trigger execution
-     - prefer one `probe_status` call with `keys[]` after trigger execution
+     - prefer one `probe_get_status` call with `keys[]` after trigger execution
    - if setup/reset should target all known lines for one class:
      - use `probe_reset` with `className`
 3. `regression_plus_line_probe`
@@ -56,7 +56,7 @@ Rules:
      - `probe_reset` -> API regression request -> probe verification
    - for multi-target verification in combined mode:
      - batch reset targets with `probe_reset(keys[])`
-     - batch verify targets with `probe_status(keys[])`
+     - batch verify targets with `probe_get_status(keys[])`
 
 ## Required Human Run Summary
 
@@ -77,3 +77,4 @@ Always include these fields:
 1. Never run probe tools when selected mode is `regression_api_only`.
 2. Never claim line success without strict line key verification (`Class#method:line`).
 3. Keep output machine-first from `structuredContent`, with concise human summary.
+

@@ -35,7 +35,7 @@ Use JVM args (example):
 - Runtime probe keys are dynamic: `fully.qualified.ClassName#methodName`.
 - Line-level probe keys are also emitted: `fully.qualified.ClassName#methodName:<lineNumber>`.
   - Example: `com.nimbly.phshoesbackend.useraccount.core.service.impl.SuppressionServiceImpl#shouldBlock:32`
-- In `mcp-jvm-debugger`, `projects_discover` can infer a default include glob from project packages.
+- In `mcp-jvm-debugger`, `project_list` can infer a default include glob from project packages.
 - If `include` is omitted, the agent auto-infers base package at startup:
   - from executable jar manifest `Start-Class` (or `Main-Class`)
   - or from class-launch command (`java com.example.Main`)
@@ -71,3 +71,4 @@ Use JVM args (example):
 - `POST /__probe/reset`
   - Body: `{ "key":"com.nimbly.phshoesbackend.catalog.core.repository.jpa.CatalogShoeSpecifications#finalPriceGte" }`
   - Line-key reset works the same way using `Class#method:<line>`.
+
