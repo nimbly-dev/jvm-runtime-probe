@@ -3,10 +3,12 @@ package com.nimbly.mcpjvmdebugger.agent;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -22,7 +24,7 @@ public final class ProbeRuntime {
       new ConcurrentHashMap<>();
 
   private static final Object CAPTURE_LOCK = new Object();
-  private static final LinkedHashMap<String, CaptureEntry> CAPTURE_BY_METHOD_KEY =
+  private static final LinkedHashMap<String, Deque<CaptureEntry>> CAPTURE_BY_METHOD_KEY =
       new LinkedHashMap<>(16, 0.75f, true);
   private static final LinkedHashMap<String, CaptureEntry> CAPTURE_BY_ID = new LinkedHashMap<>();
   private static final AtomicLong CAPTURE_SEQ = new AtomicLong(0L);
@@ -40,6 +42,7 @@ public final class ProbeRuntime {
   private static volatile boolean CAPTURE_ENABLED = true;
   private static volatile int CAPTURE_MAX_KEYS = 1000;
   private static volatile int CAPTURE_MAX_ARGS = 32;
+  private static volatile int CAPTURE_METHOD_BUFFER_SIZE = 3;
   private static volatile int CAPTURE_PREVIEW_MAX_CHARS = 1024;
   private static volatile int CAPTURE_STORED_MAX_CHARS = 16384;
   private static volatile String CAPTURE_REDACTION_MODE = "basic";
@@ -71,6 +74,7 @@ public final class ProbeRuntime {
       boolean captureEnabled,
       int captureMaxKeys,
       int captureMaxArgs,
+      int captureMethodBufferSize,
       int capturePreviewMaxChars,
       int captureStoredMaxChars,
       String captureRedactionMode
@@ -78,6 +82,7 @@ public final class ProbeRuntime {
     CAPTURE_ENABLED = captureEnabled;
     CAPTURE_MAX_KEYS = clamp(captureMaxKeys, 10, 20_000, 1000);
     CAPTURE_MAX_ARGS = clamp(captureMaxArgs, 1, 512, 32);
+    CAPTURE_METHOD_BUFFER_SIZE = clamp(captureMethodBufferSize, 1, 32, 3);
     CAPTURE_PREVIEW_MAX_CHARS = clamp(capturePreviewMaxChars, 64, 65_536, 1024);
     CAPTURE_STORED_MAX_CHARS = clamp(captureStoredMaxChars, 256, 524_288, 16_384);
     if (CAPTURE_STORED_MAX_CHARS < CAPTURE_PREVIEW_MAX_CHARS) {
@@ -90,11 +95,6 @@ public final class ProbeRuntime {
     if (key == null || key.isEmpty()) return;
     COUNTS.computeIfAbsent(key, k -> new AtomicLong()).incrementAndGet();
     LAST_HIT_EPOCH_MS.computeIfAbsent(key, k -> new AtomicLong()).set(System.currentTimeMillis());
-  }
-
-  public static void hitByClassMethod(String dottedClassName, String methodName) {
-    if (dottedClassName == null || methodName == null) return;
-    hit(dottedClassName + "#" + methodName);
   }
 
   public static void captureByClassMethod(
@@ -127,11 +127,17 @@ public final class ProbeRuntime {
     );
 
     synchronized (CAPTURE_LOCK) {
-      CaptureEntry replaced = CAPTURE_BY_METHOD_KEY.put(methodKey, entry);
-      if (replaced != null) {
-        CAPTURE_BY_ID.remove(replaced.captureId);
+      Deque<CaptureEntry> methodCaptures = CAPTURE_BY_METHOD_KEY.get(methodKey);
+      if (methodCaptures == null) {
+        methodCaptures = new ArrayDeque<>();
+        CAPTURE_BY_METHOD_KEY.put(methodKey, methodCaptures);
       }
+      methodCaptures.addLast(entry);
       CAPTURE_BY_ID.put(captureId, entry);
+      while (methodCaptures.size() > CAPTURE_METHOD_BUFFER_SIZE) {
+        CaptureEntry removed = methodCaptures.removeFirst();
+        CAPTURE_BY_ID.remove(removed.captureId);
+      }
       evictCapturesIfNeeded();
     }
   }
@@ -206,7 +212,11 @@ public final class ProbeRuntime {
     String methodKey = toMethodKey(key);
     if (methodKey == null) return CapturePreviewView.unavailable(CAPTURE_REDACTION_MODE);
     synchronized (CAPTURE_LOCK) {
-      CaptureEntry entry = CAPTURE_BY_METHOD_KEY.get(methodKey);
+      Deque<CaptureEntry> captures = CAPTURE_BY_METHOD_KEY.get(methodKey);
+      if (captures == null || captures.isEmpty()) {
+        return CapturePreviewView.unavailable(CAPTURE_REDACTION_MODE);
+      }
+      CaptureEntry entry = captures.peekLast();
       if (entry == null) return CapturePreviewView.unavailable(CAPTURE_REDACTION_MODE);
       return entry.toPreview(CAPTURE_PREVIEW_MAX_CHARS);
     }
@@ -245,9 +255,11 @@ public final class ProbeRuntime {
     String methodKey = toMethodKey(key);
     if (methodKey != null) {
       synchronized (CAPTURE_LOCK) {
-        CaptureEntry removed = CAPTURE_BY_METHOD_KEY.remove(methodKey);
+        Deque<CaptureEntry> removed = CAPTURE_BY_METHOD_KEY.remove(methodKey);
         if (removed != null) {
-          CAPTURE_BY_ID.remove(removed.captureId);
+          for (CaptureEntry capture : removed) {
+            CAPTURE_BY_ID.remove(capture.captureId);
+          }
         }
       }
     }
@@ -511,10 +523,12 @@ public final class ProbeRuntime {
 
   private static void evictCapturesIfNeeded() {
     while (CAPTURE_BY_METHOD_KEY.size() > CAPTURE_MAX_KEYS) {
-      Map.Entry<String, CaptureEntry> eldest = CAPTURE_BY_METHOD_KEY.entrySet().iterator().next();
-      CaptureEntry removed = CAPTURE_BY_METHOD_KEY.remove(eldest.getKey());
+      Map.Entry<String, Deque<CaptureEntry>> eldest = CAPTURE_BY_METHOD_KEY.entrySet().iterator().next();
+      Deque<CaptureEntry> removed = CAPTURE_BY_METHOD_KEY.remove(eldest.getKey());
       if (removed != null) {
-        CAPTURE_BY_ID.remove(removed.captureId);
+        for (CaptureEntry capture : removed) {
+          CAPTURE_BY_ID.remove(capture.captureId);
+        }
       }
     }
   }

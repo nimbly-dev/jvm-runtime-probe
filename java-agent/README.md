@@ -19,7 +19,7 @@ java-agent\target\mcp-jvm-probe-agent-0.1.0-all.jar
 Use JVM args (example):
 
 ```text
--javaagent:C:\Users\Altheo\repository\mcp-jvm-debugger\java-agent\target\mcp-jvm-probe-agent-0.1.0-all.jar=host=127.0.0.1;port=9191;mode=observe;actuatorId=none;include=com.nimbly.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
+-javaagent:C:\Users\Altheo\repository\mcp-jvm-debugger\java-agent\target\mcp-jvm-probe-agent-0.1.0-all.jar=host=127.0.0.1;port=9191;mode=observe;actuatorId=none;captureMethodBufferSize=3;include=com.nimbly.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
 ```
 
 `include` and `exclude` are comma-separated glob patterns over dotted class names.
@@ -50,9 +50,14 @@ Use JVM args (example):
   - `-Dmcp.probe.capture.enabled=true|false` or env `MCP_PROBE_CAPTURE_ENABLED`
   - `-Dmcp.probe.capture.max.keys=<int>` or env `MCP_PROBE_CAPTURE_MAX_KEYS`
   - `-Dmcp.probe.capture.max.args=<int>` or env `MCP_PROBE_CAPTURE_MAX_ARGS`
+  - `-Dmcp.probe.capture.method.buffer.size=<int>` or env `MCP_PROBE_CAPTURE_METHOD_BUFFER_SIZE`
   - `-Dmcp.probe.capture.preview.max.chars=<int>` or env `MCP_PROBE_CAPTURE_PREVIEW_MAX_CHARS`
   - `-Dmcp.probe.capture.stored.max.chars=<int>` or env `MCP_PROBE_CAPTURE_STORED_MAX_CHARS`
   - `-Dmcp.probe.capture.redaction=basic|off` or env `MCP_PROBE_CAPTURE_REDACTION`
+- `captureMethodBufferSize` controls recent captures retained per `Class#method`.
+  - Range: `1..32`
+  - Default: `3`
+  - Precedence: `agent arg > JVM system property > environment variable > default`
 
 ### Endpoints Exposed By Agent
 

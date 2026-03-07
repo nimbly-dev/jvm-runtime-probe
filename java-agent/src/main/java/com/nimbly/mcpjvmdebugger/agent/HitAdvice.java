@@ -6,14 +6,6 @@ import net.bytebuddy.implementation.bytecode.assign.Assigner;
 public final class HitAdvice {
   private HitAdvice() {}
 
-  @Advice.OnMethodEnter(suppress = Throwable.class)
-  public static void onEnter(
-      @Advice.Origin("#t") String dottedClassName,
-      @Advice.Origin("#m") String methodName
-  ) {
-    ProbeRuntime.hitByClassMethod(dottedClassName, methodName);
-  }
-
   @Advice.OnMethodExit(onThrowable = Throwable.class, suppress = Throwable.class)
   public static void onExit(
       @Advice.Origin("#t") String dottedClassName,
