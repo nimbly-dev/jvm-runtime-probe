@@ -6,10 +6,15 @@
 [![Java Agent Target](https://img.shields.io/badge/Java%20Agent%20Target-17-ED8B00?logo=openjdk&logoColor=white)](https://maven.apache.org/)
 [![package](https://img.shields.io/badge/package-mcp--jvm--debugger%400.1.0-0A66C2)](https://github.com/nimbly-dev/mcp-jvm-debugger)
 
-Coding agents execute the debugging workflow; this project supplies live runtime probe data from a ByteBuddy Java agent through MCP tools so agents can generate reproducible steps and line-hit verification.
+**Java MCP Dev Tool** connects agentic coding tools to live Java runtime data through a lightweight sidecar agent.  
+It attaches to a running service and exposes bytecode/runtime signals that static analysis alone cannot see,
+with that, it enables targeted regression checks, line-level/runtime-path inspection, and more reliable debugging decisions.  
 
-This is **not** a JDWP replacement.
+The Java Agent is built with **ByteBuddy**, it complements `JDWP` rather than replacing it.
 
+## How It Works
+
+Operator workflows and end-to-end execution flows are documented in [docs/how-it-works/README.md](./docs/how-it-works/README.md).
 ---
 
 ## Requirements
@@ -34,7 +39,7 @@ mvn -f java-agent\pom.xml -DskipTests package
 ## Java Agent
 
 ```text
--javaagent:C:\Users\Altheo\repository\mcp-jvm-debugger\java-agent\target\mcp-jvm-probe-agent-0.1.0-all.jar=host=0.0.0.0;port=9191;include=com.nimbly.phshoesbackend.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
+-javaagent:C:\Users\Altheo\repository\mcp-jvm-debugger\java-agent\target\mcp-jvm-probe-agent-0.1.0-all.jar=host=0.0.0.0;port=9191;include=com.{your_workspace_root_package}.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
 ```
 
 Optional Java agent capture history tuning:
@@ -146,26 +151,6 @@ Shipped skills:
 
 - `mcp-jvm-line-probe-run`
 - `mcp-jvm-regression-suite`
-
-Behavior:
-
-- Skills are MCP-first and must use `mcp-jvm-debugger` tools.
-- If MCP toolchain is unavailable, skills must stop with `toolchain_unavailable` (no raw HTTP fallback).
-- Both skills must emit explicit `Repro Steps` in run summaries.
-
-## Dynamic Probe Route Resolution (Skill)
-
-For multi-service runtimes, the shipped skills resolve probe/API targets dynamically at execution time.
-
-- Discovery is runtime-first (no static host/port assumptions in probe-capable flows).
-- Java agent status includes runtime metadata hints:
-  - `runtime.applicationType { value, source, confidence }`
-  - `runtime.appPort { value|null, source, confidence }`
-- Metadata is advisory. Final route selection must still pass probe/API reachability and strict line-target alignment checks.
-- Resolution is fail-closed:
-  - `probe_route_not_found` when no valid route exists
-  - `probe_route_ambiguous` when multiple routes remain valid
-  - summaries must include `attemptedCandidates`, `validationResults`, `nextAction`, and `Repro Steps`.
 
 ---
 
