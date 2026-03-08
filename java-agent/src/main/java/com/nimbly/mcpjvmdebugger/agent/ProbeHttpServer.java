@@ -239,6 +239,8 @@ final class ProbeHttpServer {
     boolean lineResolvable = includeLineValidation && ProbeRuntime.isLineResolvableKey(key);
 
     ProbeRuntime.CapturePreviewView capturePreview = ProbeRuntime.getCapturePreviewForKey(key);
+    ProbeRuntime.RuntimeStringSignal applicationType = ProbeRuntime.getApplicationTypeSignal();
+    ProbeRuntime.RuntimePortSignal appPort = ProbeRuntime.getAppPortSignal();
 
     String probeJson =
         "{"
@@ -256,7 +258,9 @@ final class ProbeHttpServer {
             + "\"mode\":\"" + esc(ProbeRuntime.getMode()) + "\","
             + "\"actuatorId\":\"" + esc(ProbeRuntime.getActuatorId()) + "\","
             + "\"actuateTargetKey\":\"" + esc(ProbeRuntime.getActuateTargetKey()) + "\","
-            + "\"actuateReturnBoolean\":" + ProbeRuntime.getActuateReturnBoolean()
+            + "\"actuateReturnBoolean\":" + ProbeRuntime.getActuateReturnBoolean() + ","
+            + "\"applicationType\":" + buildRuntimeStringSignalJson(applicationType) + ","
+            + "\"appPort\":" + buildRuntimePortSignalJson(appPort)
             + "}";
 
     return "\"probe\":" + probeJson + ","
@@ -296,6 +300,36 @@ final class ProbeHttpServer {
         + "\"returnValue\":" + buildNullableCaptureValueJson(capture.returnValue) + ","
         + "\"thrownValue\":" + buildNullableCaptureValueJson(capture.thrownValue) + ","
         + "\"truncatedAny\":" + capture.truncatedAny
+        + "}";
+  }
+
+  private static String buildRuntimeStringSignalJson(ProbeRuntime.RuntimeStringSignal signal) {
+    if (signal == null) {
+      return "{"
+          + "\"value\":\"unknown\","
+          + "\"source\":\"runtime_introspection\","
+          + "\"confidence\":0.0"
+          + "}";
+    }
+    return "{"
+        + "\"value\":\"" + esc(signal.value) + "\","
+        + "\"source\":\"" + esc(signal.source) + "\","
+        + "\"confidence\":" + signal.confidence
+        + "}";
+  }
+
+  private static String buildRuntimePortSignalJson(ProbeRuntime.RuntimePortSignal signal) {
+    if (signal == null) {
+      return "{"
+          + "\"value\":null,"
+          + "\"source\":\"runtime_introspection\","
+          + "\"confidence\":0.0"
+          + "}";
+    }
+    return "{"
+        + "\"value\":" + (signal.value == null ? "null" : String.valueOf(signal.value)) + ","
+        + "\"source\":\"" + esc(signal.source) + "\","
+        + "\"confidence\":" + signal.confidence
         + "}";
   }
 

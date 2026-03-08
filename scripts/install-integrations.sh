@@ -11,7 +11,7 @@ Usage:
 Options:
   --client <codex|kiro|both>      Target client(s). Default: both
   --server-name <name>            MCP server name. Default: mcp-jvm-debugger
-  --skill-name <name>             Skill folder name in ./skills. Default: mcp-jvm-repro-orchestration
+  --skill-name <name>             Install only selected skill(s). Repeatable. Default: install all shipped skills
   --probe-base-url <url>          Default: http://127.0.0.1:9193
   --workspace-root <absPath>      Optional MCP_WORKSPACE_ROOT value
   --codex-home <absPath>          Override CODEX_HOME (default: ~/.codex)
@@ -28,13 +28,17 @@ Options:
 Behavior:
 - Idempotent by default: skips if Skill/MCP already installed.
 - Use --update-skill-if-exists to replace existing installed skill folders.
+- Retired skill mcp-jvm-repro-orchestration is removed during skill install/update.
 - If no args are provided, interactive mode is enabled automatically.
 EOF
 }
 
 CLIENT="both"
 SERVER_NAME="mcp-jvm-debugger"
-SKILL_NAME="mcp-jvm-repro-orchestration"
+SKILL_NAMES_DEFAULT=("mcp-jvm-line-probe-run" "mcp-jvm-regression-suite")
+SKILL_NAMES=("${SKILL_NAMES_DEFAULT[@]}")
+SKILL_NAME_OVERRIDE=0
+RETIRED_SKILL_NAME="mcp-jvm-repro-orchestration"
 PROBE_BASE_URL="http://127.0.0.1:9193"
 WORKSPACE_ROOT=""
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
@@ -55,7 +59,14 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --client) CLIENT="${2:-}"; shift 2 ;;
     --server-name) SERVER_NAME="${2:-}"; shift 2 ;;
-    --skill-name) SKILL_NAME="${2:-}"; shift 2 ;;
+    --skill-name)
+      if [[ "$SKILL_NAME_OVERRIDE" -eq 0 ]]; then
+        SKILL_NAMES=()
+        SKILL_NAME_OVERRIDE=1
+      fi
+      SKILL_NAMES+=("${2:-}")
+      shift 2
+      ;;
     --probe-base-url) PROBE_BASE_URL="${2:-}"; shift 2 ;;
     --workspace-root) WORKSPACE_ROOT="${2:-}"; shift 2 ;;
     --codex-home) CODEX_HOME="${2:-}"; shift 2 ;;
@@ -112,7 +123,6 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SERVER_JS_PATH="$REPO_ROOT/dist/server.js"
-SKILL_SOURCE="$REPO_ROOT/skills/$SKILL_NAME"
 
 prompt_default() {
   local label="$1"
@@ -144,7 +154,6 @@ if [[ "$INTERACTIVE" -eq 1 ]]; then
   echo "Interactive install configuration:"
   CLIENT="$(prompt_default "Client (codex|kiro|both)" "$CLIENT")"
   SERVER_NAME="$(prompt_default "MCP server name" "$SERVER_NAME")"
-  SKILL_NAME="$(prompt_default "Skill name (folder under ./skills)" "$SKILL_NAME")"
   PROBE_BASE_URL="$(prompt_default "MCP_PROBE_BASE_URL" "$PROBE_BASE_URL")"
   read -r -p "MCP_WORKSPACE_ROOT (optional, empty to skip): " WORKSPACE_ROOT
   if prompt_yes_no "Install Skill?" "y"; then SKIP_SKILL=0; else SKIP_SKILL=1; fi
@@ -155,6 +164,29 @@ fi
 
 if [[ "$CLIENT" != "codex" && "$CLIENT" != "kiro" && "$CLIENT" != "both" ]]; then
   echo "Invalid client: $CLIENT" >&2
+  exit 1
+fi
+
+dedupe_skill_names() {
+  local -A seen=()
+  local out=()
+  local s
+  for s in "${SKILL_NAMES[@]}"; do
+    if [[ -z "$s" ]]; then
+      continue
+    fi
+    if [[ -n "${seen[$s]+x}" ]]; then
+      continue
+    fi
+    seen[$s]=1
+    out+=("$s")
+  done
+  SKILL_NAMES=("${out[@]}")
+}
+
+dedupe_skill_names
+if [[ "$SKIP_SKILL" -eq 0 && "${#SKILL_NAMES[@]}" -eq 0 ]]; then
+  echo "No skills selected. Provide --skill-name <name> or omit --skill-name to install defaults." >&2
   exit 1
 fi
 
@@ -222,6 +254,23 @@ install_or_update_skill() {
   if [[ "$DRY_RUN" -eq 0 ]]; then
     mkdir -p "$(dirname "$dest_dir")"
     cp -R "$source_dir" "$dest_dir"
+  fi
+}
+
+remove_retired_skill_if_present() {
+  local skills_root="$1"
+  local retired_name="$2"
+  local label="$3"
+  local retired_dir="$skills_root/$retired_name"
+
+  if [[ ! -d "$retired_dir" ]]; then
+    echo "- $label: retired skill not present, skipping ($retired_dir)"
+    return
+  fi
+
+  echo "- $label: removing retired skill $retired_dir"
+  if [[ "$DRY_RUN" -eq 0 ]]; then
+    replace_skill_dir "$retired_dir" "$skills_root"
   fi
 }
 
@@ -355,7 +404,14 @@ fi
 
 if [[ "$CLIENT" == "codex" || "$CLIENT" == "both" ]]; then
   if [[ "$SKIP_SKILL" -eq 0 ]]; then
-    install_or_update_skill "$SKILL_SOURCE" "$CODEX_HOME/skills/$SKILL_NAME" "Codex skill" "$CODEX_HOME/skills"
+    remove_retired_skill_if_present "$CODEX_HOME/skills" "$RETIRED_SKILL_NAME" "Codex skills"
+    for skill_name in "${SKILL_NAMES[@]}"; do
+      install_or_update_skill \
+        "$REPO_ROOT/skills/$skill_name" \
+        "$CODEX_HOME/skills/$skill_name" \
+        "Codex skill ($skill_name)" \
+        "$CODEX_HOME/skills"
+    done
   fi
   if [[ "$SKIP_MCP" -eq 0 ]]; then
     append_codex_mcp_if_missing "$CODEX_HOME/config.toml" "$SERVER_NAME" "$SERVER_JS_PATH"
@@ -370,7 +426,14 @@ if [[ "$CLIENT" == "kiro" || "$CLIENT" == "both" ]]; then
     KIRO_CONFIG="$(detect_kiro_config_path)"
   fi
   if [[ "$SKIP_SKILL" -eq 0 ]]; then
-    install_or_update_skill "$SKILL_SOURCE" "$KIRO_SKILLS_DIR/$SKILL_NAME" "Kiro skill" "$KIRO_SKILLS_DIR"
+    remove_retired_skill_if_present "$KIRO_SKILLS_DIR" "$RETIRED_SKILL_NAME" "Kiro skills"
+    for skill_name in "${SKILL_NAMES[@]}"; do
+      install_or_update_skill \
+        "$REPO_ROOT/skills/$skill_name" \
+        "$KIRO_SKILLS_DIR/$skill_name" \
+        "Kiro skill ($skill_name)" \
+        "$KIRO_SKILLS_DIR"
+    done
   fi
   if [[ "$SKIP_MCP" -eq 0 ]]; then
     install_kiro_mcp_if_missing "$KIRO_CONFIG" "$SERVER_NAME" "$SERVER_JS_PATH"

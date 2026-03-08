@@ -95,6 +95,12 @@ Column meanings:
 | `response.json.lineValidation` | Line validation verdict (`resolvable` or `invalid_line_target`). | `probe_get_status` | false | `"resolvable"` |
 | `response.json.capturePreview` | Lightweight runtime payload preview from Java agent. | `probe_get_status` | false | `{"available":true,"captureId":"abc123"}` |
 | `response.json.runtime` | Runtime actuation/observe mode payload. | `probe_get_status` | false | `{"mode":"observe"}` |
+| `response.json.runtime.applicationType.value` | Runtime application framework classification hint. | `probe_get_status` | false | `"spring-boot"` |
+| `response.json.runtime.applicationType.source` | Source used to infer application type. | `probe_get_status` | false | `"classpath:org.springframework.boot.SpringApplication"` |
+| `response.json.runtime.applicationType.confidence` | Confidence score (`0.0..1.0`) for application type hint. | `probe_get_status` | false | `0.9` |
+| `response.json.runtime.appPort.value` | Runtime application port hint when inferable (`null` when unknown). | `probe_get_status` | false | `8082` |
+| `response.json.runtime.appPort.source` | Source used to infer app port hint. | `probe_get_status` | false | `"system_property:server.port"` |
+| `response.json.runtime.appPort.confidence` | Confidence score (`0.0..1.0`) for app port hint. | `probe_get_status` | false | `0.95` |
 | `result` | Guidance block when runtime alignment fails. | `probe_get_status` | false | `{"reason":"invalid_line_target","actionCode":"runtime_not_aligned"}` |
 | `mode` | Batch marker when `keys[]` is used. | `probe_get_status` | false | `"probe_batch"` |
 | `operation` | Batch operation identifier. | `probe_get_status` | false | `"status"` |
@@ -135,5 +141,17 @@ Column meanings:
 | `result.actionCode` | Action code for deterministic orchestrator next-step routing. | `probe_wait_for_hit` | false | `"line_not_executed_in_window"` |
 | `result.nextAction` | Human-readable follow-up action. | `probe_wait_for_hit` | false | `"verify_trigger_path_or_branch_then_rerun_probe_wait_for_hit"` |
 | `result.lastStatus` | Last observed probe status payload. | `probe_wait_for_hit` | false | `{"hitCount":0}` |
+
+## Skill-Orchestrated Route Pushback (`mcp-jvm-line-probe-run`, `mcp-jvm-regression-suite`)
+
+These fields are emitted by orchestration summaries in skill-guided runs when probe route resolution cannot be proven uniquely.
+
+| fieldName | fieldDesc | toolUsedBy | required | exampleValue |
+| --- | --- | --- | --- | --- |
+| `reasonCode` | Deterministic failure code (`toolchain_unavailable`, `probe_route_not_found`, `probe_route_ambiguous`). | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `"probe_route_ambiguous"` |
+| `attemptedCandidates` | Candidate runtime routes evaluated before pushback. | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `[{"apiBase":"http://localhost:8082","probeBase":"http://localhost:9192"}]` |
+| `validationResults` | Per-candidate validation outcomes (probe/API/line alignment checks). | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `[{"probeReachable":true,"apiReachable":false}]` |
+| `nextAction` | Action required from the user to proceed after pushback. | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `"Provide a unique runtime/service selector or stop conflicting services."` |
+| `reproSteps` | Ordered executable reproduction steps emitted for both success and pushback outputs. | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `["1. Call project_list", "2. Call probe_recipe_create", "3. Resolve runtime route"]` |
 
 

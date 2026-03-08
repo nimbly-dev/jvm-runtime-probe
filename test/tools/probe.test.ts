@@ -82,6 +82,16 @@ test("probe_get_status supports 0.1.0v nested envelope", async () => {
         actuatorId: "",
         actuateTargetKey: "",
         actuateReturnBoolean: false,
+        applicationType: {
+          value: "spring-boot",
+          source: "classpath:org.springframework.boot.SpringApplication",
+          confidence: 0.9,
+        },
+        appPort: {
+          value: 8082,
+          source: "system_property:server.port",
+          confidence: 0.95,
+        },
       },
     });
   }, async () => {
@@ -95,6 +105,11 @@ test("probe_get_status supports 0.1.0v nested envelope", async () => {
     assert.equal(parsed.executionHit, "line_hit");
     assert.equal(out.structuredContent.response.json.contractVersion, "0.1.0v");
     assert.equal(out.structuredContent.response.json.capturePreview.captureId, "abc123");
+    assert.equal(
+      out.structuredContent.response.json.runtime.applicationType.value,
+      "spring-boot",
+    );
+    assert.equal(out.structuredContent.response.json.runtime.appPort.value, 8082);
   });
 });
 
@@ -357,6 +372,16 @@ test("probe_get_status supports 0.1.0v batch rows with nested probe payload", as
             actuatorId: "",
             actuateTargetKey: "",
             actuateReturnBoolean: false,
+            applicationType: {
+              value: "spring-boot",
+              source: "classpath:org.springframework.boot.SpringApplication",
+              confidence: 0.9,
+            },
+            appPort: {
+              value: 8082,
+              source: "system_property:server.port",
+              confidence: 0.95,
+            },
           },
         },
       ],
@@ -374,6 +399,9 @@ test("probe_get_status supports 0.1.0v batch rows with nested probe payload", as
     assert.equal(first.probeHit, "hitCount=3, lastHitEpochMs=2222");
     assert.equal(first.runtimeMode, "observe");
     assert.equal((first as any).capturePreview.captureId, "cap-1");
+    const responseRows = (out.structuredContent.response.json as any).results;
+    assert.equal(responseRows[0].runtime.applicationType.value, "spring-boot");
+    assert.equal(responseRows[0].runtime.appPort.value, 8082);
   });
 });
 
