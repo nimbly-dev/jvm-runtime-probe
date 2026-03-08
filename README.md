@@ -12,9 +12,8 @@ with that, it enables targeted regression checks, line-level/runtime-path inspec
 
 The Java Agent is built with **ByteBuddy**, it complements `JDWP` rather than replacing it.
 
-## How It Works
-
 Operator workflows and end-to-end execution flows are documented in [docs/how-it-works/README.md](./docs/how-it-works/README.md).
+
 ---
 
 ## Requirements
