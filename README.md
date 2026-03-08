@@ -100,13 +100,24 @@ Optional env:
 ./scripts/install-integrations.sh
 ```
 
+Default skill install set:
+
+- `mcp-jvm-line-probe-run`
+- `mcp-jvm-regression-suite`
+
 Non-interactive:
 
 ```bash
 ./scripts/install-integrations.sh --client codex --probe-base-url http://127.0.0.1:9193
 ./scripts/install-integrations.sh --client kiro --dry-run
 ./scripts/install-integrations.sh --client both --update-skill-if-exists
+./scripts/install-integrations.sh --client codex --skill-name mcp-jvm-line-probe-run
+./scripts/install-integrations.sh --client codex --skill-name mcp-jvm-line-probe-run --skill-name mcp-jvm-regression-suite
 ```
+
+Installer migration behavior:
+
+- Retired skill `mcp-jvm-repro-orchestration` is removed from installed skill roots during skill install/update.
 
 ---
 
@@ -129,6 +140,32 @@ Probe endpoint paths are fixed and non-overridable:
 - reset: `"/__probe/reset"`
 - capture: `"/__probe/capture"`
 
+## Skills
+
+Shipped skills:
+
+- `mcp-jvm-line-probe-run`
+- `mcp-jvm-regression-suite`
+
+Behavior:
+
+- Skills are MCP-first and must use `mcp-jvm-debugger` tools.
+- If MCP toolchain is unavailable, skills must stop with `toolchain_unavailable` (no raw HTTP fallback).
+- Both skills must emit explicit `Repro Steps` in run summaries.
+
+## Dynamic Probe Route Resolution (Skill)
+
+For multi-service runtimes, the shipped skills resolve probe/API targets dynamically at execution time.
+
+- Discovery is runtime-first (no static host/port assumptions in probe-capable flows).
+- Java agent status includes runtime metadata hints:
+  - `runtime.applicationType { value, source, confidence }`
+  - `runtime.appPort { value|null, source, confidence }`
+- Metadata is advisory. Final route selection must still pass probe/API reachability and strict line-target alignment checks.
+- Resolution is fail-closed:
+  - `probe_route_not_found` when no valid route exists
+  - `probe_route_ambiguous` when multiple routes remain valid
+  - summaries must include `attemptedCandidates`, `validationResults`, `nextAction`, and `Repro Steps`.
 
 ---
 
