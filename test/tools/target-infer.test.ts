@@ -4,7 +4,7 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { discoverClassMethods } = require("../../src/tools/target_infer/domain");
+const { discoverClassMethods } = require("../../src/tools/core/target_infer/domain");
 
 async function withTempDir(run: (dir: string) => Promise<void>) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "target-infer-"));

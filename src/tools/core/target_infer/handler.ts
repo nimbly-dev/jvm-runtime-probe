@@ -2,10 +2,10 @@ import * as path from "node:path";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import type { ServerConfig } from "../../config/server-config";
-import { clampInt } from "../../lib/safety";
-import { resolveProjectForInference } from "../../utils/project_resolution.util";
-import { ProjectRuntime } from "../../utils/project_discovery/project_runtime.util";
+import type { ServerConfig } from "../../../config/server-config";
+import { clampInt } from "../../../lib/safety";
+import { resolveProjectForInference } from "../../../utils/project_resolution.util";
+import type { ProjectRuntime } from "../../../utils/project_discovery/project_runtime.util";
 import { discoverClassMethods, inferTargets } from "./domain";
 import { TARGET_INFER_TOOL } from "./contract";
 

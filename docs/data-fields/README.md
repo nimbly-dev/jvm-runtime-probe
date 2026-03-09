@@ -68,9 +68,15 @@ Column meanings:
 | `executionPlan` | Step plan emitted for execution/verification tooling. | `probe_recipe_create` | true | `{"selectedMode":"single_line_probe"}` |
 | `resultType` | Output category (`recipe` or `report`). | `probe_recipe_create` | true | `"recipe"` |
 | `status` | Recipe generation status for orchestration decisions. | `probe_recipe_create` | true | `"single_line_probe_ready"` |
+| `reasonCode` | Deterministic synthesis/report reason code for fail-closed routing. | `probe_recipe_create` | false | `"spring_entrypoint_not_proven"` |
+| `failedStep` | Specific synthesis stage that failed proof. | `probe_recipe_create` | false | `"spring_entrypoint_resolution"` |
 | `selectedMode` | Final routed intent mode. | `probe_recipe_create` | true | `"single_line_probe"` |
 | `executionReadiness` | Execution gate (`ready` or `needs_user_input`). | `probe_recipe_create` | true | `"ready"` |
 | `missingInputs` | Missing runtime/auth inputs blocking execution. | `probe_recipe_create` | true | `[]` |
+| `synthesizerUsed` | Internal synthesizer plugin selected for request synthesis. | `probe_recipe_create` | false | `"spring"` |
+| `attemptedStrategies` | Ordered synthesis strategies attempted by the selected plugin. | `probe_recipe_create` | true | `["spring_annotation_mapping","spring_call_chain_resolution"]` |
+| `evidence` | Compact evidence lines used for deterministic synthesis and pushback context. | `probe_recipe_create` | true | `["request_source=spring_mvc"]` |
+| `trigger` | Protocol-aware trigger envelope emitted by synthesis. | `probe_recipe_create` | false | `{"kind":"http","method":"POST","path":"/v1/catalog"}` |
 | `auth` | Auth inference result and next-step hints. | `probe_recipe_create` | true | `{"status":"ok","strategy":"bearer"}` |
 | `notes` | Run notes and routing/inference diagnostics. | `probe_recipe_create` | true | `["result_type=recipe"]` |
 | `runtimeCapture` | Optional runtime capture preview from live probe status. | `probe_recipe_create` | false | `{"status":"available","capturePreview":{"captureId":"abc123"}}` |

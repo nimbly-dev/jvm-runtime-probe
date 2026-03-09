@@ -1,4 +1,4 @@
-import { TargetInferInputSchema } from "../../models/inputs";
+import { TargetInferInputSchema } from "../../../models/inputs";
 
 export const TARGET_INFER_TOOL = {
   name: "probe_target_infer",

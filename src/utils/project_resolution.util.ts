@@ -1,5 +1,5 @@
 import type { DiscoveredProject } from "../models/project_discovery.model";
-import { inferTargets, type InferredTarget } from "../tools/target_infer/domain";
+import { inferTargets, type InferredTarget } from "../tools/core/target_infer/domain";
 
 export type ProjectScopedInferenceCandidate = InferredTarget & {
   projectId: string;
