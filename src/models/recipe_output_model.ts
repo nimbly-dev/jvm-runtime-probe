@@ -1,9 +1,61 @@
-import type { RecipeTemplateModel } from "../lib/recipe_template";
-import type { generateRecipe } from "../tools/recipe_generate/domain";
-import type { RecipeExecutionStep } from "../utils/recipe_types.util";
-import { redactSecret } from "../utils/redaction.util";
+type RecipeTemplateModel = Record<string, string>;
 
-type GeneratedRecipe = Awaited<ReturnType<typeof generateRecipe>>;
+type RecipeExecutionStep = {
+  phase: "prepare" | "execute" | "verify" | "cleanup";
+  title: string;
+  instruction: string;
+};
+
+type RecipeCandidate = {
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+  path: string;
+  queryTemplate: string;
+  fullUrlHint: string;
+  bodyTemplate?: string;
+  confidence?: number;
+};
+
+type TemplateAuth = {
+  required: boolean | "unknown";
+  status: "not_required" | "auto_resolved" | "needs_user_input" | "unknown";
+  strategy: "none" | "bearer" | "basic" | "cookie" | "unknown";
+  nextAction: string;
+  requestHeaders?: Record<string, string>;
+  missing?: string[];
+  source?: string;
+  notes: string[];
+  loginHint?: {
+    path: string;
+    bodyTemplate: string;
+  };
+};
+
+type GeneratedRecipeTemplateInput = {
+  inferredTarget?: {
+    key?: string;
+  };
+  requestCandidates: RecipeCandidate[];
+  executionPlan: {
+    selectedMode: string;
+    routingReason: string;
+    steps: RecipeExecutionStep[];
+  };
+  resultType: "recipe" | "report";
+  status: string;
+  selectedMode: string;
+  routingNote?: string;
+  nextAction?: string;
+  failurePhase?: string;
+  failureReasonCode?: string;
+  reasonCode?: string;
+  failedStep?: string;
+  inferenceDiagnostics: {
+    target: { matched: boolean };
+    request: { matched: boolean; source?: string };
+  };
+  auth: TemplateAuth;
+  notes: string[];
+};
 
 function formatSteps(steps: RecipeExecutionStep[]): string {
   if (steps.length === 0) return "No steps available.";
@@ -12,7 +64,14 @@ function formatSteps(steps: RecipeExecutionStep[]): string {
     .join("\n");
 }
 
-function formatRecipeSteps(generated: GeneratedRecipe): string {
+function redactSecret(value: string): string {
+  if (!value) return value;
+  const trimmed = value.trim();
+  if (trimmed.length <= 8) return "***";
+  return `${trimmed.slice(0, 4)}...${trimmed.slice(-2)}`;
+}
+
+function formatRecipeSteps(generated: GeneratedRecipeTemplateInput): string {
   const selectedModeLine = `Selected mode: ${generated.selectedMode}`;
   if (generated.resultType === "report") {
     const missingInput =
@@ -44,7 +103,7 @@ export function buildRecipeTemplateModel(args: {
   classHint: string;
   methodHint: string;
   lineHint?: number;
-  generated: GeneratedRecipe;
+  generated: GeneratedRecipeTemplateInput;
 }): RecipeTemplateModel {
   const { classHint, methodHint, lineHint, generated } = args;
   const inferredPath = generated.inferredTarget?.key
@@ -111,6 +170,8 @@ export function buildRecipeTemplateModel(args: {
         `routing_reason=${planReason}`,
         generated.failurePhase ? `failure_phase=${generated.failurePhase}` : "",
         generated.failureReasonCode ? `failure_reason=${generated.failureReasonCode}` : "",
+        generated.reasonCode ? `synthesis_reason_code=${generated.reasonCode}` : "",
+        generated.failedStep ? `synthesis_failed_step=${generated.failedStep}` : "",
         `inference_target_matched=${String(generated.inferenceDiagnostics.target.matched)}`,
         `inference_request_matched=${String(generated.inferenceDiagnostics.request.matched)}`,
         generated.inferenceDiagnostics.request.source

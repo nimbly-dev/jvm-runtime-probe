@@ -30,7 +30,7 @@ Operator workflows and end-to-end execution flows are documented in [docs/how-it
 ```powershell
 npm.cmd install
 npm.cmd run build
-mvn -f java-agent\pom.xml -DskipTests package
+mvn -f java-agent\core\pom.xml -DskipTests package
 ```
 
 ---
@@ -38,7 +38,7 @@ mvn -f java-agent\pom.xml -DskipTests package
 ## Java Agent
 
 ```text
--javaagent:C:\Users\Altheo\repository\mcp-jvm-debugger\java-agent\target\mcp-jvm-probe-agent-0.1.0-all.jar=host=0.0.0.0;port=9191;include=com.{your_workspace_root_package}.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
+-javaagent:C:\Users\Altheo\repository\mcp-jvm-debugger\java-agent\core\target\mcp-jvm-probe-agent-0.1.0.jar=host=0.0.0.0;port=9191;include=com.{your_workspace_root_package}.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
 ```
 
 Optional Java agent capture history tuning:

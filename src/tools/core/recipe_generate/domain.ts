@@ -1,12 +1,14 @@
-import type { AuthResolution } from "../../models/auth_resolution.model";
-import { type IntentMode, type RecipeStatus } from "../../utils/recipe_constants.util";
-import { buildExecutionReadiness } from "../../utils/execution_readiness.util";
-import { buildRecipeExecutionPlan } from "../../utils/recipe_execution_plan.util";
-import { buildRoutingContext, resolveSelectedMode } from "../../utils/recipe_intent_routing.util";
+import type { AuthResolution } from "../../../models/auth_resolution.model";
+import type { SynthesizerFailure } from "../../../models/synthesis/synthesizer_failure.model";
+import type { SynthesisHttpTrigger, SynthesizerOutput } from "../../../models/synthesis/synthesizer_output.model";
+import { type IntentMode, type RecipeStatus } from "../../../utils/recipe_constants.util";
+import { buildExecutionReadiness } from "../../../utils/execution_readiness.util";
+import { buildRecipeExecutionPlan } from "../../../utils/recipe_execution_plan.util";
+import { buildRoutingContext, resolveSelectedMode } from "../../../utils/recipe_intent_routing.util";
 import {
   buildSearchRoots,
-  findControllerRequestCandidate,
-} from "../../utils/recipe_candidate_infer.util";
+} from "../../../utils/recipe_candidate_infer.util";
+import type { findControllerRequestCandidate } from "../../../utils/recipe_candidate_infer.util";
 import type {
   ExecutionReadiness,
   InferenceDiagnostics,
@@ -14,17 +16,21 @@ import type {
   MissingExecutionInput,
   RecipeCandidate,
   RecipeExecutionPlan,
-} from "../../utils/recipe_types.util";
-import { resolveAuthForRecipe } from "../../utils/recipe_generate/auth_resolve.util";
+} from "../../../utils/recipe_types.util";
+import { resolveAuthForRecipe } from "../../../utils/recipe_generate/auth_resolve.util";
 import {
   defaultStatusForMode,
   buildMissingRequestNextAction,
-} from "../../utils/recipe_generate/mode.util";
-import { normalizeRecipeGenerateInput } from "../../utils/recipe_generate/normalize_input.util";
-import { buildRunNotes } from "../../utils/recipe_generate/run_notes.util";
+} from "../../../utils/recipe_generate/mode.util";
+import { normalizeRecipeGenerateInput } from "../../../utils/recipe_generate/normalize_input.util";
+import { buildRunNotes } from "../../../utils/recipe_generate/run_notes.util";
+import {
+  createDefaultSynthesizerRegistry,
+  type SynthesizerRegistry,
+} from "../../synthesizers/registry/plugin.loader";
 import { inferTargets } from "../target_infer/domain";
 
-export type { RecipeCandidate, RecipeExecutionPlan } from "../../utils/recipe_types.util";
+export type { RecipeCandidate, RecipeExecutionPlan } from "../../../utils/recipe_types.util";
 export type RecipeResultType = "recipe" | "report";
 
 export type GenerateRecipeResult = {
@@ -48,6 +54,12 @@ export type GenerateRecipeResult = {
   nextAction?: string;
   failurePhase?: InferenceFailurePhase;
   failureReasonCode?: string;
+  reasonCode?: string;
+  failedStep?: string;
+  synthesizerUsed?: string;
+  attemptedStrategies: string[];
+  evidence: string[];
+  trigger?: SynthesisHttpTrigger;
   inferenceDiagnostics: InferenceDiagnostics;
   auth: AuthResolution;
   notes: string[];
@@ -56,6 +68,7 @@ export type GenerateRecipeResult = {
 export type GenerateRecipeDeps = {
   inferTargetsFn?: typeof inferTargets;
   findControllerRequestCandidateFn?: typeof findControllerRequestCandidate;
+  synthesizerRegistry?: SynthesizerRegistry;
   resolveAuthForRecipeFn?: typeof resolveAuthForRecipe;
 };
 
@@ -103,9 +116,8 @@ export async function generateRecipe(
   deps: GenerateRecipeDeps = {},
 ): Promise<GenerateRecipeResult> {
   const inferTargetsFn = deps.inferTargetsFn ?? inferTargets;
-  const findControllerRequestCandidateFn =
-    deps.findControllerRequestCandidateFn ?? findControllerRequestCandidate;
   const resolveAuthForRecipeFn = deps.resolveAuthForRecipeFn ?? resolveAuthForRecipe;
+  const synthesizerRegistry = deps.synthesizerRegistry ?? createDefaultSynthesizerRegistry();
 
   const normalized = normalizeRecipeGenerateInput(args);
   const routingDecision = resolveSelectedMode(
@@ -126,15 +138,78 @@ export async function generateRecipe(
   const top = inferred.candidates[0];
 
   const searchRootsAbs = buildSearchRoots(normalized.rootAbs, normalized.workspaceRootAbs);
-  const controllerMatch = await findControllerRequestCandidateFn({
-    searchRootsAbs,
-    methodHint: normalized.methodHint,
-    ...(top ? { inferredTargetFileAbs: top.file } : {}),
-  });
-  const bestRequest = controllerMatch.recipe;
-  const matchedControllerFile = controllerMatch.matchedControllerFile;
-  const matchedBranchCondition = controllerMatch.matchedBranchCondition;
-  const authRootAbs = controllerMatch.matchedRootAbs ?? normalized.rootAbs;
+  let synthesis: SynthesizerOutput | SynthesizerFailure;
+  if (deps.findControllerRequestCandidateFn) {
+    const controllerMatch = await deps.findControllerRequestCandidateFn({
+      searchRootsAbs,
+      methodHint: normalized.methodHint,
+      ...(top ? { inferredTargetFileAbs: top.file } : {}),
+    });
+    if (controllerMatch.recipe) {
+      synthesis = {
+        status: "recipe",
+        synthesizerUsed: "spring",
+        framework: "spring",
+        requestCandidate: controllerMatch.recipe,
+        trigger: {
+          kind: "http",
+          method: controllerMatch.recipe.method,
+          path: controllerMatch.recipe.path,
+          queryTemplate: controllerMatch.recipe.queryTemplate,
+          fullUrlHint: controllerMatch.recipe.fullUrlHint,
+          ...(controllerMatch.recipe.bodyTemplate ? { bodyTemplate: controllerMatch.recipe.bodyTemplate } : {}),
+          headers: {},
+          ...(controllerMatch.recipe.bodyTemplate ? { contentType: "application/json" } : {}),
+        },
+        ...(controllerMatch.requestSource ? { requestSource: controllerMatch.requestSource } : {}),
+        ...(controllerMatch.matchedControllerFile
+          ? { matchedControllerFile: controllerMatch.matchedControllerFile }
+          : {}),
+        ...(controllerMatch.matchedBranchCondition
+          ? { matchedBranchCondition: controllerMatch.matchedBranchCondition }
+          : {}),
+        ...(controllerMatch.matchedRootAbs ? { matchedRootAbs: controllerMatch.matchedRootAbs } : {}),
+        evidence: ["legacy_injected_findControllerRequestCandidateFn=true"],
+        attemptedStrategies: ["legacy_find_controller_request_candidate"],
+      };
+    } else {
+      synthesis = {
+        status: "report",
+        reasonCode: "request_candidate_missing",
+        failedStep: "request_synthesis",
+        nextAction:
+          "Request candidate was not inferred in legacy recipe flow. Refine classHint/methodHint/lineHint and rerun probe_recipe_create.",
+        evidence: ["legacy_injected_findControllerRequestCandidateFn=true"],
+        attemptedStrategies: ["legacy_find_controller_request_candidate"],
+        synthesizerUsed: "spring",
+      };
+    }
+  } else {
+    synthesis = await synthesizerRegistry.synthesize({
+      rootAbs: normalized.rootAbs,
+      workspaceRootAbs: normalized.workspaceRootAbs,
+      searchRootsAbs,
+      classHint: normalized.classHint,
+      methodHint: normalized.methodHint,
+      intentMode: normalized.intentMode,
+      ...(typeof normalized.lineHint === "number" ? { lineHint: normalized.lineHint } : {}),
+      ...(top?.file ? { inferredTargetFileAbs: top.file } : {}),
+    });
+  }
+
+  const synthesisSuccess = synthesis.status === "recipe" ? synthesis : undefined;
+  const synthesisFailure = synthesis.status === "report" ? synthesis : undefined;
+  const bestRequest = synthesisSuccess?.requestCandidate;
+  const matchedControllerFile = synthesisSuccess?.matchedControllerFile;
+  const matchedBranchCondition = synthesisSuccess?.matchedBranchCondition;
+  const authRootAbs = synthesisSuccess?.matchedRootAbs ?? normalized.rootAbs;
+  const synthesizerUsed = synthesisSuccess?.synthesizerUsed ?? synthesisFailure?.synthesizerUsed;
+  const attemptedStrategies =
+    synthesisSuccess?.attemptedStrategies ?? synthesisFailure?.attemptedStrategies ?? [];
+  const evidence = synthesisSuccess?.evidence ?? synthesisFailure?.evidence ?? [];
+  const trigger = synthesisSuccess?.trigger;
+  let reasonCode = synthesisFailure?.reasonCode;
+  let failedStep = synthesisFailure?.failedStep;
 
   const inferenceDiagnostics: InferenceDiagnostics = {
     target: {
@@ -146,7 +221,7 @@ export async function generateRecipe(
     request: {
       attempted: true,
       matched: Boolean(bestRequest),
-      ...(controllerMatch.requestSource ? { source: controllerMatch.requestSource } : {}),
+      ...(synthesisSuccess?.requestSource ? { source: synthesisSuccess.requestSource } : {}),
     },
   };
 
@@ -214,8 +289,10 @@ export async function generateRecipe(
     resultType = "report";
     status = "api_request_not_inferred";
     failurePhase = "request_inference";
-    failureReasonCode = "request_candidate_missing";
-    nextAction = buildMissingRequestNextAction(routingDecision);
+    failureReasonCode = reasonCode ?? "request_candidate_missing";
+    reasonCode = reasonCode ?? "request_candidate_missing";
+    failedStep = failedStep ?? "request_synthesis";
+    nextAction = synthesisFailure?.nextAction ?? buildMissingRequestNextAction(routingDecision);
   } else if (auth.status === "needs_user_input") {
     nextAction =
       `Missing input: ${(auth.missing ?? ["authToken"]).join(", ")}. ` +
@@ -262,6 +339,9 @@ export async function generateRecipe(
   );
   if (failurePhase) runNotes.push(`failure_phase=${failurePhase}`);
   if (failureReasonCode) runNotes.push(`failure_reason=${failureReasonCode}`);
+  if (reasonCode) runNotes.push(`synthesis_reason_code=${reasonCode}`);
+  if (failedStep) runNotes.push(`synthesis_failed_step=${failedStep}`);
+  if (synthesizerUsed) runNotes.push(`synthesizer_used=${synthesizerUsed}`);
 
   return {
     ...(inferredTarget ? { inferredTarget } : {}),
@@ -279,6 +359,12 @@ export async function generateRecipe(
     ...(nextAction ? { nextAction } : {}),
     ...(failurePhase ? { failurePhase } : {}),
     ...(failureReasonCode ? { failureReasonCode } : {}),
+    ...(reasonCode ? { reasonCode } : {}),
+    ...(failedStep ? { failedStep } : {}),
+    ...(synthesizerUsed ? { synthesizerUsed } : {}),
+    ...(trigger ? { trigger } : {}),
+    attemptedStrategies,
+    evidence,
     inferenceDiagnostics,
     auth,
     notes: runNotes,

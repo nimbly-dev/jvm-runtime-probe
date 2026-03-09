@@ -1,5 +1,5 @@
 import * as path from "node:path";
-import { buildJavaIndex } from "../../utils/inference/java_index.util";
+import { buildJavaIndex } from "../../../utils/inference/java_index.util";
 
 export type InferredTarget = {
   file: string;

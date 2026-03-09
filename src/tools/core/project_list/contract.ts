@@ -1,4 +1,4 @@
-import { ProjectsDiscoverInputSchema } from "../../models/inputs";
+import { ProjectsDiscoverInputSchema } from "../../../models/inputs";
 
 export const PROJECT_LIST_TOOL = {
   name: "project_list",

@@ -25,14 +25,21 @@ Use this workflow only for strict one-line verification runs.
 
 1. Call `project_list`.
 2. Call `probe_recipe_create` with probe intent and line target context.
-3. Resolve route dynamically from runtime candidates.
-4. Validate exactly one route using:
+3. If `probe_recipe_create` returns `resultType=report`, treat it as fail-closed synthesis pushback and stop unless the report indicates only missing user input.
+4. On report outputs, always capture synthesis diagnostics:
+   - `reasonCode`
+   - `failedStep`
+   - `evidence`
+   - `attemptedStrategies`
+   - `synthesizerUsed`
+5. Resolve route dynamically from runtime candidates.
+6. Validate exactly one route using:
    - probe reachability
    - API reachability
    - strict target alignment (`Class#method:line` resolvability or class-scoped line discovery)
-5. Execute probe flow:
+7. Execute probe flow:
    - `probe_reset` -> trigger HTTP request -> `probe_wait_for_hit` / `probe_get_status`
-6. Cleanup (disable actuation when used).
+8. Cleanup (disable actuation when used).
 
 ## Route Pushback
 
@@ -47,6 +54,11 @@ Pushback output must include:
 2. `validationResults`
 3. `nextAction`
 4. `Repro Steps`
+5. `reasonCode`
+6. `failedStep`
+7. `synthesizerUsed` (when recipe synthesis was attempted)
+8. `attemptedStrategies` (when recipe synthesis was attempted)
+9. `evidence` (when recipe synthesis was attempted)
 
 ## Required Human Run Summary
 
@@ -57,7 +69,8 @@ Always include:
 3. `Trigger Request`
 4. `HTTP Result`
 5. `Probe Verification`
-6. `Repro Steps` (ordered, executable, numbered)
-7. `Cleanup`
-8. `Trust Note`
+6. `Synthesis Diagnostics` (`synthesizerUsed`, `reasonCode`, `failedStep` when present)
+7. `Repro Steps` (ordered, executable, numbered)
+8. `Cleanup`
+9. `Trust Note`
 

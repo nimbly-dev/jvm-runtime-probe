@@ -27,6 +27,17 @@ Use this workflow for regression runs at controller scope, service scope, or who
 2. Run probe checks only when strict line target is available/provided.
 3. Never claim line success without strict `Class#method:line` verification.
 
+## Recipe Synthesis Policy
+
+1. Treat `probe_recipe_create` as deterministic and fail-closed.
+2. If `probe_recipe_create` returns `resultType=report`, stop endpoint execution for that route unless report indicates only missing user input.
+3. Capture and propagate synthesis diagnostics for every fail-closed report:
+   - `reasonCode`
+   - `failedStep`
+   - `evidence`
+   - `attemptedStrategies`
+   - `synthesizerUsed`
+
 ## Route Resolution (Probe-Capable Endpoints)
 
 1. Resolve route dynamically from runtime candidates.
@@ -39,6 +50,14 @@ Use this workflow for regression runs at controller scope, service scope, or who
    - `probe_route_not_found`
    - `probe_route_ambiguous`
    - include `attemptedCandidates`, `validationResults`, `nextAction`, and `Repro Steps`.
+5. If blocked before route validation due to synthesis report, emit synthesis pushback with:
+   - `reasonCode`
+   - `failedStep`
+   - `synthesizerUsed`
+   - `attemptedStrategies`
+   - `evidence`
+   - `nextAction`
+   - `Repro Steps`
 
 ## Required Human Run Summary
 
@@ -49,7 +68,8 @@ Always include:
 3. `Endpoint Results` (method/path/http code)
 4. `Probe Coverage` (which endpoints were probe-verified vs HTTP-only)
 5. `Probe Verification`
-6. `Repro Steps` (ordered, executable, numbered)
-7. `Cleanup`
-8. `Trust Note`
+6. `Synthesis Diagnostics` (aggregate reason/failure fields for blocked endpoints)
+7. `Repro Steps` (ordered, executable, numbered)
+8. `Cleanup`
+9. `Trust Note`
 

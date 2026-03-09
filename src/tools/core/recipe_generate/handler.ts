@@ -2,13 +2,13 @@ import * as path from "node:path";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import { renderRecipeTemplate } from "../../lib/recipe_template";
-import { buildRecipeTemplateModel } from "../../models/recipe_output_model";
-import type { ServerConfig } from "../../config/server-config";
-import { resolveProjectForInference } from "../../utils/project_resolution.util";
-import { buildRoutingContext, resolveSelectedMode } from "../../utils/recipe_intent_routing.util";
-import { enrichRuntimeCapture } from "../../utils/recipe_generate/runtime_capture_enrich.util";
-import { ProjectRuntime } from "../../utils/project_discovery/project_runtime.util";
+import { renderRecipeTemplate } from "../../../lib/recipe_template";
+import { buildRecipeTemplateModel } from "../../../models/recipe_output_model";
+import type { ServerConfig } from "../../../config/server-config";
+import { resolveProjectForInference } from "../../../utils/project_resolution.util";
+import { buildRoutingContext, resolveSelectedMode } from "../../../utils/recipe_intent_routing.util";
+import { enrichRuntimeCapture } from "../../../utils/recipe_generate/runtime_capture_enrich.util";
+import type { ProjectRuntime } from "../../../utils/project_discovery/project_runtime.util";
 import { inferTargets } from "../target_infer/domain";
 import { generateRecipe } from "./domain";
 import { RECIPE_CREATE_TOOL } from "./contract";
@@ -270,6 +270,12 @@ export function registerRecipeCreateTool(
         ...(generated.nextAction ? { nextAction: generated.nextAction } : {}),
         ...(generated.failurePhase ? { failurePhase: generated.failurePhase } : {}),
         ...(generated.failureReasonCode ? { failureReasonCode: generated.failureReasonCode } : {}),
+        ...(generated.reasonCode ? { reasonCode: generated.reasonCode } : {}),
+        ...(generated.failedStep ? { failedStep: generated.failedStep } : {}),
+        ...(generated.synthesizerUsed ? { synthesizerUsed: generated.synthesizerUsed } : {}),
+        ...(generated.trigger ? { trigger: generated.trigger } : {}),
+        attemptedStrategies: generated.attemptedStrategies,
+        evidence: generated.evidence,
         inferenceDiagnostics: generated.inferenceDiagnostics,
         auth: generated.auth,
         notes: generated.notes,
@@ -289,6 +295,12 @@ export function registerRecipeCreateTool(
         ...(generated.nextAction ? { nextAction: generated.nextAction } : {}),
         ...(generated.failurePhase ? { failurePhase: generated.failurePhase } : {}),
         ...(generated.failureReasonCode ? { failureReasonCode: generated.failureReasonCode } : {}),
+        ...(generated.reasonCode ? { reasonCode: generated.reasonCode } : {}),
+        ...(generated.failedStep ? { failedStep: generated.failedStep } : {}),
+        ...(generated.synthesizerUsed ? { synthesizerUsed: generated.synthesizerUsed } : {}),
+        ...(generated.trigger ? { trigger: generated.trigger } : {}),
+        attemptedStrategies: generated.attemptedStrategies,
+        evidence: generated.evidence,
         inferenceDiagnostics: generated.inferenceDiagnostics,
         routingReason: generated.executionPlan.routingReason,
         inferredTarget: structuredContent.inferredTarget,
