@@ -1,7 +1,7 @@
-import { fetchJson } from "../../lib/http";
-import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "../../lib/safety";
-import { joinUrl } from "../../utils/probe.util";
-import { formatProbeOutput } from "../../utils/probe/output.util";
+import { fetchJson } from "../../../lib/http";
+import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "../../../lib/safety";
+import { joinUrl } from "../../../utils/probe.util";
+import { formatProbeOutput } from "../../../utils/probe/output.util";
 
 export async function probeDiagnose(args: {
   baseUrl: string;

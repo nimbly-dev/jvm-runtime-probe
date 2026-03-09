@@ -1,8 +1,8 @@
 import * as path from "node:path";
 
-import { clampInt } from "../../lib/safety";
-import type { ServerConfig } from "../../config/server-config";
-import { ProjectRuntime } from "../../utils/project_discovery/project_runtime.util";
+import { clampInt } from "../../../lib/safety";
+import type { ServerConfig } from "../../../config/server-config";
+import type { ProjectRuntime } from "../../../utils/project_discovery/project_runtime.util";
 
 export type ProjectListDomainDeps = {
   config: ServerConfig;

@@ -1,4 +1,4 @@
-import { RecipeGenerateInputSchema } from "../../models/inputs";
+import { RecipeGenerateInputSchema } from "../../../models/inputs";
 
 export const RECIPE_CREATE_TOOL = {
   name: "probe_recipe_create",

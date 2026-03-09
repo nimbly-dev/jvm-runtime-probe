@@ -1,8 +1,8 @@
-import { probeActuate as probeActuateUtil } from "../../utils/probe/probe_actuate.util";
-import { probeCaptureGet as probeCaptureGetUtil } from "../../utils/probe/probe_capture_get.util";
-import { probeReset as probeResetUtil } from "../../utils/probe/probe_reset.util";
-import { probeStatus as probeStatusUtil } from "../../utils/probe/probe_status.util";
-import { probeWaitHit as probeWaitHitUtil } from "../../utils/probe/probe_wait_hit.util";
+import { probeActuate as probeActuateUtil } from "../../../utils/probe/probe_actuate.util";
+import { probeCaptureGet as probeCaptureGetUtil } from "../../../utils/probe/probe_capture_get.util";
+import { probeReset as probeResetUtil } from "../../../utils/probe/probe_reset.util";
+import { probeStatus as probeStatusUtil } from "../../../utils/probe/probe_status.util";
+import { probeWaitHit as probeWaitHitUtil } from "../../../utils/probe/probe_wait_hit.util";
 
 export type ProbeDomainConfig = {
   probeBaseUrl: string;

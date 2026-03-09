@@ -6,11 +6,11 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 
 import { loadConfigFromEnvAndArgs } from "./config/server-config";
 import { CONFIG_DEFAULTS } from "./config/defaults";
-import { registerProjectListTool } from "./tools/project_list/handler";
-import { registerProbeCheckTool } from "./tools/probe_check/handler";
-import { registerTargetInferTool } from "./tools/target_infer/handler";
-import { registerRecipeCreateTool } from "./tools/recipe_generate/handler";
-import { registerProbeTools } from "./tools/probe/handler";
+import { registerProjectListTool } from "./tools/core/project_list/handler";
+import { registerProbeCheckTool } from "./tools/core/probe_check/handler";
+import { registerTargetInferTool } from "./tools/core/target_infer/handler";
+import { registerRecipeCreateTool } from "./tools/core/recipe_generate/handler";
+import { registerProbeTools } from "./tools/core/probe/handler";
 import { ProjectRuntime } from "./utils/project_discovery/project_runtime.util";
 
 async function main() {

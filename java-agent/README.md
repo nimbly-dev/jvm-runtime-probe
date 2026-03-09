@@ -5,13 +5,13 @@ Runtime-only probe agent for local JVMs. No application source code changes requ
 ### Build
 
 ```powershell
-mvn -f java-agent\pom.xml -DskipTests package
+mvn -f java-agent\core\pom.xml -DskipTests package
 ```
 
 Built artifact:
 
 ```text
-java-agent\target\mcp-jvm-probe-agent-0.1.0-all.jar
+java-agent\core\target\mcp-jvm-probe-agent-0.1.0.jar
 ```
 
 ### Run With Spring Boot
@@ -19,7 +19,7 @@ java-agent\target\mcp-jvm-probe-agent-0.1.0-all.jar
 Use JVM args (example):
 
 ```text
--javaagent:C:\Users\Altheo\repository\mcp-jvm-debugger\java-agent\target\mcp-jvm-probe-agent-0.1.0-all.jar=host=127.0.0.1;port=9191;mode=observe;actuatorId=none;captureMethodBufferSize=3;include=com.nimbly.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
+-javaagent:C:\Users\Altheo\repository\mcp-jvm-debugger\java-agent\core\target\mcp-jvm-probe-agent-0.1.0.jar=host=127.0.0.1;port=9191;mode=observe;actuatorId=none;captureMethodBufferSize=3;include=com.nimbly.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
 ```
 
 `include` and `exclude` are comma-separated glob patterns over dotted class names.
