@@ -3,6 +3,7 @@ package com.nimbly.mcpjvmdebugger.agent;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -95,7 +96,7 @@ public final class ProbeRuntime {
   public static void hit(String key) {
     if (key == null || key.isEmpty()) return;
     COUNTS.computeIfAbsent(key, k -> new AtomicLong()).incrementAndGet();
-    LAST_HIT_EPOCH_MS.computeIfAbsent(key, k -> new AtomicLong()).set(System.currentTimeMillis());
+    LAST_HIT_EPOCH_MS.computeIfAbsent(key, k -> new AtomicLong()).set(currentEpochMs());
   }
 
   public static void captureByClassMethod(
@@ -111,7 +112,7 @@ public final class ProbeRuntime {
 
     String methodKey = dottedClassName + "#" + methodName;
     String captureId = Long.toHexString(CAPTURE_SEQ.incrementAndGet());
-    long capturedAtEpochMs = System.currentTimeMillis();
+    long capturedAtEpochMs = currentEpochMs();
 
     List<CaptureValue> capturedArgs = serializeArguments(allArguments);
     CaptureValue capturedReturn = serializeSingleValue(returnValue, null);
@@ -195,6 +196,10 @@ public final class ProbeRuntime {
 
   static RuntimePortSignal getAppPortSignal() {
     return detectAppPort();
+  }
+
+  static long currentEpochMs() {
+    return Instant.now().toEpochMilli();
   }
 
   static String getActuatorId() {

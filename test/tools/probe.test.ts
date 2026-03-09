@@ -87,6 +87,7 @@ test("probe_get_status supports 0.1.0v nested envelope", async () => {
         actuatorId: "",
         actuateTargetKey: "",
         actuateReturnBoolean: false,
+        serverEpochMs: 7777,
         applicationType: {
           value: "spring-boot",
           source: "classpath:org.springframework.boot.SpringApplication",
@@ -114,6 +115,7 @@ test("probe_get_status supports 0.1.0v nested envelope", async () => {
       out.structuredContent.response.json.runtime.applicationType.value,
       "spring-boot",
     );
+    assert.equal(out.structuredContent.response.json.runtime.serverEpochMs, 7777);
     assert.equal(out.structuredContent.response.json.runtime.appPort.value, 8082);
   });
 });
@@ -377,6 +379,7 @@ test("probe_get_status supports 0.1.0v batch rows with nested probe payload", as
             actuatorId: "",
             actuateTargetKey: "",
             actuateReturnBoolean: false,
+            serverEpochMs: 3333,
             applicationType: {
               value: "spring-boot",
               source: "classpath:org.springframework.boot.SpringApplication",
@@ -405,6 +408,7 @@ test("probe_get_status supports 0.1.0v batch rows with nested probe payload", as
     assert.equal(first.runtimeMode, "observe");
     assert.equal((first as any).capturePreview.captureId, "cap-1");
     const responseRows = (out.structuredContent.response.json as any).results;
+    assert.equal(responseRows[0].runtime.serverEpochMs, 3333);
     assert.equal(responseRows[0].runtime.applicationType.value, "spring-boot");
     assert.equal(responseRows[0].runtime.appPort.value, 8082);
   });

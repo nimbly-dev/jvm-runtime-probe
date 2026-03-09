@@ -235,6 +235,7 @@ final class ProbeHttpServer {
   private static String buildStatusBodyJson(String key) {
     long hitCount = ProbeRuntime.getCount(key);
     long lastHitEpochMs = ProbeRuntime.getLastHitEpochMs(key);
+    long serverEpochMs = ProbeRuntime.currentEpochMs();
     boolean includeLineValidation = ProbeRuntime.isLineKey(key);
     boolean lineResolvable = includeLineValidation && ProbeRuntime.isLineResolvableKey(key);
 
@@ -259,6 +260,7 @@ final class ProbeHttpServer {
             + "\"actuatorId\":\"" + esc(ProbeRuntime.getActuatorId()) + "\","
             + "\"actuateTargetKey\":\"" + esc(ProbeRuntime.getActuateTargetKey()) + "\","
             + "\"actuateReturnBoolean\":" + ProbeRuntime.getActuateReturnBoolean() + ","
+            + "\"serverEpochMs\":" + serverEpochMs + ","
             + "\"applicationType\":" + buildRuntimeStringSignalJson(applicationType) + ","
             + "\"appPort\":" + buildRuntimePortSignalJson(appPort)
             + "}";

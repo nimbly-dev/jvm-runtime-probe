@@ -97,13 +97,14 @@ Column meanings:
 | `response` | Raw endpoint response after MCP normalization. | `probe_get_status` | true | `{"status":200,"json":{"hitCount":1}}` |
 | `response.json.contractVersion` | Probe contract marker. | `probe_get_status` | false | `"0.1.0v"` |
 | `response.json.hitCount` | Probe hit counter for the line key. | `probe_get_status` | false | `1` |
-| `response.json.lastHitEpochMs` | Last hit timestamp in epoch milliseconds. | `probe_get_status` | false | `1739671200000` |
+| `response.json.lastHitEpochMs` | Last hit timestamp in JVM host wall-clock epoch milliseconds. | `probe_get_status` | false | `1739671200000` |
 | `response.json.lineValidation` | Line validation verdict (`resolvable` or `invalid_line_target`). | `probe_get_status` | false | `"resolvable"` |
 | `response.json.capturePreview` | Lightweight runtime payload preview from Java agent. | `probe_get_status` | false | `{"available":true,"captureId":"abc123"}` |
 | `response.json.runtime` | Runtime actuation/observe mode payload. | `probe_get_status` | false | `{"mode":"observe"}` |
 | `response.json.runtime.applicationType.value` | Runtime application framework classification hint. | `probe_get_status` | false | `"spring-boot"` |
 | `response.json.runtime.applicationType.source` | Source used to infer application type. | `probe_get_status` | false | `"classpath:org.springframework.boot.SpringApplication"` |
 | `response.json.runtime.applicationType.confidence` | Confidence score (`0.0..1.0`) for application type hint. | `probe_get_status` | false | `0.9` |
+| `response.json.runtime.serverEpochMs` | JVM host wall-clock epoch milliseconds at status response build time. | `probe_get_status` | false | `1739671200123` |
 | `response.json.runtime.appPort.value` | Runtime application port hint when inferable (`null` when unknown). | `probe_get_status` | false | `8082` |
 | `response.json.runtime.appPort.source` | Source used to infer app port hint. | `probe_get_status` | false | `"system_property:server.port"` |
 | `response.json.runtime.appPort.confidence` | Confidence score (`0.0..1.0`) for app port hint. | `probe_get_status` | false | `0.95` |
