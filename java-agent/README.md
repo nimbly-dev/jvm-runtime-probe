@@ -5,14 +5,17 @@ Runtime-only probe agent for local JVMs. No application source code changes requ
 ### Build
 
 ```powershell
-mvn -f java-agent\core\pom.xml -DskipTests package
+mvn -f java-agent\pom.xml -DskipTests package
 ```
 
-Built artifact:
+Built artifacts:
 
 ```text
 java-agent\core\target\mcp-jvm-probe-agent-0.1.0.jar
+java-agent\request-mapping-resolver\target\mcp-jvm-request-mapping-resolver-0.1.0-all.jar
 ```
+
+The request-mapping resolver is a generic JVM AST helper consumed by synthesizers through a `stdin/stdout` JSON contract. Spring MVC and JAX-RS are the first built-in framework resolvers.
 
 ### Run With Spring Boot
 
@@ -35,7 +38,7 @@ Use JVM args (example):
 - Runtime probe keys are dynamic: `fully.qualified.ClassName#methodName`.
 - Line-level probe keys are also emitted: `fully.qualified.ClassName#methodName:<lineNumber>`.
   - Example: `com.nimbly.phshoesbackend.useraccount.core.service.impl.SuppressionServiceImpl#shouldBlock:32`
-- In `mcp-jvm-debugger`, `project_list` can infer a default include glob from project packages.
+- In `mcp-jvm-debugger`, `project_context_validate` can validate scoped project roots before probe runs.
 - If `include` is omitted, the agent auto-infers base package at startup:
   - from executable jar manifest `Start-Class` (or `Main-Class`)
   - or from class-launch command (`java com.example.Main`)

@@ -1,4 +1,4 @@
-export { ProjectsDiscoverInputSchema } from "./projects_discover.input.model";
+export { ProjectContextValidateInputSchema } from "./project_context_validate.input.model";
 export { ProbeDiagnoseInputSchema } from "./probe_diagnose.input.model";
 export { ProbeCaptureGetInputSchema } from "./probe_capture_get.input.model";
 export { TargetInferInputSchema } from "./target_infer.input.model";

@@ -1,94 +1,104 @@
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const os = require("node:os");
-const path = require("node:path");
 const test = require("node:test");
 
 const { synthesizeSpringRecipe } = require("../../src/utils/synthesizers/spring/synthesis.util");
 
-async function withTempDir(run: (dir: string) => Promise<void>) {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "spring-synthesizer-"));
-  try {
-    await run(dir);
-  } finally {
-    await fs.rm(dir, { recursive: true, force: true });
-  }
-}
-
-test("spring synthesizer builds deterministic request candidate from annotations", async () => {
-  await withTempDir(async (dir) => {
-    await fs.writeFile(
-      path.join(dir, "pom.xml"),
-      "<project><artifactId>demo</artifactId><dependencies><dependency><groupId>org.springframework</groupId></dependency></dependencies></project>",
-      "utf8",
-    );
-    const javaFile = path.join(dir, "src", "main", "java", "com", "example", "HealthController.java");
-    await fs.mkdir(path.dirname(javaFile), { recursive: true });
-    await fs.writeFile(
-      javaFile,
-      [
-        "package com.example;",
-        "import org.springframework.web.bind.annotation.GetMapping;",
-        "import org.springframework.web.bind.annotation.RequestMapping;",
-        "import org.springframework.web.bind.annotation.RestController;",
-        "@RestController",
-        '@RequestMapping("/v1/health")',
-        "public class HealthController {",
-        "  @GetMapping",
-        "  public String health() { return \"ok\"; }",
-        "}",
-      ].join("\n"),
-      "utf8",
-    );
-
-    const result = await synthesizeSpringRecipe({
-      rootAbs: dir,
-      workspaceRootAbs: dir,
-      searchRootsAbs: [dir],
+test("spring synthesizer maps AST resolver success into a request recipe", async () => {
+  const result = await synthesizeSpringRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      searchRootsAbs: ["C:\\repo\\service"],
       classHint: "HealthController",
       methodHint: "health",
       intentMode: "regression_api_only",
-    });
+      inferredTargetFileAbs: "C:\\repo\\service\\src\\main\\java\\HealthController.java",
+    },
+    {
+      resolveRequestMappingFn: async () => ({
+        status: "ok",
+        contractVersion: "0.1.0v",
+        framework: "spring_mvc",
+        requestSource: "spring_mvc",
+        requestCandidate: {
+          method: "GET",
+          path: "/v1/health",
+          queryTemplate: "",
+          fullUrlHint: "/v1/health",
+          rationale: ["ast"],
+        },
+        matchedTypeFile: "C:\\repo\\service\\src\\main\\java\\HealthController.java",
+        matchedRootAbs: "C:\\repo\\service",
+        evidence: ["resolvedType=com.example.HealthController"],
+        attemptedStrategies: ["java_ast_index_lookup", "java_ast_spring_mvc_resolver"],
+      }),
+    },
+  );
 
-    assert.equal(result.status, "recipe");
-    assert.equal(result.synthesizerUsed, "spring");
-    assert.equal(result.requestCandidate.method, "GET");
-    assert.equal(result.trigger.kind, "http");
-  });
+  assert.equal(result.status, "recipe");
+  assert.equal(result.synthesizerUsed, "spring");
+  assert.equal(result.requestCandidate.method, "GET");
+  assert.equal(result.requestSource, "spring_mvc");
+  assert.deepEqual(result.attemptedStrategies, [
+    "java_ast_index_lookup",
+    "java_ast_spring_mvc_resolver",
+  ]);
 });
 
-test("spring synthesizer fails closed when entrypoint is not proven", async () => {
-  await withTempDir(async (dir) => {
-    await fs.writeFile(
-      path.join(dir, "pom.xml"),
-      "<project><artifactId>demo</artifactId><dependencies><dependency><groupId>org.springframework</groupId></dependency></dependencies></project>",
-      "utf8",
-    );
-    const javaFile = path.join(dir, "src", "main", "java", "com", "example", "ServiceOnly.java");
-    await fs.mkdir(path.dirname(javaFile), { recursive: true });
-    await fs.writeFile(
-      javaFile,
-      [
-        "package com.example;",
-        "public class ServiceOnly {",
-        "  public boolean finalPriceLte() { return true; }",
-        "}",
-      ].join("\n"),
-      "utf8",
-    );
+test("spring synthesizer surfaces AST resolver bootstrap failures distinctly", async () => {
+  const result = await synthesizeSpringRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      searchRootsAbs: ["C:\\repo\\service"],
+      classHint: "HealthController",
+      methodHint: "health",
+      intentMode: "regression_api_only",
+    },
+    {
+      resolveRequestMappingFn: async () => ({
+        status: "report",
+        contractVersion: "0.1.0v",
+        reasonCode: "ast_resolver_unavailable",
+        failedStep: "request_mapping_resolver_bootstrap",
+        nextAction: "Build resolver JAR.",
+        evidence: ["resolver_jar_missing=true"],
+        attemptedStrategies: ["java_ast_resolver_bootstrap"],
+      }),
+    },
+  );
 
-    const result = await synthesizeSpringRecipe({
-      rootAbs: dir,
-      workspaceRootAbs: dir,
-      searchRootsAbs: [dir],
-      classHint: "ServiceOnly",
-      methodHint: "finalPriceLte",
-      intentMode: "single_line_probe",
-      lineHint: 12,
-    });
+  assert.equal(result.status, "report");
+  assert.equal(result.reasonCode, "ast_resolver_unavailable");
+  assert.equal(result.failedStep, "request_mapping_resolver_bootstrap");
+});
 
-    assert.equal(result.status, "report");
-    assert.equal(result.reasonCode, "spring_entrypoint_not_proven");
-    assert.equal(result.failedStep, "spring_entrypoint_resolution");
-  });
+test("spring synthesizer maps generic AST mapping failures to spring entrypoint failures", async () => {
+  const result = await synthesizeSpringRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      searchRootsAbs: ["C:\\repo\\service"],
+      classHint: "CatalogController",
+      methodHint: "getCatalog",
+      lineHint: 41,
+      intentMode: "regression_plus_line_probe",
+    },
+    {
+      resolveRequestMappingFn: async () => ({
+        status: "report",
+        contractVersion: "0.1.0v",
+        reasonCode: "request_mapping_not_proven",
+        failedStep: "request_mapping_resolution",
+        nextAction: "Refine hints.",
+        evidence: ["resolvedType=com.example.CatalogController"],
+        attemptedStrategies: ["java_ast_index_lookup", "java_ast_framework_resolution"],
+      }),
+    },
+  );
+
+  assert.equal(result.status, "report");
+  assert.equal(result.reasonCode, "spring_entrypoint_not_proven");
+  assert.equal(result.failedStep, "spring_entrypoint_resolution");
+  assert.match(result.nextAction, /AST-backed request mapping resolution/);
 });

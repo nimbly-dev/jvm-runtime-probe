@@ -15,7 +15,6 @@ export type RecipeCandidate = {
 export type RequestInferenceSource =
   | "spring_mvc"
   | "jaxrs"
-  | "openapi"
   | "controller_declaration_fallback";
 
 export type InferenceFailurePhase = "target_inference" | "request_inference" | "auth_resolution";
