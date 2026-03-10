@@ -42,7 +42,6 @@ export function normalizeStatusBatchRow(raw: Record<string, unknown>): Record<st
     ...(raw.probe as Record<string, unknown>),
   };
   if (typeof raw.ok === "boolean") out.ok = raw.ok;
-  if (typeof raw.contractVersion === "string") out.contractVersion = raw.contractVersion;
   if (typeof raw.capturePreview === "object" && raw.capturePreview !== null) {
     out.capturePreview = raw.capturePreview;
   }

@@ -12,5 +12,6 @@
 
   <modules>
     <module>core</module>
+    <module>request-mapping-resolver</module>
   </modules>
 </project>

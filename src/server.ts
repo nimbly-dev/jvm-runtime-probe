@@ -1,21 +1,18 @@
 #!/usr/bin/env node
-import * as path from "node:path";
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
 import { loadConfigFromEnvAndArgs } from "./config/server-config";
 import { CONFIG_DEFAULTS } from "./config/defaults";
-import { registerProjectListTool } from "./tools/core/project_list/handler";
+import { registerProjectContextValidateTool } from "./tools/core/project_context_validate/handler";
 import { registerProbeCheckTool } from "./tools/core/probe_check/handler";
 import { registerTargetInferTool } from "./tools/core/target_infer/handler";
 import { registerRecipeCreateTool } from "./tools/core/recipe_generate/handler";
 import { registerProbeTools } from "./tools/core/probe/handler";
-import { ProjectRuntime } from "./utils/project_discovery/project_runtime.util";
 
 async function main() {
   const cfg = loadConfigFromEnvAndArgs(process.argv);
-  const serverRepoRootAbs = path.resolve(__dirname, "..");
   const probeStatusPath = cfg.probeStatusPath;
   const probeResetPath = cfg.probeResetPath;
   const probeActuatePath = CONFIG_DEFAULTS.PROBE_ACTUATE_PATH;
@@ -25,7 +22,6 @@ async function main() {
     name: "mcp-jvm-debugger",
     version: "0.1.0",
   });
-  const projectRuntime = new ProjectRuntime(cfg.workspaceRootAbs);
 
   // Register at least one resource so Codex doesn't spam resources/list with "method not found".
   server.registerResource(
@@ -87,11 +83,7 @@ async function main() {
     },
   );
 
-  registerProjectListTool(server, {
-    config: cfg,
-    serverRepoRootAbs,
-    projectRuntime,
-  });
+  registerProjectContextValidateTool(server);
   registerProbeCheckTool(server, {
     probeBaseUrl: cfg.probeBaseUrl,
     probeStatusPath,
@@ -99,12 +91,10 @@ async function main() {
   });
   registerTargetInferTool(server, {
     config: cfg,
-    projectRuntime,
   });
   registerRecipeCreateTool(server, {
-    config: cfg,
+    probeBaseUrl: cfg.probeBaseUrl,
     probeStatusPath,
-    projectRuntime,
   });
   registerProbeTools(server, {
     probeBaseUrl: cfg.probeBaseUrl,

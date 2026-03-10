@@ -15,7 +15,7 @@ Use this workflow for regression runs at controller scope, service scope, or who
 
 ## MCP-First Requirement
 
-1. Mandatory tools: `project_list`, `probe_recipe_create` (per endpoint or representative target), plus probe tools when probe verification is requested/available.
+1. Mandatory tools: `project_context_validate`, `probe_recipe_create` (per endpoint or representative target), plus probe tools when probe verification is requested/available.
 2. If MCP toolchain is unavailable, stop immediately and return:
    - `reasonCode=toolchain_unavailable`
    - `nextAction=enable_mcp_jvm_debugger_tools_then_rerun`
@@ -31,7 +31,11 @@ Use this workflow for regression runs at controller scope, service scope, or who
 
 1. Treat `probe_recipe_create` as deterministic and fail-closed.
 2. If `probe_recipe_create` returns `resultType=report`, stop endpoint execution for that route unless report indicates only missing user input.
-3. Capture and propagate synthesis diagnostics for every fail-closed report:
+3. In report mode, prefer compact execution metadata:
+   - `executionPlan.routingReason` (code)
+   - `executionPlan.steps[].actionCode` (code)
+   - avoid depending on verbose instruction text.
+4. Capture and propagate synthesis diagnostics for every fail-closed report:
    - `reasonCode`
    - `failedStep`
    - `evidence`

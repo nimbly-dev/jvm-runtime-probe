@@ -1,15 +1,15 @@
 import * as z from "zod/v4";
 
 export const RecipeGenerateInputSchema = {
+  projectRootAbs: z
+    .string()
+    .describe("Absolute project root selected by orchestrator; all inference stays scoped here."),
   classHint: z.string().describe("Class hint, e.g. CatalogShoeSpecifications"),
   methodHint: z.string().describe("Method hint, e.g. finalPriceLte"),
   lineHint: z.number().int().positive().optional(),
   intentMode: z
     .enum(["regression_api_only", "single_line_probe", "regression_plus_line_probe"])
     .describe("Required execution intent routing mode."),
-  serviceHint: z.string().optional().describe("Optional service hint to pick project root"),
-  projectId: z.string().optional().describe("Optional discovered project id"),
-  workspaceRoot: z.string().optional().describe("Optional workspace root override"),
   authToken: z
     .string()
     .optional()

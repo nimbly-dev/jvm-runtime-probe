@@ -3,8 +3,9 @@ import { probeStatus } from "../probe/probe_status.util";
 export type RuntimeCaptureSummary =
   | {
       status: "available";
-      probeStatus: Record<string, unknown>;
       capturePreview: Record<string, unknown>;
+      lineValidation?: string;
+      lineResolvable?: boolean;
     }
   | {
       status: "not_captured_yet" | "unavailable";
@@ -41,10 +42,15 @@ export async function enrichRuntimeCapture(args: {
         ? (statusJson.capturePreview as Record<string, unknown>)
         : null;
     if (capturePreview && capturePreview.available === true) {
+      const lineValidation =
+        typeof statusJson?.lineValidation === "string" ? statusJson.lineValidation : undefined;
+      const lineResolvable =
+        typeof statusJson?.lineResolvable === "boolean" ? statusJson.lineResolvable : undefined;
       return {
         status: "available",
-        probeStatus: statusJson ?? {},
         capturePreview,
+        ...(lineValidation ? { lineValidation } : {}),
+        ...(typeof lineResolvable === "boolean" ? { lineResolvable } : {}),
       };
     }
     return {

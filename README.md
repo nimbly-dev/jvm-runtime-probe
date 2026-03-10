@@ -30,7 +30,7 @@ Operator workflows and end-to-end execution flows are documented in [docs/how-it
 ```powershell
 npm.cmd install
 npm.cmd run build
-mvn -f java-agent\core\pom.xml -DskipTests package
+mvn -f java-agent\pom.xml -DskipTests package
 ```
 
 ---
@@ -134,6 +134,8 @@ Required:
 Optional:
 
 - `MCP_WORKSPACE_ROOT`
+- `MCP_JAVA_REQUEST_MAPPING_RESOLVER_JAR`
+- `MCP_JAVA_BIN`
 - `MCP_PROBE_WAIT_MAX_RETRIES` (default `1`, max `10`)
 - `MCP_PROBE_WAIT_UNREACHABLE_RETRY_ENABLED` (default `false`)
 - `MCP_PROBE_WAIT_UNREACHABLE_MAX_RETRIES` (default `3`, max `10`)
@@ -156,7 +158,7 @@ Shipped skills:
 ## MCP Tools
 
 - `debug_check`
-- `project_list`
+- `project_context_validate`
 - `probe_check`
 - `probe_target_infer`
 - `probe_recipe_create`
@@ -165,4 +167,11 @@ Shipped skills:
 - `probe_reset`
 - `probe_wait_for_hit`
 - `probe_enable`
+
+## Synthesis Notes
+
+- `probe_recipe_create` request synthesis is code-first via synthesizer plugins and a generic JVM AST request-mapping resolver (no OpenAPI route fallback).
+- The AST resolver exposes a framework-agnostic contract over `stdin/stdout`; Spring MVC and JAX-RS are the first built-in resolvers.
+- OpenAPI files are still used for auth hinting when available.
+- When `resultType=report`, `executionPlan.steps` are compact action codes (for example `resolve_auth`, `request_candidate_missing`) instead of verbose instruction text.
 
