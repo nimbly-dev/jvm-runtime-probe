@@ -19,7 +19,7 @@ test("new skills include mandatory MCP-first and Repro Steps contract", () => {
     const text = fs.readFileSync(skillPath, "utf8");
     assert.match(text, /toolchain_unavailable/);
     assert.match(text, /Repro Steps/);
-    assert.match(text, /project_list/);
+    assert.match(text, /project_context_validate/);
     assert.match(text, /probe_recipe_create/);
   }
 });

@@ -5,6 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
+    "build:java": "mvn -f java-agent\\pom.xml -DskipTests package",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/server.js",
     "test": "node --test -r ts-node/register test/**/*.test.ts",
@@ -51,6 +52,7 @@
   },
   "files": [
     "dist/**",
+    "java-agent/request-mapping-resolver/target/*.jar",
     "README.md"
   ]
 }

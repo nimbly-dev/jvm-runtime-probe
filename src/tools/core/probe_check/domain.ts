@@ -3,6 +3,44 @@ import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from ".
 import { joinUrl } from "../../../utils/probe.util";
 import { formatProbeOutput } from "../../../utils/probe/output.util";
 
+function sanitizeRuntime(runtime: unknown): Record<string, unknown> | undefined {
+  if (!runtime || typeof runtime !== "object") return undefined;
+  const input = runtime as Record<string, unknown>;
+  const out: Record<string, unknown> = { ...input };
+
+  // serverEpochMs is a remote host clock and can be misleading in mixed-host setups.
+  delete out.serverEpochMs;
+
+  const applicationType =
+    typeof out.applicationType === "object" && out.applicationType !== null
+      ? (out.applicationType as Record<string, unknown>)
+      : undefined;
+  if (applicationType) {
+    const value = typeof applicationType.value === "string" ? applicationType.value : "";
+    const confidence =
+      typeof applicationType.confidence === "number" ? applicationType.confidence : undefined;
+    const shouldHide = value.toLowerCase() === "unknown" || (confidence ?? 0) < 0.7;
+    if (shouldHide) {
+      delete out.applicationType;
+    }
+  }
+
+  return out;
+}
+
+function sanitizeCheckPayload(json: unknown): Record<string, unknown> | null {
+  if (!json || typeof json !== "object") return null;
+  const out = { ...(json as Record<string, unknown>) };
+  delete out.contractVersion;
+  const runtime = sanitizeRuntime(out.runtime);
+  if (runtime && Object.keys(runtime).length > 0) {
+    out.runtime = runtime;
+  } else {
+    delete out.runtime;
+  }
+  return out;
+}
+
 export async function probeDiagnose(args: {
   baseUrl: string;
   statusPath: string;
@@ -25,6 +63,7 @@ export async function probeDiagnose(args: {
 
   const checks: Record<string, unknown> = {};
   const recommendations: string[] = [];
+  let contractVersion: string | undefined;
 
   try {
     const reset = await fetchJson(resetUrl, {
@@ -33,10 +72,14 @@ export async function probeDiagnose(args: {
       body: JSON.stringify({ key: probeKey }),
       timeoutMs,
     });
+    const resetJson = sanitizeCheckPayload(reset.json);
+    if (!contractVersion && typeof reset.json?.contractVersion === "string") {
+      contractVersion = reset.json.contractVersion;
+    }
     checks.reset = {
       ok: reset.status >= 200 && reset.status < 300,
       status: reset.status,
-      json: reset.json,
+      ...(resetJson ? { json: resetJson } : {}),
     };
   } catch (err) {
     checks.reset = { ok: false, error: err instanceof Error ? err.message : String(err) };
@@ -47,6 +90,10 @@ export async function probeDiagnose(args: {
 
   try {
     const status = await fetchJson(statusUrl.toString(), { method: "GET", timeoutMs });
+    const statusJson = sanitizeCheckPayload(status.json);
+    if (!contractVersion && typeof status.json?.contractVersion === "string") {
+      contractVersion = status.json.contractVersion;
+    }
     const responseKey =
       typeof status.json?.probe?.key === "string"
         ? status.json.probe.key
@@ -57,8 +104,7 @@ export async function probeDiagnose(args: {
     checks.status = {
       ok: status.status >= 200 && status.status < 300,
       status: status.status,
-      json: status.json,
-      responseKey,
+      ...(statusJson ? { json: statusJson } : {}),
       keyDecodingOk: decodeOk,
     };
     if (!decodeOk) {
@@ -82,6 +128,7 @@ export async function probeDiagnose(args: {
     },
     checks,
     recommendations,
+    ...(contractVersion ? { contractVersion } : {}),
   };
   const allOk =
     (checks.reset as any)?.ok === true &&

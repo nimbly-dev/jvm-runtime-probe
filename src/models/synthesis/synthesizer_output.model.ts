@@ -3,7 +3,6 @@ export type SynthesisHttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 export type SynthesisRequestInferenceSource =
   | "spring_mvc"
   | "jaxrs"
-  | "openapi"
   | "controller_declaration_fallback";
 
 export type SynthesisRecipeCandidate = {
