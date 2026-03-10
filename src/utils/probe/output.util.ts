@@ -46,6 +46,7 @@ export function formatProbeOutput(args: {
   runNotes?: string;
   actionCode?: string;
   nextAction?: string;
+  mirrorHttpResponseInResponseDetails?: boolean;
 }): string {
   const parsedRequest = parseHttpRequestLine(args.httpRequest);
   const requestMethod = args.requestMethod ?? parsedRequest.method;
@@ -65,7 +66,7 @@ export function formatProbeOutput(args: {
       },
       responseDetails: {
         code: args.httpCode,
-        body: args.httpResponse,
+        ...(args.mirrorHttpResponseInResponseDetails ? { body: args.httpResponse } : {}),
       },
       targetKey: args.probeKey,
       executionHit: args.executionHit,

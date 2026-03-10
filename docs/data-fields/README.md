@@ -17,18 +17,19 @@ Column meanings:
 | `serverTime` | Server timestamp when ping response is produced. | `debug_check` | true | `"2026-03-07T04:00:00.000Z"` |
 | `version` | MCP server version. | `debug_check` | true | `"0.1.0"` |
 
-## project_list
+## project_context_validate
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
-| `workspaceRoot` | Workspace root used for discovery. | `project_list` | true | `"C:\\repo\\workspace"` |
-| `maxJavaFilesPerProject` | Per-project Java scan cap. | `project_list` | true | `300` |
-| `defaultProjectId` | Auto-selected project id when unambiguous. | `project_list` | false | `"catalog-service"` |
-| `projects` | Discovered project list. | `project_list` | true | `[{"id":"catalog-service"}]` |
-| `projects[].id` | Stable project identifier. | `project_list` | true | `"catalog-service"` |
-| `projects[].root` | Absolute project root path. | `project_list` | true | `"C:\\repo\\workspace\\catalog-service"` |
-| `projects[].build` | Build system marker. | `project_list` | true | `"maven"` |
-| `projects[].probeScope.suggestedInclude` | Suggested Java package include glob for probe agent. | `project_list` | false | `"com.example.catalog.**"` |
+| `resultType` | Output shape discriminator for context validation. | `project_context_validate` | true | `"project_context"` |
+| `status` | Validation status (`ok` or selector error status). | `project_context_validate` | true | `"ok"` |
+| `projectRootAbs` | Absolute orchestrator-selected project root used for scoped validation. | `project_context_validate` | false | `"C:\\repo\\catalog-service"` |
+| `buildMarkers` | Build markers found directly under `projectRootAbs`. | `project_context_validate` | false | `["pom.xml"]` |
+| `hasBuildMarker` | Whether any Maven/Gradle marker exists in the project root. | `project_context_validate` | false | `true` |
+| `javaSourceRoots` | Basic Java source roots discovered under the selected project root. | `project_context_validate` | false | `["C:\\repo\\catalog-service\\src\\main\\java"]` |
+| `hasJavaSourceRoot` | Whether at least one basic Java source root exists. | `project_context_validate` | false | `true` |
+| `reason` | Error reason for selector failures. | `project_context_validate` | false | `"projectRootAbs must be absolute"` |
+| `nextAction` | Follow-up action when validation fails. | `project_context_validate` | false | `"Provide projectRootAbs as an absolute existing project directory path."` |
 
 ## probe_check
 
@@ -38,6 +39,7 @@ Column meanings:
 | `checks` | Aggregated endpoint checks. | `probe_check` | true | `{"reset":{"ok":true},"status":{"ok":true}}` |
 | `checks.reset` | Reset endpoint diagnostic result. | `probe_check` | true | `{"ok":true,"status":200}` |
 | `checks.status` | Status endpoint diagnostic result. | `probe_check` | true | `{"ok":true,"keyDecodingOk":true}` |
+| `checks.status.keyDecodingOk` | Whether the probe status key decoding behavior is valid. | `probe_check` | false | `true` |
 | `recommendations` | Operator follow-up hints when check fails. | `probe_check` | true | `[]` |
 
 ## probe_target_infer
@@ -46,9 +48,8 @@ Column meanings:
 | --- | --- | --- | --- | --- |
 | `resultType` | Target infer response mode (`report`, `class_methods`, `disambiguation`). | `probe_target_infer` | false | `"class_methods"` |
 | `status` | Inference status code for next-step routing. | `probe_target_infer` | false | `"ok"` |
-| `workspaceRoot` | Workspace root used for inference. | `probe_target_infer` | true | `"C:\\repo\\workspace"` |
-| `hints` | Input hints used for inference. | `probe_target_infer` | true | `{"classHint":"CatalogService"}` |
-| `projectResolution` | Project selection diagnostics. | `probe_target_infer` | true | `{"mode":"single_project"}` |
+| `projectRoot` | Absolute project root selected by orchestrator and used for scoped inference. | `probe_target_infer` | true | `"C:\\repo\\catalog-service"` |
+| `hints` | Input hints used for scoped inference. | `probe_target_infer` | true | `{"projectRootAbs":"C:\\repo\\catalog-service","classHint":"CatalogService"}` |
 | `scannedJavaFiles` | Approximate Java file scan count. | `probe_target_infer` | false | `412` |
 | `candidates` | Ranked target candidates for runtime probe keying. | `probe_target_infer` | false | `[{"key":"com.example.Catalog#save"}]` |
 | `class` | Selected class block in `class_methods` mode. | `probe_target_infer` | false | `{"fqcn":"com.example.CatalogController"}` |
@@ -59,13 +60,13 @@ Column meanings:
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
-| `workspaceRoot` | Workspace root used for recipe generation. | `probe_recipe_create` | true | `"C:\\repo\\workspace"` |
-| `projectRoot` | Selected project root for inference/auth resolution. | `probe_recipe_create` | true | `"C:\\repo\\workspace\\catalog-service"` |
+| `projectRoot` | Absolute project root selected by orchestrator and used for scoped recipe generation. | `probe_recipe_create` | true | `"C:\\repo\\catalog-service"` |
 | `hints` | Effective input hints and actuation preferences. | `probe_recipe_create` | true | `{"classHint":"CatalogService","lineHint":88}` |
-| `projectResolution` | Project disambiguation summary. | `probe_recipe_create` | true | `{"mode":"single_project"}` |
 | `inferredTarget` | Best inferred runtime target for probe verification. | `probe_recipe_create` | false | `{"key":"com.example.CatalogService#save","line":88}` |
-| `requestCandidates` | HTTP request candidates inferred from controller/schema analysis. | `probe_recipe_create` | true | `[{"method":"POST","path":"/v1/catalog"}]` |
-| `executionPlan` | Step plan emitted for execution/verification tooling. | `probe_recipe_create` | true | `{"selectedMode":"single_line_probe"}` |
+| `requestCandidates` | HTTP request candidates inferred from code-based synthesizer analysis. | `probe_recipe_create` | true | `[{"method":"POST","path":"/v1/catalog"}]` |
+| `executionPlan` | Step plan emitted for execution/verification tooling. Report mode emits compact action-code steps. | `probe_recipe_create` | true | `{"selectedMode":"single_line_probe"}` |
+| `executionPlan.routingReason` | Routing reason code for selected mode (`single_line_probe`, `regression_api_only_no_probe`, etc). | `probe_recipe_create` | true | `"regression_api_only_no_probe"` |
+| `executionPlan.steps[].actionCode` | Compact step action code in report mode (no verbose instruction strings). | `probe_recipe_create` | false | `"request_candidate_missing"` |
 | `resultType` | Output category (`recipe` or `report`). | `probe_recipe_create` | true | `"recipe"` |
 | `status` | Recipe generation status for orchestration decisions. | `probe_recipe_create` | true | `"single_line_probe_ready"` |
 | `reasonCode` | Deterministic synthesis/report reason code for fail-closed routing. | `probe_recipe_create` | false | `"spring_entrypoint_not_proven"` |
@@ -78,8 +79,10 @@ Column meanings:
 | `evidence` | Compact evidence lines used for deterministic synthesis and pushback context. | `probe_recipe_create` | true | `["request_source=spring_mvc"]` |
 | `trigger` | Protocol-aware trigger envelope emitted by synthesis. | `probe_recipe_create` | false | `{"kind":"http","method":"POST","path":"/v1/catalog"}` |
 | `auth` | Auth inference result and next-step hints. | `probe_recipe_create` | true | `{"status":"ok","strategy":"bearer"}` |
-| `notes` | Run notes and routing/inference diagnostics. | `probe_recipe_create` | true | `["result_type=recipe"]` |
+| `notes` | Run notes and routing/inference diagnostics. Report mode is compact/failure-focused. | `probe_recipe_create` | true | `["execution_readiness=ready"]` |
 | `runtimeCapture` | Optional runtime capture preview from live probe status. | `probe_recipe_create` | false | `{"status":"available","capturePreview":{"captureId":"abc123"}}` |
+| `runtimeCapture.lineValidation` | Optional line-validation hint from runtime capture enrich pass. | `probe_recipe_create` | false | `"invalid_line_target"` |
+| `runtimeCapture.lineResolvable` | Optional line-resolvable hint from runtime capture enrich pass. | `probe_recipe_create` | false | `false` |
 | `rendered` | Optional rendered template output when `outputTemplate` is supplied. | `probe_recipe_create` | false | `"Reproduction execution plan..."` |
 
 ## probe_enable
@@ -159,6 +162,6 @@ These fields are emitted by orchestration summaries in skill-guided runs when pr
 | `attemptedCandidates` | Candidate runtime routes evaluated before pushback. | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `[{"apiBase":"http://localhost:8082","probeBase":"http://localhost:9192"}]` |
 | `validationResults` | Per-candidate validation outcomes (probe/API/line alignment checks). | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `[{"probeReachable":true,"apiReachable":false}]` |
 | `nextAction` | Action required from the user to proceed after pushback. | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `"Provide a unique runtime/service selector or stop conflicting services."` |
-| `reproSteps` | Ordered executable reproduction steps emitted for both success and pushback outputs. | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `["1. Call project_list", "2. Call probe_recipe_create", "3. Resolve runtime route"]` |
+| `reproSteps` | Ordered executable reproduction steps emitted for both success and pushback outputs. | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `["1. Validate projectRootAbs", "2. Call probe_recipe_create", "3. Resolve runtime route"]` |
 
 

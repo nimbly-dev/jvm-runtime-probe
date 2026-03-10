@@ -5,10 +5,7 @@ import { type IntentMode, type RecipeStatus } from "../../../utils/recipe_consta
 import { buildExecutionReadiness } from "../../../utils/execution_readiness.util";
 import { buildRecipeExecutionPlan } from "../../../utils/recipe_execution_plan.util";
 import { buildRoutingContext, resolveSelectedMode } from "../../../utils/recipe_intent_routing.util";
-import {
-  buildSearchRoots,
-} from "../../../utils/recipe_candidate_infer.util";
-import type { findControllerRequestCandidate } from "../../../utils/recipe_candidate_infer.util";
+import { buildSearchRoots } from "../../../utils/synthesis_search_roots.util";
 import type {
   ExecutionReadiness,
   InferenceDiagnostics,
@@ -67,7 +64,6 @@ export type GenerateRecipeResult = {
 
 export type GenerateRecipeDeps = {
   inferTargetsFn?: typeof inferTargets;
-  findControllerRequestCandidateFn?: typeof findControllerRequestCandidate;
   synthesizerRegistry?: SynthesizerRegistry;
   resolveAuthForRecipeFn?: typeof resolveAuthForRecipe;
 };
@@ -138,64 +134,16 @@ export async function generateRecipe(
   const top = inferred.candidates[0];
 
   const searchRootsAbs = buildSearchRoots(normalized.rootAbs, normalized.workspaceRootAbs);
-  let synthesis: SynthesizerOutput | SynthesizerFailure;
-  if (deps.findControllerRequestCandidateFn) {
-    const controllerMatch = await deps.findControllerRequestCandidateFn({
-      searchRootsAbs,
-      methodHint: normalized.methodHint,
-      ...(top ? { inferredTargetFileAbs: top.file } : {}),
-    });
-    if (controllerMatch.recipe) {
-      synthesis = {
-        status: "recipe",
-        synthesizerUsed: "spring",
-        framework: "spring",
-        requestCandidate: controllerMatch.recipe,
-        trigger: {
-          kind: "http",
-          method: controllerMatch.recipe.method,
-          path: controllerMatch.recipe.path,
-          queryTemplate: controllerMatch.recipe.queryTemplate,
-          fullUrlHint: controllerMatch.recipe.fullUrlHint,
-          ...(controllerMatch.recipe.bodyTemplate ? { bodyTemplate: controllerMatch.recipe.bodyTemplate } : {}),
-          headers: {},
-          ...(controllerMatch.recipe.bodyTemplate ? { contentType: "application/json" } : {}),
-        },
-        ...(controllerMatch.requestSource ? { requestSource: controllerMatch.requestSource } : {}),
-        ...(controllerMatch.matchedControllerFile
-          ? { matchedControllerFile: controllerMatch.matchedControllerFile }
-          : {}),
-        ...(controllerMatch.matchedBranchCondition
-          ? { matchedBranchCondition: controllerMatch.matchedBranchCondition }
-          : {}),
-        ...(controllerMatch.matchedRootAbs ? { matchedRootAbs: controllerMatch.matchedRootAbs } : {}),
-        evidence: ["legacy_injected_findControllerRequestCandidateFn=true"],
-        attemptedStrategies: ["legacy_find_controller_request_candidate"],
-      };
-    } else {
-      synthesis = {
-        status: "report",
-        reasonCode: "request_candidate_missing",
-        failedStep: "request_synthesis",
-        nextAction:
-          "Request candidate was not inferred in legacy recipe flow. Refine classHint/methodHint/lineHint and rerun probe_recipe_create.",
-        evidence: ["legacy_injected_findControllerRequestCandidateFn=true"],
-        attemptedStrategies: ["legacy_find_controller_request_candidate"],
-        synthesizerUsed: "spring",
-      };
-    }
-  } else {
-    synthesis = await synthesizerRegistry.synthesize({
-      rootAbs: normalized.rootAbs,
-      workspaceRootAbs: normalized.workspaceRootAbs,
-      searchRootsAbs,
-      classHint: normalized.classHint,
-      methodHint: normalized.methodHint,
-      intentMode: normalized.intentMode,
-      ...(typeof normalized.lineHint === "number" ? { lineHint: normalized.lineHint } : {}),
-      ...(top?.file ? { inferredTargetFileAbs: top.file } : {}),
-    });
-  }
+  const synthesis = await synthesizerRegistry.synthesize({
+    rootAbs: normalized.rootAbs,
+    workspaceRootAbs: normalized.workspaceRootAbs,
+    searchRootsAbs,
+    classHint: normalized.classHint,
+    methodHint: normalized.methodHint,
+    intentMode: normalized.intentMode,
+    ...(typeof normalized.lineHint === "number" ? { lineHint: normalized.lineHint } : {}),
+    ...(top?.file ? { inferredTargetFileAbs: top.file } : {}),
+  });
 
   const synthesisSuccess = synthesis.status === "recipe" ? synthesis : undefined;
   const synthesisFailure = synthesis.status === "report" ? synthesis : undefined;
@@ -342,6 +290,17 @@ export async function generateRecipe(
   if (reasonCode) runNotes.push(`synthesis_reason_code=${reasonCode}`);
   if (failedStep) runNotes.push(`synthesis_failed_step=${failedStep}`);
   if (synthesizerUsed) runNotes.push(`synthesizer_used=${synthesizerUsed}`);
+  const notesForOutput =
+    resultType === "report"
+      ? runNotes.filter(
+          (note) =>
+            note.startsWith("execution_readiness=") ||
+            note.startsWith("inference_target=") ||
+            note.startsWith("inference_request=") ||
+            note.startsWith("failure_") ||
+            note.startsWith("synthesis_"),
+        )
+      : runNotes;
 
   return {
     ...(inferredTarget ? { inferredTarget } : {}),
@@ -367,6 +326,6 @@ export async function generateRecipe(
     evidence,
     inferenceDiagnostics,
     auth,
-    notes: runNotes,
+    notes: notesForOutput,
   };
 }

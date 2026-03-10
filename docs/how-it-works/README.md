@@ -34,14 +34,15 @@ Return the exact request plan and probe verification steps.
 
 ### Expected Runtime Flow 
 
-1. `project_list` discovers projects and selects the target project root.
-2. `probe_recipe_create` is called with `intentMode=single_line_probe`, class/method/line hints, and bearer auth context.
-3. `probe_recipe_create` performs route inference from project hints/OpenAPI hints and returns `executionReadiness`, `requestCandidates`, `inferredTarget`, and `selectedMode`.
-4. If route/target cannot be proven uniquely, the run stops with pushback (`probe_route_not_found` or `probe_route_ambiguous`) and returns candidate validation evidence.
-5. On ready state, `probe_reset` clears baseline counter/state for the strict line key.
-6. The orchestrator executes the selected HTTP trigger request from the recipe using the bearer token.
-7. `probe_wait_for_hit` confirms inline line execution; if unavailable, fallback check can use `probe_get_status` for detailed status payload.
-8. When `capturePreview.captureId` is present, `probe_get_capture` retrieves full runtime capture payload for arguments/context evidence.
+1. Orchestrator selects the project root and passes `projectRootAbs`.
+2. `project_context_validate` optionally validates scoped project context for that exact root.
+3. `probe_recipe_create` is called with `projectRootAbs`, `intentMode=single_line_probe`, class/method/line hints, and bearer auth context.
+4. `probe_recipe_create` performs code-based route inference through synthesizer plugins backed by the generic JVM AST request-mapping resolver and returns `executionReadiness`, `requestCandidates`, `inferredTarget`, and `selectedMode`.
+5. If `resultType=report`, treat output as fail-closed and read compact execution metadata (`executionPlan.routingReason`, `executionPlan.steps[].actionCode`) plus synthesis diagnostics.
+6. On ready state, `probe_reset` clears baseline counter/state for the strict line key.
+7. The orchestrator executes the selected HTTP trigger request from the recipe using the bearer token.
+8. `probe_wait_for_hit` confirms inline line execution; if unavailable, fallback check can use `probe_get_status` for detailed status payload.
+9. When `capturePreview.captureId` is present, `probe_get_capture` retrieves full runtime capture payload for arguments/context evidence.
 
 ### Expected Outputs and Artifacts
 
@@ -75,13 +76,15 @@ Return endpoint-level HTTP results and any probe-verifiable evidence.
 
 ### Expected Runtime Flow 
 
-1. `project_list` resolves the API project and runtime scope.
-2. For each route under the controller scope, `probe_recipe_create` is called to produce executable request candidates and auth/readiness diagnostics.
-3. The orchestrator executes regression HTTP requests route-by-route with bearer auth and records request/response outcomes.
-4. Probe verification is applied only when strict line targets are available for an endpoint.
-5. For probe-eligible endpoints, `probe_reset` -> execute HTTP request -> `probe_wait_for_hit` (or `probe_get_status`) verifies runtime line execution.
-6. Any probe capture preview discovered during status checks can be expanded through `probe_get_capture`.
-7. Endpoints without strict line mapping remain HTTP-only and must be marked explicitly as non-probe-verified.
+1. Orchestrator resolves the API project and passes `projectRootAbs`.
+2. `project_context_validate` optionally validates scoped project context for that exact root.
+3. For each route under the controller scope, `probe_recipe_create` is called to produce executable request candidates from AST-backed request mapping resolution plus auth/readiness diagnostics.
+4. If `probe_recipe_create` returns `resultType=report`, stop that route as fail-closed and use compact execution metadata (`executionPlan.routingReason`, `executionPlan.steps[].actionCode`) with diagnostics for routing decisions.
+5. The orchestrator executes regression HTTP requests route-by-route with bearer auth and records request/response outcomes.
+6. Probe verification is applied only when strict line targets are available for an endpoint.
+7. For probe-eligible endpoints, `probe_reset` -> execute HTTP request -> `probe_wait_for_hit` (or `probe_get_status`) verifies runtime line execution.
+8. Any probe capture preview discovered during status checks can be expanded through `probe_get_capture`.
+9. Endpoints without strict line mapping remain HTTP-only and must be marked explicitly as non-probe-verified.
 
 ### Expected Outputs and Artifacts
 

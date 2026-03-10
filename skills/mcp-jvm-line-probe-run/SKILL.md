@@ -15,7 +15,7 @@ Use this workflow only for strict one-line verification runs.
 
 ## MCP-First Requirement
 
-1. Mandatory tools: `project_list`, `probe_recipe_create`, `probe_reset`, `probe_wait_for_hit` or `probe_get_status`.
+1. Mandatory tools: `project_context_validate`, `probe_recipe_create`, `probe_reset`, `probe_wait_for_hit` or `probe_get_status`.
 2. If MCP toolchain is unavailable, stop immediately and return:
    - `reasonCode=toolchain_unavailable`
    - `nextAction=enable_mcp_jvm_debugger_tools_then_rerun`
@@ -23,23 +23,27 @@ Use this workflow only for strict one-line verification runs.
 
 ## Execution Sequence
 
-1. Call `project_list`.
+1. Call `project_context_validate` with orchestrator-selected `projectRootAbs`.
 2. Call `probe_recipe_create` with probe intent and line target context.
 3. If `probe_recipe_create` returns `resultType=report`, treat it as fail-closed synthesis pushback and stop unless the report indicates only missing user input.
-4. On report outputs, always capture synthesis diagnostics:
+4. In report mode, read compact execution metadata:
+   - `executionPlan.routingReason` (code)
+   - `executionPlan.steps[].actionCode` (code)
+   - avoid depending on verbose instruction text.
+5. On report outputs, always capture synthesis diagnostics:
    - `reasonCode`
    - `failedStep`
    - `evidence`
    - `attemptedStrategies`
    - `synthesizerUsed`
-5. Resolve route dynamically from runtime candidates.
-6. Validate exactly one route using:
+6. Resolve route dynamically from runtime candidates.
+7. Validate exactly one route using:
    - probe reachability
    - API reachability
    - strict target alignment (`Class#method:line` resolvability or class-scoped line discovery)
-7. Execute probe flow:
+8. Execute probe flow:
    - `probe_reset` -> trigger HTTP request -> `probe_wait_for_hit` / `probe_get_status`
-8. Cleanup (disable actuation when used).
+9. Cleanup (disable actuation when used).
 
 ## Route Pushback
 

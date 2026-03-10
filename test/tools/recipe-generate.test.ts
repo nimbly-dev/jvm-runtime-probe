@@ -25,17 +25,32 @@ test("uses request fallback when target is not inferred in regression_api_only m
         scannedJavaFiles: 20,
         candidates: [],
       }),
-      findControllerRequestCandidateFn: async () => ({
-        recipe: {
-          method: "POST",
-          path: "/v1/synonyms-rule",
-          queryTemplate: "",
-          fullUrlHint: "/v1/synonyms-rule",
-          confidence: 0.78,
-          rationale: ["fallback"],
-        },
-        requestSource: "controller_declaration_fallback",
-      }),
+      synthesizerRegistry: {
+        synthesize: async () => ({
+          status: "recipe",
+          synthesizerUsed: "spring",
+          framework: "spring",
+          requestCandidate: {
+            method: "POST",
+            path: "/v1/synonyms-rule",
+            queryTemplate: "",
+            fullUrlHint: "/v1/synonyms-rule",
+            confidence: 0.78,
+            rationale: ["fallback"],
+          },
+          trigger: {
+            kind: "http",
+            method: "POST",
+            path: "/v1/synonyms-rule",
+            queryTemplate: "",
+            fullUrlHint: "/v1/synonyms-rule",
+            headers: {},
+          },
+          requestSource: "spring_mvc",
+          evidence: ["resolver=stub"],
+          attemptedStrategies: ["stub_strategy"],
+        }),
+      },
       resolveAuthForRecipeFn: async () => okAuth,
     },
   );
@@ -46,7 +61,7 @@ test("uses request fallback when target is not inferred in regression_api_only m
   assert.equal(result.failurePhase, undefined);
   assert.equal(result.inferenceDiagnostics.target.matched, false);
   assert.equal(result.inferenceDiagnostics.request.matched, true);
-  assert.equal(result.inferenceDiagnostics.request.source, "controller_declaration_fallback");
+  assert.equal(result.inferenceDiagnostics.request.source, "spring_mvc");
 });
 
 test("keeps target_not_inferred for probe mode when strict line target is unavailable", async () => {
@@ -64,17 +79,32 @@ test("keeps target_not_inferred for probe mode when strict line target is unavai
         scannedJavaFiles: 20,
         candidates: [],
       }),
-      findControllerRequestCandidateFn: async () => ({
-        recipe: {
-          method: "POST",
-          path: "/v1/synonyms-rule",
-          queryTemplate: "",
-          fullUrlHint: "/v1/synonyms-rule",
-          confidence: 0.78,
-          rationale: ["fallback"],
-        },
-        requestSource: "controller_declaration_fallback",
-      }),
+      synthesizerRegistry: {
+        synthesize: async () => ({
+          status: "recipe",
+          synthesizerUsed: "spring",
+          framework: "spring",
+          requestCandidate: {
+            method: "POST",
+            path: "/v1/synonyms-rule",
+            queryTemplate: "",
+            fullUrlHint: "/v1/synonyms-rule",
+            confidence: 0.78,
+            rationale: ["fallback"],
+          },
+          trigger: {
+            kind: "http",
+            method: "POST",
+            path: "/v1/synonyms-rule",
+            queryTemplate: "",
+            fullUrlHint: "/v1/synonyms-rule",
+            headers: {},
+          },
+          requestSource: "spring_mvc",
+          evidence: ["resolver=stub"],
+          attemptedStrategies: ["stub_strategy"],
+        }),
+      },
       resolveAuthForRecipeFn: async () => okAuth,
     },
   );
@@ -111,7 +141,17 @@ test("reports request_inference failure when target is inferred but request cand
           },
         ],
       }),
-      findControllerRequestCandidateFn: async () => ({}),
+      synthesizerRegistry: {
+        synthesize: async () => ({
+          status: "report",
+          reasonCode: "request_candidate_missing",
+          failedStep: "request_synthesis",
+          nextAction: "Refine classHint/methodHint/lineHint.",
+          evidence: ["resolver=stub"],
+          attemptedStrategies: ["stub_strategy"],
+          synthesizerUsed: "spring",
+        }),
+      },
     },
   );
 
@@ -147,17 +187,32 @@ test("reports auth_resolution when request exists but auth input is still requir
           },
         ],
       }),
-      findControllerRequestCandidateFn: async () => ({
-        recipe: {
-          method: "POST",
-          path: "/v1/synonyms-rule",
-          queryTemplate: "",
-          fullUrlHint: "/v1/synonyms-rule",
-          confidence: 0.82,
-          rationale: ["controller mapping"],
-        },
-        requestSource: "spring_mvc",
-      }),
+      synthesizerRegistry: {
+        synthesize: async () => ({
+          status: "recipe",
+          synthesizerUsed: "spring",
+          framework: "spring",
+          requestCandidate: {
+            method: "POST",
+            path: "/v1/synonyms-rule",
+            queryTemplate: "",
+            fullUrlHint: "/v1/synonyms-rule",
+            confidence: 0.82,
+            rationale: ["controller mapping"],
+          },
+          trigger: {
+            kind: "http",
+            method: "POST",
+            path: "/v1/synonyms-rule",
+            queryTemplate: "",
+            fullUrlHint: "/v1/synonyms-rule",
+            headers: {},
+          },
+          requestSource: "spring_mvc",
+          evidence: ["resolver=stub"],
+          attemptedStrategies: ["stub_strategy"],
+        }),
+      },
       resolveAuthForRecipeFn: async () => ({
         required: true,
         status: "needs_user_input",
