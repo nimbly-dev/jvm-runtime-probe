@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { buildExecutionReadiness } = require("../../src/utils/execution_readiness.util");
+const { buildExecutionReadiness } = require("@/utils/execution_readiness.util");
 
 const readyAuth = {
   required: true,

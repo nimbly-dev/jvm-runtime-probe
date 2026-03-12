@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import { createProbeDomain } from "./domain";
-import { PROBE_TOOLS } from "./contract";
+import { createProbeDomain } from "@/tools/core/probe/domain";
+import { PROBE_TOOLS } from "@/tools/core/probe/contract";
 
 export type ProbeHandlerConfig = {
   probeBaseUrl: string;

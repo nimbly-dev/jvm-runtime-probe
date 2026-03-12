@@ -1,12 +1,12 @@
-import type { SynthesizerFailure } from "../../../models/synthesis/synthesizer_failure.model";
-import type { SynthesizerInput } from "../../../models/synthesis/synthesizer_input.model";
+import type { SynthesizerFailure } from "@/models/synthesis/synthesizer_failure.model";
+import type { SynthesizerInput } from "@/models/synthesis/synthesizer_input.model";
 import type {
   JvmAstRequestMappingFailure,
   JvmAstRequestMappingResult,
-} from "../../../models/synthesis/request_mapping_ast.model";
-import type { SynthesizerOutput } from "../../../models/synthesis/synthesizer_output.model";
-import { resolveRequestMappingAst } from "../../../lib/request_mapping_ast_resolver";
-import { SPRING_FAILURE_CODES } from "./failure_codes.util";
+} from "@/models/synthesis/request_mapping_ast.model";
+import type { SynthesizerOutput } from "@/models/synthesis/synthesizer_output.model";
+import { resolveRequestMappingAst } from "@/lib/request_mapping_ast_resolver";
+import { SPRING_FAILURE_CODES } from "@/utils/synthesizers/spring/failure_codes.util";
 
 export type SynthesizeSpringRecipeDeps = {
   resolveRequestMappingFn?: (input: {
@@ -17,6 +17,17 @@ export type SynthesizeSpringRecipeDeps = {
     inferredTargetFileAbs?: string;
   }) => Promise<JvmAstRequestMappingResult>;
 };
+
+function readResolverContextPathHint(
+  extensions: Record<string, unknown> | undefined,
+): string | undefined {
+  if (!extensions) return undefined;
+  for (const key of ["contextPathHint", "apiBasePath", "contextPath"]) {
+    const value = extensions[key];
+    if (typeof value === "string" && value.trim().length > 0) return value.trim();
+  }
+  return undefined;
+}
 
 function mapResolverFailureToSynthFailure(
   failure: JvmAstRequestMappingFailure,
@@ -67,6 +78,7 @@ export async function synthesizeSpringRecipe(
   if (resolved.status !== "ok") {
     return mapResolverFailureToSynthFailure(resolved, input);
   }
+  const contextPathHint = readResolverContextPathHint(resolved.extensions);
 
   const out: SynthesizerOutput = {
     status: "recipe",
@@ -93,6 +105,7 @@ export async function synthesizeSpringRecipe(
       `controller_file=${resolved.matchedTypeFile}`,
       `ast_framework=${resolved.framework}`,
       ...resolved.evidence,
+      ...(contextPathHint ? [`ast_context_path_hint=${contextPathHint}`] : []),
     ],
     attemptedStrategies: resolved.attemptedStrategies,
   };

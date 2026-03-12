@@ -2,8 +2,8 @@ import {
   API_REQUEST_NOT_INFERRED_NOTE,
   type IntentMode,
   type RecipeStatus,
-} from "../../utils/recipe_constants.util";
-import type { RoutingDecision } from "../../utils/recipe_intent_routing.util";
+} from "@/utils/recipe_constants.util";
+import type { RoutingDecision } from "@/utils/recipe_intent_routing.util";
 
 export function defaultStatusForMode(mode: IntentMode): RecipeStatus {
   if (mode === "single_line_probe") return "single_line_probe_ready";

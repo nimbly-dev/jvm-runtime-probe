@@ -1,5 +1,5 @@
-import { formatProbeOutput } from "./output.util";
-import type { ToolTextResponse } from "../../models/tool_response.model";
+import { formatProbeOutput } from "@/utils/probe/output.util";
+import type { ToolTextResponse } from "@/models/tool_response.model";
 
 export function buildTextResponse(
   structuredContent: Record<string, unknown>,

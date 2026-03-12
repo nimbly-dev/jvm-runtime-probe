@@ -1,12 +1,11 @@
-import type { AuthResolution } from "../../models/auth_resolution.model";
-import type { RecipeCandidate, RecipeExecutionPlan } from "../../utils/recipe_types.util";
+import type { AuthResolution } from "@/models/auth_resolution.model";
+import type { RecipeCandidate, RecipeExecutionPlan } from "@/utils/recipe_types.util";
 
 export function buildRunNotes(args: {
   selectedMode: "regression_api_only" | "single_line_probe" | "regression_plus_line_probe";
   lineHint?: number;
   inferredLine?: number;
   bestRequest?: RecipeCandidate;
-  routingNote?: string;
   matchedBranchCondition?: string;
   auth: AuthResolution;
   executionPlan: RecipeExecutionPlan;
@@ -16,7 +15,6 @@ export function buildRunNotes(args: {
   if (!args.bestRequest) {
     notes.push("No controller call mapping found in the selected module roots.");
   }
-  if (args.routingNote) notes.push(args.routingNote);
   if (args.selectedMode === "regression_api_only") {
     notes.push("Probe tools are disabled for this route.");
   } else {
@@ -36,9 +34,6 @@ export function buildRunNotes(args: {
   }
   if (args.matchedBranchCondition)
     notes.push(`Line/branch precondition hint: ${args.matchedBranchCondition}`);
-  if (args.bestRequest?.confidence !== undefined) {
-    notes.push(`Request candidate confidence=${args.bestRequest.confidence.toFixed(2)}.`);
-  }
   if (args.bestRequest?.needsConfirmation?.length) {
     notes.push(`Needs confirmation: ${args.bestRequest.needsConfirmation.join(" ")}`);
   }

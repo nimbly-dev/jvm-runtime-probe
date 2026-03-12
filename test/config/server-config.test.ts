@@ -1,9 +1,9 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { CONFIG_DEFAULTS } = require("../../src/config/defaults");
-const { MCP_ENV } = require("../../src/config/env-vars");
-const { loadConfigFromEnvAndArgs } = require("../../src/config/server-config");
+const { CONFIG_DEFAULTS } = require("@/config/defaults");
+const { MCP_ENV } = require("@/config/env-vars");
+const { loadConfigFromEnvAndArgs } = require("@/config/server-config");
 
 const MANAGED_ENV_NAMES = [
   MCP_ENV.PROBE_BASE_URL,

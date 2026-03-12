@@ -2,11 +2,11 @@ import * as path from "node:path";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import type { ServerConfig } from "../../../config/server-config";
-import { clampInt } from "../../../lib/safety";
-import { validateProjectRootAbs } from "../../../utils/project_root_validate.util";
-import { discoverClassMethods, inferTargets } from "./domain";
-import { TARGET_INFER_TOOL } from "./contract";
+import type { ServerConfig } from "@/config/server-config";
+import { clampInt } from "@/lib/safety";
+import { validateProjectRootAbs } from "@/utils/project_root_validate.util";
+import { discoverClassMethods, inferTargets } from "@/tools/core/target_infer/domain";
+import { TARGET_INFER_TOOL } from "@/tools/core/target_infer/contract";
 
 export type TargetInferHandlerDeps = {
   config: ServerConfig;
@@ -79,8 +79,7 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
           rootAbs,
           classHint: classHintTrimmed,
         });
-        const chosenMatches =
-          discovered.matchMode === "exact" ? discovered.classes : discovered.classes;
+        const chosenMatches = discovered.classes;
 
         if (chosenMatches.length === 0) {
           const structuredContent = {
@@ -140,6 +139,24 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
         };
       }
 
+      if (!classHint?.trim()) {
+        const structuredContent = {
+          resultType: "report",
+          status: "class_hint_required",
+          reasonCode: "class_hint_required",
+          failedStep: "input_validation",
+          projectRoot: rootAbs,
+          hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint },
+          reason: "ranked_candidates requires exact classHint for deterministic target selection.",
+          nextAction:
+            "Provide classHint as exact FQCN (preferred) or exact class name, then rerun probe_target_infer.",
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
+
       const inferred = await inferTargets({
         rootAbs,
         maxCandidates: clampInt(maxCandidates ?? 8, 1, 20),
@@ -148,11 +165,63 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
         ...(typeof lineHint === "number" ? { lineHint } : {}),
       });
 
+      if (inferred.candidates.length === 0) {
+        const structuredContent = {
+          resultType: "report",
+          status: "target_not_found",
+          reasonCode: "target_not_found",
+          failedStep: "target_inference",
+          projectRoot: rootAbs,
+          hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint },
+          scannedJavaFiles: inferred.scannedJavaFiles,
+          nextAction:
+            "Refine classHint/methodHint to exact runtime identifiers and rerun probe_target_infer.",
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
+
+      const lineMatches =
+        typeof lineHint === "number"
+          ? inferred.candidates.filter(
+              (candidate) =>
+                candidate.line === lineHint || candidate.declarationLine === lineHint,
+            )
+          : [];
+      const selectedCandidates =
+        typeof lineHint === "number" && lineMatches.length === 1 ? lineMatches : inferred.candidates;
+
+      if (selectedCandidates.length > 1) {
+        const structuredContent = {
+          resultType: "disambiguation",
+          status: "target_ambiguous",
+          reasonCode: "target_ambiguous",
+          failedStep: "target_selection",
+          projectRoot: rootAbs,
+          hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint },
+          scannedJavaFiles: inferred.scannedJavaFiles,
+          matches: selectedCandidates.map((candidate) => ({
+            ...candidate,
+            file: path.relative(rootAbs, candidate.file) || candidate.file,
+          })),
+          nextAction:
+            "Refine classHint to exact FQCN and methodHint to exact method name (add lineHint only when strict line disambiguation is known), then rerun probe_target_infer.",
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
+
       const structuredContent = {
+        resultType: "ranked_candidates",
+        status: "ok",
         projectRoot: rootAbs,
         hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint },
         scannedJavaFiles: inferred.scannedJavaFiles,
-        candidates: inferred.candidates.map((c) => ({
+        candidates: selectedCandidates.map((c) => ({
           ...c,
           file: path.relative(rootAbs, c.file) || c.file,
         })),

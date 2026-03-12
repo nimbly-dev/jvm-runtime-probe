@@ -1,4 +1,4 @@
-import { probeStatus } from "../probe/probe_status.util";
+import { probeStatus } from "@/utils/probe/probe_status.util";
 
 export type RuntimeCaptureSummary =
   | {

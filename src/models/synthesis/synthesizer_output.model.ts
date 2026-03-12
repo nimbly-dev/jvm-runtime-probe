@@ -1,9 +1,6 @@
 export type SynthesisHttpMethod = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
 
-export type SynthesisRequestInferenceSource =
-  | "spring_mvc"
-  | "jaxrs"
-  | "controller_declaration_fallback";
+export type SynthesisRequestInferenceSource = "spring_mvc" | "jaxrs";
 
 export type SynthesisRecipeCandidate = {
   method: SynthesisHttpMethod;
@@ -11,7 +8,6 @@ export type SynthesisRecipeCandidate = {
   queryTemplate: string;
   fullUrlHint: string;
   bodyTemplate?: string;
-  confidence?: number;
   assumptions?: string[];
   needsConfirmation?: string[];
   rationale: string[];

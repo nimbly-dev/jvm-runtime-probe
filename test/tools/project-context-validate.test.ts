@@ -6,7 +6,7 @@ const test = require("node:test");
 
 const {
   projectContextValidateDomain,
-} = require("../../src/tools/core/project_context_validate/domain");
+} = require("@/tools/core/project_context_validate/domain");
 
 async function withTempDir(run: (dir: string) => Promise<void>) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "project-context-"));

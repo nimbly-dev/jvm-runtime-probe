@@ -1,7 +1,7 @@
-import { fetchJson } from "../../../lib/http";
-import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "../../../lib/safety";
-import { joinUrl } from "../../../utils/probe.util";
-import { formatProbeOutput } from "../../../utils/probe/output.util";
+import { fetchJson } from "@/lib/http";
+import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "@/lib/safety";
+import { joinUrl } from "@/utils/probe.util";
+import { formatProbeOutput } from "@/utils/probe/output.util";
 
 function sanitizeRuntime(runtime: unknown): Record<string, unknown> | undefined {
   if (!runtime || typeof runtime !== "object") return undefined;
@@ -17,12 +17,22 @@ function sanitizeRuntime(runtime: unknown): Record<string, unknown> | undefined 
       : undefined;
   if (applicationType) {
     const value = typeof applicationType.value === "string" ? applicationType.value : "";
-    const confidence =
-      typeof applicationType.confidence === "number" ? applicationType.confidence : undefined;
-    const shouldHide = value.toLowerCase() === "unknown" || (confidence ?? 0) < 0.7;
+    delete applicationType.confidence;
+    const shouldHide = value.toLowerCase() === "unknown";
     if (shouldHide) {
       delete out.applicationType;
+    } else {
+      out.applicationType = applicationType;
     }
+  }
+
+  const appPort =
+    typeof out.appPort === "object" && out.appPort !== null
+      ? (out.appPort as Record<string, unknown>)
+      : undefined;
+  if (appPort) {
+    delete appPort.confidence;
+    out.appPort = appPort;
   }
 
   return out;

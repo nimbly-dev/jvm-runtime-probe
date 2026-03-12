@@ -1,4 +1,4 @@
-import type { IntentMode } from "./recipe_constants.util";
+import type { IntentMode } from "@/utils/recipe_constants.util";
 
 export type RecipeCandidate = {
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -6,16 +6,12 @@ export type RecipeCandidate = {
   queryTemplate: string;
   fullUrlHint: string;
   bodyTemplate?: string;
-  confidence?: number;
   assumptions?: string[];
   needsConfirmation?: string[];
   rationale: string[];
 };
 
-export type RequestInferenceSource =
-  | "spring_mvc"
-  | "jaxrs"
-  | "controller_declaration_fallback";
+export type RequestInferenceSource = "spring_mvc" | "jaxrs";
 
 export type InferenceFailurePhase = "target_inference" | "request_inference" | "auth_resolution";
 
@@ -24,7 +20,6 @@ export type InferenceDiagnostics = {
     attempted: true;
     matched: boolean;
     candidateCount: number;
-    topConfidence?: number;
   };
   request: {
     attempted: true;

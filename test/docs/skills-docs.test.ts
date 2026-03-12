@@ -21,6 +21,12 @@ test("new skills include mandatory MCP-first and Repro Steps contract", () => {
     assert.match(text, /Repro Steps/);
     assert.match(text, /project_context_validate/);
     assert.match(text, /probe_recipe_create/);
+    assert.match(text, /FQCN|fully qualified/i);
+    assert.match(text, /test sources are excluded/i);
+    assert.match(text, /deterministic/i);
+    assert.match(text, /resultType|reasonCode|failedStep/);
+    assert.match(text, /Never use confidence|confidence\/heuristic/i);
+    assert.match(text, /apiBasePath/);
+    assert.match(text, /at most once per run/i);
   }
 });
-

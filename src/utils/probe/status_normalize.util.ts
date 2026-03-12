@@ -12,6 +12,40 @@ export function readLineValidation(json: Record<string, unknown> | null): {
   return out;
 }
 
+function sanitizeRuntimeHints(runtime: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...runtime };
+  if (typeof out.serverEpochMs === "number") {
+    out.serverMs = out.serverEpochMs;
+    delete out.serverEpochMs;
+  }
+  const applicationType =
+    typeof out.applicationType === "object" && out.applicationType !== null
+      ? { ...(out.applicationType as Record<string, unknown>) }
+      : undefined;
+  if (applicationType) {
+    delete applicationType.confidence;
+    out.applicationType = applicationType;
+  }
+  const appPort =
+    typeof out.appPort === "object" && out.appPort !== null
+      ? { ...(out.appPort as Record<string, unknown>) }
+      : undefined;
+  if (appPort) {
+    delete appPort.confidence;
+    out.appPort = appPort;
+  }
+  return out;
+}
+
+function sanitizeCapturePreview(capturePreview: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...capturePreview };
+  if (typeof out.capturedAtEpochMs === "number") {
+    out.capturedAtMs = out.capturedAtEpochMs;
+    delete out.capturedAtEpochMs;
+  }
+  return out;
+}
+
 export function normalizeStatusJson(
   raw: Record<string, unknown> | null,
 ): Record<string, unknown> | null {
@@ -25,13 +59,18 @@ export function normalizeStatusJson(
       ? (raw.runtime as Record<string, unknown>)
       : null;
   const out: Record<string, unknown> = { ...probe };
+  if (typeof out.lastHitEpochMs === "number") {
+    out.lastHitMs = out.lastHitEpochMs;
+    delete out.lastHitEpochMs;
+  }
   if (typeof raw.contractVersion === "string") out.contractVersion = raw.contractVersion;
   if (typeof raw.capturePreview === "object" && raw.capturePreview !== null) {
-    out.capturePreview = raw.capturePreview;
+    out.capturePreview = sanitizeCapturePreview(raw.capturePreview as Record<string, unknown>);
   }
   if (runtime) {
-    out.runtime = runtime;
-    if (typeof runtime.mode === "string") out.mode = runtime.mode;
+    const sanitizedRuntime = sanitizeRuntimeHints(runtime);
+    out.runtime = sanitizedRuntime;
+    if (typeof sanitizedRuntime.mode === "string") out.mode = sanitizedRuntime.mode;
   }
   return out;
 }
@@ -41,13 +80,18 @@ export function normalizeStatusBatchRow(raw: Record<string, unknown>): Record<st
   const out: Record<string, unknown> = {
     ...(raw.probe as Record<string, unknown>),
   };
+  if (typeof out.lastHitEpochMs === "number") {
+    out.lastHitMs = out.lastHitEpochMs;
+    delete out.lastHitEpochMs;
+  }
   if (typeof raw.ok === "boolean") out.ok = raw.ok;
   if (typeof raw.capturePreview === "object" && raw.capturePreview !== null) {
-    out.capturePreview = raw.capturePreview;
+    out.capturePreview = sanitizeCapturePreview(raw.capturePreview as Record<string, unknown>);
   }
   if (typeof raw.runtime === "object" && raw.runtime !== null) {
-    out.runtime = raw.runtime;
-    const mode = (raw.runtime as Record<string, unknown>).mode;
+    const sanitizedRuntime = sanitizeRuntimeHints(raw.runtime as Record<string, unknown>);
+    out.runtime = sanitizedRuntime;
+    const mode = sanitizedRuntime.mode;
     if (typeof mode === "string") out.mode = mode;
   }
   return out;

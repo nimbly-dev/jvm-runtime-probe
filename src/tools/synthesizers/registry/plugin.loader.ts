@@ -1,8 +1,8 @@
-import type { SynthesizerInput } from "../../../models/synthesis/synthesizer_input.model";
-import type { SynthesizerFailure } from "../../../models/synthesis/synthesizer_failure.model";
-import { springSynthesizerPlugin } from "../spring/plugin";
-import { assertPluginCompatibility } from "./plugin.compat";
-import type { SynthesizerPlugin, SynthesizerResult } from "./plugin.contract";
+import type { SynthesizerInput } from "@/models/synthesis/synthesizer_input.model";
+import type { SynthesizerFailure } from "@/models/synthesis/synthesizer_failure.model";
+import { springSynthesizerPlugin } from "@/tools/synthesizers/spring/plugin";
+import { assertPluginCompatibility } from "@/tools/synthesizers/registry/plugin.compat";
+import type { SynthesizerPlugin, SynthesizerResult } from "@/tools/synthesizers/registry/plugin.contract";
 
 export class SynthesizerRegistry {
   private readonly plugins: SynthesizerPlugin[];

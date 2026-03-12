@@ -6,7 +6,8 @@ const {
   probeStatus,
   probeWaitHit,
   probeCaptureGet,
-} = require("../../src/tools/core/probe/domain");
+} = require("@/tools/core/probe/domain");
+const { LAST_RESET_EPOCH_BY_KEY } = require("@/utils/probe/constants.util");
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
@@ -67,10 +68,10 @@ test("probe_get_status returns invalid_line_target for unresolved runtime line",
   assert.equal(calls, 1);
 });
 
-test("probe_get_status supports 0.1.0v nested envelope", async () => {
+test("probe_get_status supports 0.1.0 nested envelope", async () => {
   await withMockedFetch(async () => {
     return jsonResponse(200, {
-      contractVersion: "0.1.0v",
+      contractVersion: "0.1.0",
       probe: {
         key: "com.example.Catalog#updateAndStageSynonymRule:122",
         hitCount: 1,
@@ -81,6 +82,7 @@ test("probe_get_status supports 0.1.0v nested envelope", async () => {
       capturePreview: {
         available: true,
         captureId: "abc123",
+        capturedAtEpochMs: 5555,
       },
       runtime: {
         mode: "observe",
@@ -109,14 +111,19 @@ test("probe_get_status supports 0.1.0v nested envelope", async () => {
     const parsed = parseProbeText(out);
     assert.equal(parsed.reproStatus, "status_checked");
     assert.equal(parsed.executionHit, "line_hit");
-    assert.equal(out.structuredContent.response.json.contractVersion, "0.1.0v");
+    assert.equal(out.structuredContent.response.json.contractVersion, "0.1.0");
     assert.equal(out.structuredContent.response.json.capturePreview.captureId, "abc123");
+    assert.equal(out.structuredContent.response.json.capturePreview.capturedAtMs, 5555);
+    assert.equal(out.structuredContent.response.json.capturePreview.capturedAtEpochMs, undefined);
     assert.equal(
       out.structuredContent.response.json.runtime.applicationType.value,
       "spring-boot",
     );
-    assert.equal(out.structuredContent.response.json.runtime.serverEpochMs, 7777);
+    assert.equal(out.structuredContent.response.json.runtime.serverMs, 7777);
+    assert.equal(out.structuredContent.response.json.runtime.serverEpochMs, undefined);
+    assert.equal(out.structuredContent.response.json.runtime.applicationType.confidence, undefined);
     assert.equal(out.structuredContent.response.json.runtime.appPort.value, 8082);
+    assert.equal(out.structuredContent.response.json.runtime.appPort.confidence, undefined);
   });
 });
 
@@ -290,6 +297,47 @@ test("probe_wait_for_hit timeout_no_inline_hit returns line-not-executed guidanc
   assert.ok(calls >= 2);
 });
 
+test("probe_wait_for_hit emits minimal non-duplicative epoch fields", async () => {
+  const key = "com.example.Catalog#updateAndStageSynonymRule:122";
+  const originalNow = Date.now;
+  let calls = 0;
+  try {
+    LAST_RESET_EPOCH_BY_KEY.set(key, 1_000);
+    Date.now = () => 2_000;
+    await withMockedFetch(async () => {
+      calls += 1;
+      return jsonResponse(200, {
+        key,
+        hitCount: 1,
+        lastHitEpochMs: 1_500,
+        mode: "observe",
+        lineResolvable: true,
+        lineValidation: "resolvable",
+      });
+    }, async () => {
+      const out = await probeWaitHit({
+        key,
+        baseUrl: "http://127.0.0.1:9191",
+        statusPath: "/__probe/status",
+        timeoutMs: 250,
+        pollIntervalMs: 100,
+        maxRetries: 1,
+      });
+      assert.equal(out.structuredContent.result.hit, true);
+      assert.equal(out.structuredContent.result.inline, true);
+      assert.equal(out.structuredContent.request.waitStartMs, 2_000);
+      assert.equal(out.structuredContent.request.triggerWindowStartMs, 1_000);
+      assert.equal(out.structuredContent.request.inlineStartEpochMs, undefined);
+      assert.equal(out.structuredContent.request.lastResetEpochMs, undefined);
+    });
+    assert.equal(calls, 1);
+    assert.equal(LAST_RESET_EPOCH_BY_KEY.has(key), false);
+  } finally {
+    Date.now = originalNow;
+    LAST_RESET_EPOCH_BY_KEY.delete(key);
+  }
+});
+
 test("probe_get_status remains backward-compatible when line validation fields are absent", async () => {
   await withMockedFetch(async () => {
     return jsonResponse(200, {
@@ -353,11 +401,11 @@ test("probe_get_status supports keys[] batch with partial success semantics", as
   assert.deepEqual(postedBody, { keys: [lineKey] });
 });
 
-test("probe_get_status supports 0.1.0v batch rows with nested probe payload", async () => {
+test("probe_get_status supports 0.1.0 batch rows with nested probe payload", async () => {
   const lineKey = "com.example.Catalog#updateAndStageSynonymRule:122";
   await withMockedFetch(async () => {
     return jsonResponse(200, {
-      contractVersion: "0.1.0v",
+      contractVersion: "0.1.0",
       ok: true,
       count: 1,
       results: [
@@ -373,6 +421,7 @@ test("probe_get_status supports 0.1.0v batch rows with nested probe payload", as
           capturePreview: {
             available: true,
             captureId: "cap-1",
+            capturedAtEpochMs: 4444,
           },
           runtime: {
             mode: "observe",
@@ -404,20 +453,26 @@ test("probe_get_status supports 0.1.0v batch rows with nested probe payload", as
     const results = parsed.results as Array<Record<string, unknown>>;
     const first = results[0];
     if (!first) throw new Error("expected first batch row");
-    assert.equal(first.probeHit, "hitCount=3, lastHitEpochMs=2222");
+    assert.equal(first.probeHit, "hitCount=3, lastHitMs=2222");
     assert.equal(first.runtimeMode, "observe");
     assert.equal((first as any).capturePreview.captureId, "cap-1");
+    assert.equal((first as any).capturePreview.capturedAtMs, 4444);
+    assert.equal((first as any).capturePreview.capturedAtEpochMs, undefined);
     const responseRows = (out.structuredContent.response.json as any).results;
-    assert.equal(responseRows[0].runtime.serverEpochMs, 3333);
+    assert.equal(responseRows[0].lastHitMs, 2222);
+    assert.equal(responseRows[0].runtime.serverMs, 3333);
+    assert.equal(responseRows[0].runtime.serverEpochMs, undefined);
     assert.equal(responseRows[0].runtime.applicationType.value, "spring-boot");
+    assert.equal(responseRows[0].runtime.applicationType.confidence, undefined);
     assert.equal(responseRows[0].runtime.appPort.value, 8082);
+    assert.equal(responseRows[0].runtime.appPort.confidence, undefined);
   });
 });
 
 test("probe_get_capture returns capture payload when available", async () => {
   await withMockedFetch(async () => {
     return jsonResponse(200, {
-      contractVersion: "0.1.0v",
+      contractVersion: "0.1.0",
       capture: {
         captureId: "abc123",
         methodKey: "com.example.Catalog#updateAndStageSynonymRule",
@@ -443,7 +498,7 @@ test("probe_get_capture returns capture payload when available", async () => {
 test("probe_get_capture returns not found state when capture is missing", async () => {
   await withMockedFetch(async () => {
     return jsonResponse(404, {
-      contractVersion: "0.1.0v",
+      contractVersion: "0.1.0",
       error: "capture_not_found",
       captureId: "missing",
     });

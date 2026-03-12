@@ -2,12 +2,12 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
 
+import { getContractVersion } from "@/config/contract-version";
 import type {
   JvmAstRequestMappingInput,
   JvmAstRequestMappingResult,
-} from "../models/synthesis/request_mapping_ast.model";
+} from "@/models/synthesis/request_mapping_ast.model";
 
-const CONTRACT_VERSION = "0.1.0v";
 const DEFAULT_TIMEOUT_MS = 15_000;
 const AST_RESOLVER_JAR_ENV = "MCP_JAVA_REQUEST_MAPPING_RESOLVER_JAR";
 const JAVA_BIN_ENV = "MCP_JAVA_BIN";
@@ -55,7 +55,7 @@ function buildUnavailableFailure(
 ): JvmAstRequestMappingResult {
   return {
     status: "report",
-    contractVersion: CONTRACT_VERSION,
+    contractVersion: getContractVersion(),
     reasonCode: "ast_resolver_unavailable",
     failedStep: "request_mapping_resolver_bootstrap",
     nextAction:

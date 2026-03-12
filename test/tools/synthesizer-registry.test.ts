@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { SynthesizerRegistry } = require("../../src/tools/synthesizers/registry/plugin.loader");
+const { SynthesizerRegistry } = require("@/tools/synthesizers/registry/plugin.loader");
 
 test("registry selects the first plugin that can handle the input", async () => {
   const plugin = {

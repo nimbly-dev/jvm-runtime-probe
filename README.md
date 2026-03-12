@@ -30,7 +30,7 @@ Operator workflows and end-to-end execution flows are documented in [docs/how-it
 ```powershell
 npm.cmd install
 npm.cmd run build
-mvn -f java-agent\pom.xml -DskipTests package
+mvn -f java-agent\pom.xml package
 ```
 
 ---
@@ -171,7 +171,11 @@ Shipped skills:
 ## Synthesis Notes
 
 - `probe_recipe_create` request synthesis is code-first via synthesizer plugins and a generic JVM AST request-mapping resolver (no OpenAPI route fallback).
+- `probe_recipe_create` requires `classHint` as exact FQCN (for example `com.acme.catalog.web.controller.ProductController`).
+- Runtime synthesis candidate scope is runtime-only (`src/main/java` + generated-main roots); `src/test/java` is excluded.
 - The AST resolver exposes a framework-agnostic contract over `stdin/stdout`; Spring MVC and JAX-RS are the first built-in resolvers.
 - OpenAPI files are still used for auth hinting when available.
 - When `resultType=report`, `executionPlan.steps` are compact action codes (for example `resolve_auth`, `request_candidate_missing`) instead of verbose instruction text.
+- Orchestration decisions must use deterministic fields (`resultType`, `status`, `reasonCode`, `failedStep`); confidence/heuristic scoring is not part of the public contract.
+- Preferred operator inputs for fewer ambiguities: explicit API/probe base URL, context path, and app port.
 

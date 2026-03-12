@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { AuthResolution, AuthStrategy } from "../../models/auth_resolution.model";
+import type { AuthResolution, AuthStrategy } from "@/models/auth_resolution.model";
 
 type SecretValue = {
   value: string;

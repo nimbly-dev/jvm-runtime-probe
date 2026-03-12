@@ -6,177 +6,26 @@ import {
   HARD_MAX_PROBE_POLL_INTERVAL_MS,
   HARD_MAX_PROBE_TIMEOUT_MS,
   HARD_MAX_PROBE_WAIT_MAX_RETRIES,
-} from "../../lib/safety";
-import type { ToolTextResponse } from "../../models/tool_response.model";
-import { joinUrl, parseProbeSnapshot } from "../probe.util";
-import { classifyExecutionHitStrictLine, classifyReproStatusStrictLine, isLineKey, resolveProbeKey } from "./key.util";
-import { formatProbeOutput } from "./output.util";
-import { probeStatus } from "./probe_status.util";
-import {
-  buildLineKeyRequiredResponse,
-  buildTextResponse,
-} from "./response_builders.util";
+} from "@/lib/safety";
+import type { ToolTextResponse } from "@/models/tool_response.model";
+import { joinUrl, parseProbeSnapshot } from "@/utils/probe.util";
+import { isLineKey, resolveProbeKey } from "@/utils/probe/key.util";
+import { buildLineKeyRequiredResponse } from "@/utils/probe/response_builders.util";
 import {
   DEFAULT_PROBE_WAIT_UNREACHABLE_MAX_RETRIES,
-  GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW,
-  GUIDANCE_PROBE_CONNECTIVITY_ISSUE,
-  GUIDANCE_RUNTIME_NOT_ALIGNED,
   HARD_MAX_PROBE_WAIT_UNREACHABLE_MAX_RETRIES,
-  LAST_RESET_EPOCH_BY_KEY,
-} from "./constants.util";
-import { invalidLineTargetProbeHitMessage, readLineValidation } from "./status_normalize.util";
-import { readProbeUnreachableErrorMessage, sleep } from "./wait_policy.util";
-
-async function probeStatusWithUnreachablePolicy(args: {
-  key: string;
-  baseUrl: string;
-  statusPath: string;
-  timeoutMs: number;
-  pollIntervalMs: number;
-  unreachableRetryEnabled: boolean;
-  unreachableMaxRetries: number;
-}): Promise<
-  | { kind: "status"; response: ToolTextResponse }
-  | {
-      kind: "unreachable";
-      details: {
-        endpoint: string;
-        lastError: string;
-        unreachableAttempts: number;
-        unreachableMaxRetries: number;
-        unreachableRetryEnabled: boolean;
-      };
-    }
-> {
-  const endpointUrl = new URL(joinUrl(args.baseUrl, args.statusPath));
-  endpointUrl.searchParams.set("key", args.key);
-  const maxAttempts = args.unreachableRetryEnabled ? args.unreachableMaxRetries : 1;
-  let lastError = "Probe endpoint unreachable";
-
-  for (let unreachableAttempt = 1; unreachableAttempt <= maxAttempts; unreachableAttempt++) {
-    try {
-      const response = await probeStatus({
-        key: args.key,
-        baseUrl: args.baseUrl,
-        statusPath: args.statusPath,
-        timeoutMs: args.timeoutMs,
-      });
-      return { kind: "status", response };
-    } catch (err) {
-      const unreachableError = readProbeUnreachableErrorMessage(err);
-      if (!unreachableError) throw err;
-      lastError = unreachableError;
-      if (unreachableAttempt >= maxAttempts) {
-        return {
-          kind: "unreachable",
-          details: {
-            endpoint: endpointUrl.toString(),
-            lastError,
-            unreachableAttempts: unreachableAttempt,
-            unreachableMaxRetries: maxAttempts,
-            unreachableRetryEnabled: args.unreachableRetryEnabled,
-          },
-        };
-      }
-      await sleep(args.pollIntervalMs);
-    }
-  }
-
-  return {
-    kind: "unreachable",
-    details: {
-      endpoint: endpointUrl.toString(),
-      lastError,
-      unreachableAttempts: maxAttempts,
-      unreachableMaxRetries: maxAttempts,
-      unreachableRetryEnabled: args.unreachableRetryEnabled,
-    },
-  };
-}
-
-function buildServiceUnreachableResponse(args: {
-  key: string;
-  resolvedKey: string;
-  timeoutMs: number;
-  pollIntervalMs: number;
-  maxRetries: number;
-  unreachableRetryEnabled: boolean;
-  unreachableMaxRetries: number;
-  attempt: number;
-  waitStartEpochMs: number;
-  inlineStartEpochMs: number;
-  stage: "baseline_status_check" | "poll_status_check";
-  baselineHitCount?: number;
-  baselineLastHitEpochMs?: number;
-  details: {
-    endpoint: string;
-    lastError: string;
-    unreachableAttempts: number;
-    unreachableMaxRetries: number;
-    unreachableRetryEnabled: boolean;
-  };
-}): ToolTextResponse {
-  const structuredContent: Record<string, unknown> = {
-    request: {
-      key: args.key,
-      resolvedKey: args.resolvedKey,
-      timeoutMs: args.timeoutMs,
-      pollIntervalMs: args.pollIntervalMs,
-      maxRetries: args.maxRetries,
-      unreachableRetryEnabled: args.unreachableRetryEnabled,
-      unreachableMaxRetries: args.unreachableMaxRetries,
-      attempt: args.attempt,
-      waitStartEpochMs: args.waitStartEpochMs,
-      inlineStartEpochMs: args.inlineStartEpochMs,
-      stage: args.stage,
-    },
-    result: {
-      hit: false,
-      inline: false,
-      reason: "service_unreachable",
-      actionCode: GUIDANCE_PROBE_CONNECTIVITY_ISSUE.actionCode,
-      nextAction: GUIDANCE_PROBE_CONNECTIVITY_ISSUE.nextAction,
-      endpoint: args.details.endpoint,
-      lastError: args.details.lastError,
-      unreachableAttempts: args.details.unreachableAttempts,
-      unreachableMaxRetries: args.details.unreachableMaxRetries,
-      unreachableRetryEnabled: args.details.unreachableRetryEnabled,
-    },
-  };
-  if (typeof args.baselineHitCount === "number" && typeof args.baselineLastHitEpochMs === "number") {
-    structuredContent.baseline = {
-      hitCount: args.baselineHitCount,
-      lastHitEpochMs: args.baselineLastHitEpochMs,
-    };
-  }
-  const text = formatProbeOutput({
-    probeKey: args.resolvedKey,
-    httpRequest: `POLL ${args.details.endpoint}`,
-    requestMethod: "POLL",
-    requestUrl: args.details.endpoint,
-    requestBody: {
-      key: args.resolvedKey,
-      timeoutMs: args.timeoutMs,
-      pollIntervalMs: args.pollIntervalMs,
-      maxRetries: args.maxRetries,
-      unreachableRetryEnabled: args.unreachableRetryEnabled,
-      unreachableMaxRetries: args.unreachableMaxRetries,
-    },
-    executionHit: "not_hit",
-    apiOutcome: "error",
-    reproStatus: "probe_unreachable",
-    probeHit:
-      `probe endpoint unreachable; attempts=${args.details.unreachableAttempts}/` +
-      `${args.details.unreachableMaxRetries}`,
-    httpCode: 503,
-    httpResponse: structuredContent.result,
-    actionCode: GUIDANCE_PROBE_CONNECTIVITY_ISSUE.actionCode,
-    nextAction: GUIDANCE_PROBE_CONNECTIVITY_ISSUE.nextAction,
-    runDuration: `${Date.now() - args.waitStartEpochMs}ms`,
-    runNotes: `probe_wait_for_hit service unreachable during ${args.stage}`,
-  });
-  return buildTextResponse(structuredContent, text);
-}
+} from "@/utils/probe/constants.util";
+import { readLineValidation } from "@/utils/probe/status_normalize.util";
+import { sleep } from "@/utils/probe/wait_policy.util";
+import { probeStatusWithUnreachablePolicy } from "@/utils/probe/wait/poll_status.util";
+import {
+  buildBaselineInlineHitResponse,
+  buildInvalidLineTargetResponse,
+  buildPolledInlineHitResponse,
+  buildServiceUnreachableResponse,
+  buildTimeoutNoInlineHitResponse,
+} from "@/utils/probe/wait/response.util";
+import { hasBaselineInlineHit, isInlineByTime, resolveProbeWaitWindow } from "@/utils/probe/wait/window.util";
 
 export async function probeWaitHit(args: {
   key: string;
@@ -241,8 +90,19 @@ export async function probeWaitHit(args: {
   let staleCandidate: Record<string, unknown> | undefined;
 
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    const waitStartEpochMs = Date.now();
-    const inlineStartEpochMs = LAST_RESET_EPOCH_BY_KEY.get(resolvedKey) ?? waitStartEpochMs;
+    const window = resolveProbeWaitWindow(resolvedKey);
+    const requestCtx = {
+      key: args.key,
+      resolvedKey,
+      timeoutMs,
+      pollIntervalMs,
+      maxRetries,
+      unreachableRetryEnabled,
+      unreachableMaxRetries,
+      attempt,
+      waitStartMs: window.waitStartMs,
+      triggerWindowStartMs: window.triggerWindowStartMs,
+    };
 
     const baselineStatus = await probeStatusWithUnreachablePolicy({
       key: resolvedKey,
@@ -255,20 +115,12 @@ export async function probeWaitHit(args: {
     });
     if (baselineStatus.kind === "unreachable") {
       return buildServiceUnreachableResponse({
-        key: args.key,
-        resolvedKey,
-        timeoutMs,
-        pollIntervalMs,
-        maxRetries,
-        unreachableRetryEnabled,
-        unreachableMaxRetries,
-        attempt,
-        waitStartEpochMs,
-        inlineStartEpochMs,
+        request: requestCtx,
         stage: "baseline_status_check",
         details: baselineStatus.details,
       });
     }
+
     const baselineRes = baselineStatus.response;
     const baselineJson = ((baselineRes.structuredContent as any)?.response?.json ?? null) as
       | Record<string, unknown>
@@ -276,95 +128,36 @@ export async function probeWaitHit(args: {
     const baselineLineValidation = readLineValidation(baselineJson);
     const baseline = parseProbeSnapshot(baselineRes.structuredContent);
     const baselineHitCount = baseline.hitCount ?? 0;
-    const baselineLastHitEpochMs = baseline.lastHitEpochMs ?? 0;
+    const baselineLastHitMs = baseline.lastHitMs ?? 0;
+
     if (baselineLineValidation.invalidLineTarget) {
-      const structuredContent: Record<string, unknown> = {
-        request: {
-          key: args.key,
-          resolvedKey,
-          timeoutMs,
-          pollIntervalMs,
-          maxRetries,
-          unreachableRetryEnabled,
-          unreachableMaxRetries,
-          attempt,
-          waitStartEpochMs,
-          inlineStartEpochMs,
-        },
-        result: {
-          hit: false,
-          inline: false,
-          reason: "invalid_line_target",
-          actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
-          nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
-          lineValidation: baselineLineValidation.lineValidation ?? "invalid_line_target",
-          lastStatus: baselineJson,
-        },
-      };
-      const text = formatProbeOutput({
-        probeKey: resolvedKey,
-        httpRequest: `POLL ${pollUrl} (maxRetries=${maxRetries}, pollMs=${pollIntervalMs})`,
-        requestMethod: "POLL",
-        requestUrl: pollUrl,
-        requestBody: { key: resolvedKey, maxRetries, pollIntervalMs, timeoutMs },
-        executionHit: "not_hit",
-        apiOutcome: "error",
-        reproStatus: "invalid_line_target",
-        probeHit: invalidLineTargetProbeHitMessage(baselineHitCount),
-        actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
-        nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
-        httpCode: 422,
-        httpResponse: structuredContent.result,
-        runtimeMode: typeof baselineJson?.mode === "string" ? baselineJson.mode : undefined,
-        runDuration: `${Date.now() - waitStartEpochMs}ms`,
+      return buildInvalidLineTargetResponse({
+        request: requestCtx,
+        pollUrl,
+        baselineHitCount,
+        lineValidation: baselineLineValidation.lineValidation ?? "invalid_line_target",
+        lastStatus: baselineJson,
         runNotes: "probe_wait_for_hit invalid line target detected at baseline status",
       });
-      return buildTextResponse(structuredContent, text);
     }
 
-    if (baselineHitCount > 0 && baselineLastHitEpochMs > 0 && baselineLastHitEpochMs >= inlineStartEpochMs) {
-      const baselineJsonForHit = (baselineJson ?? {}) as Record<string, unknown>;
-      const structuredContent: Record<string, unknown> = {
-        request: {
-          key: args.key,
-          resolvedKey,
-          timeoutMs,
-          pollIntervalMs,
-          maxRetries,
-          attempt,
-          waitStartEpochMs,
-          inlineStartEpochMs,
-        },
-        baseline: { hitCount: baselineHitCount, lastHitEpochMs: baselineLastHitEpochMs },
-        result: {
-          hit: true,
-          inline: true,
-          source: "already_hit_since_inline_start",
-          hitCount: baselineHitCount,
-          hitDelta: 0,
-          lastStatus: baselineJsonForHit,
-        },
-      };
-      const text = formatProbeOutput({
-        probeKey: resolvedKey,
-        httpRequest: `POLL ${pollUrl} (maxRetries=${maxRetries}, pollMs=${pollIntervalMs})`,
-        requestMethod: "POLL",
-        requestUrl: pollUrl,
-        requestBody: { key: resolvedKey, maxRetries, pollIntervalMs, timeoutMs },
-        executionHit: classifyExecutionHitStrictLine(resolvedKey, true),
-        apiOutcome: "ok",
-        reproStatus: classifyReproStatusStrictLine(resolvedKey, true),
-        probeHit: `inline line hit confirmed; hitCount=${baselineHitCount}`,
-        httpCode: 200,
-        httpResponse: structuredContent.result,
-        runtimeMode: typeof baselineJsonForHit?.mode === "string" ? baselineJsonForHit.mode : undefined,
-        runDuration: `${Date.now() - waitStartEpochMs}ms`,
-        runNotes: "probe_wait_for_hit detected baseline inline hit",
+    if (
+      hasBaselineInlineHit({
+        baselineHitCount,
+        baselineLastHitMs,
+        triggerWindowStartMs: window.triggerWindowStartMs,
+      })
+    ) {
+      return buildBaselineInlineHitResponse({
+        request: requestCtx,
+        pollUrl,
+        baselineHitCount,
+        baselineLastHitMs,
+        lastStatus: (baselineJson ?? {}) as Record<string, unknown>,
       });
-      return buildTextResponse(structuredContent, text);
     }
 
-    const start = waitStartEpochMs;
+    const start = window.waitStartMs;
     while (Date.now() - start < timeoutMs) {
       const polledStatus = await probeStatusWithUnreachablePolicy({
         key: resolvedKey,
@@ -377,118 +170,56 @@ export async function probeWaitHit(args: {
       });
       if (polledStatus.kind === "unreachable") {
         return buildServiceUnreachableResponse({
-          key: args.key,
-          resolvedKey,
-          timeoutMs,
-          pollIntervalMs,
-          maxRetries,
-          unreachableRetryEnabled,
-          unreachableMaxRetries,
-          attempt,
-          waitStartEpochMs,
-          inlineStartEpochMs,
+          request: requestCtx,
           stage: "poll_status_check",
-          baselineHitCount,
-          baselineLastHitEpochMs,
+          baseline: { hitCount: baselineHitCount, lastHitMs: baselineLastHitMs },
           details: polledStatus.details,
         });
       }
+
       const res = polledStatus.response;
       last = res.structuredContent;
-
       const json = (last as any)?.response?.json as Record<string, unknown> | undefined;
       const lineValidation = readLineValidation(json ?? null);
       if (lineValidation.invalidLineTarget) {
-        const structuredContent: Record<string, unknown> = {
-          request: {
-            key: args.key,
-            resolvedKey,
-            timeoutMs,
-            pollIntervalMs,
-            maxRetries,
-            unreachableRetryEnabled,
-            unreachableMaxRetries,
-            attempt,
-            waitStartEpochMs,
-            inlineStartEpochMs,
-          },
-          baseline: { hitCount: baselineHitCount, lastHitEpochMs: baselineLastHitEpochMs },
-          result: {
-            hit: false,
-            inline: false,
-            reason: "invalid_line_target",
-            actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
-            nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
-            lineValidation: lineValidation.lineValidation ?? "invalid_line_target",
-            lastStatus: json ?? null,
-          },
-        };
-        const text = formatProbeOutput({
-          probeKey: resolvedKey,
-          httpRequest: `POLL ${pollUrl} (maxRetries=${maxRetries}, pollMs=${pollIntervalMs})`,
-          requestMethod: "POLL",
-          requestUrl: pollUrl,
-          requestBody: { key: resolvedKey, maxRetries, pollIntervalMs, timeoutMs },
-          executionHit: "not_hit",
-          apiOutcome: "error",
-          reproStatus: "invalid_line_target",
-          probeHit: invalidLineTargetProbeHitMessage(baselineHitCount),
-          actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
-          nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
-          httpCode: 422,
-          httpResponse: structuredContent.result,
-          runtimeMode: typeof json?.mode === "string" ? json.mode : undefined,
-          runDuration: `${Date.now() - waitStartEpochMs}ms`,
+        return buildInvalidLineTargetResponse({
+          request: requestCtx,
+          pollUrl,
+          baselineHitCount,
+          lineValidation: lineValidation.lineValidation ?? "invalid_line_target",
+          lastStatus: json ?? null,
           runNotes: "probe_wait_for_hit invalid line target detected during poll",
+          baseline: { hitCount: baselineHitCount, lastHitMs: baselineLastHitMs },
         });
-        return buildTextResponse(structuredContent, text);
       }
+
       const hitCount = typeof json?.hitCount === "number" ? json.hitCount : null;
-      const lastHitEpochMs = typeof json?.lastHitEpochMs === "number" ? json.lastHitEpochMs : null;
+      const lastHitMs =
+        typeof json?.lastHitMs === "number"
+          ? json.lastHitMs
+          : typeof json?.lastHitEpochMs === "number"
+            ? json.lastHitEpochMs
+            : null;
       if (hitCount !== null) {
         const hitDelta = hitCount - baselineHitCount;
-        const isInlineByCount = hitDelta > 0;
-        const isInlineByTime = lastHitEpochMs !== null && lastHitEpochMs >= inlineStartEpochMs;
-        if (isInlineByCount && isInlineByTime) {
-          const structuredContent: Record<string, unknown> = {
-            request: {
-              key: args.key,
-              resolvedKey,
-              timeoutMs,
-              pollIntervalMs,
-              maxRetries,
-              unreachableRetryEnabled,
-              unreachableMaxRetries,
-              attempt,
-              waitStartEpochMs,
-              inlineStartEpochMs,
-            },
-            baseline: { hitCount: baselineHitCount, lastHitEpochMs: baselineLastHitEpochMs },
-            result: { hit: true, inline: true, hitCount, hitDelta, lastStatus: json },
-          };
-          const text = formatProbeOutput({
-            probeKey: resolvedKey,
-            httpRequest: `POLL ${pollUrl} (maxRetries=${maxRetries}, pollMs=${pollIntervalMs})`,
-            requestMethod: "POLL",
-            requestUrl: pollUrl,
-            requestBody: { key: resolvedKey, maxRetries, pollIntervalMs, timeoutMs },
-            executionHit: classifyExecutionHitStrictLine(resolvedKey, true),
-            apiOutcome: "ok",
-            reproStatus: classifyReproStatusStrictLine(resolvedKey, true),
-            probeHit: `inline line hit confirmed; hitCount=${hitCount}, hitDelta=${hitDelta}`,
-            httpCode: 200,
-            httpResponse: structuredContent.result,
-            runtimeMode: typeof json?.mode === "string" ? json.mode : undefined,
-            runDuration: `${Date.now() - waitStartEpochMs}ms`,
-            runNotes: "probe_wait_for_hit detected inline hit during poll",
+        const inlineByCount = hitDelta > 0;
+        const inlineByTime = isInlineByTime(lastHitMs, window.triggerWindowStartMs);
+        if (inlineByCount && inlineByTime) {
+          return buildPolledInlineHitResponse({
+            request: requestCtx,
+            pollUrl,
+            baselineHitCount,
+            baselineLastHitMs,
+            hitCount,
+            hitDelta,
+            lastStatus: json ?? {},
           });
-          return buildTextResponse(structuredContent, text);
         }
-        if (isInlineByCount && !isInlineByTime) {
+        if (inlineByCount && !inlineByTime) {
           staleCandidate = {
             hitCount,
             hitDelta,
-            lastHitEpochMs,
+            lastHitMs,
             reason: "hit_count_changed_but_not_inline_to_current_wait_window",
           };
         }
@@ -497,44 +228,16 @@ export async function probeWaitHit(args: {
     }
   }
 
-  const structuredContent: Record<string, unknown> = {
-    request: {
-      key: args.key,
-      resolvedKey,
-      timeoutMs,
-      pollIntervalMs,
-      maxRetries,
-      unreachableRetryEnabled,
-      unreachableMaxRetries,
-    },
-    result: {
-      hit: false,
-      inline: false,
-      reason: "timeout_no_inline_hit",
-      actionCode: GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW.actionCode,
-      nextAction: GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW.nextAction,
-      last,
-      staleCandidate,
-    },
-  };
-  const text = formatProbeOutput({
-    probeKey: resolvedKey,
-    httpRequest: `POLL ${pollUrl} (maxRetries=${maxRetries}, pollMs=${pollIntervalMs})`,
-    requestMethod: "POLL",
-    requestUrl: pollUrl,
-    requestBody: { key: resolvedKey, maxRetries, pollIntervalMs, timeoutMs },
-    executionHit: classifyExecutionHitStrictLine(resolvedKey, false),
-    apiOutcome: "timeout",
-    reproStatus: classifyReproStatusStrictLine(resolvedKey, false),
-    probeHit: "no inline line hit observed",
-    actionCode: GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW.actionCode,
-    nextAction: GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW.nextAction,
-    httpCode: 408,
-    httpResponse: structuredContent.result,
-    runtimeMode:
-      typeof (last as any)?.response?.json?.mode === "string" ? (last as any).response.json.mode : undefined,
-    runDuration: `${timeoutMs}ms x ${maxRetries}`,
-    runNotes: "probe_wait_for_hit timeout",
+  return buildTimeoutNoInlineHitResponse({
+    key: args.key,
+    resolvedKey,
+    timeoutMs,
+    pollIntervalMs,
+    maxRetries,
+    unreachableRetryEnabled,
+    unreachableMaxRetries,
+    pollUrl,
+    last,
+    staleCandidate,
   });
-  return buildTextResponse(structuredContent, text);
 }

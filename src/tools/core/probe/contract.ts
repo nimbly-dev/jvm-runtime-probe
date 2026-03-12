@@ -4,7 +4,7 @@ import {
   ProbeResetInputSchema,
   ProbeStatusInputSchema,
   ProbeWaitHitInputSchema,
-} from "../../../models/inputs";
+} from "@/models/inputs";
 
 export const PROBE_TOOLS = {
   enable: {

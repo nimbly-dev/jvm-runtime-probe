@@ -12,7 +12,6 @@ type RecipeCandidate = {
   queryTemplate: string;
   fullUrlHint: string;
   bodyTemplate?: string;
-  confidence?: number;
 };
 
 type TemplateAuth = {
@@ -43,7 +42,6 @@ type GeneratedRecipeTemplateInput = {
   resultType: "recipe" | "report";
   status: string;
   selectedMode: string;
-  routingNote?: string;
   nextAction?: string;
   failurePhase?: string;
   failureReasonCode?: string;
@@ -82,7 +80,6 @@ function formatRecipeSteps(generated: GeneratedRecipeTemplateInput): string {
       "Reproduction report",
       selectedModeLine,
       `Status: ${generated.status}`,
-      generated.routingNote ? `Routing Note: ${generated.routingNote}` : "Routing Note: (none)",
       generated.nextAction ? `Next Action: ${generated.nextAction}` : "Next Action: (none)",
       missingInput,
       "",
@@ -94,7 +91,6 @@ function formatRecipeSteps(generated: GeneratedRecipeTemplateInput): string {
     "Reproduction execution plan",
     selectedModeLine,
     `Routing Reason: ${generated.executionPlan.routingReason}`,
-    generated.routingNote ? `Routing Note: ${generated.routingNote}` : "Routing Note: (none)",
     formatSteps(generated.executionPlan.steps),
   ].join("\n");
 }
@@ -111,7 +107,7 @@ export function buildRecipeTemplateModel(args: {
     : `${classHint}.${methodHint}`;
   const firstReq = generated.requestCandidates[0];
   const requestDetails = firstReq
-    ? `${firstReq.method} ${firstReq.fullUrlHint}${firstReq.bodyTemplate ? ` body=${firstReq.bodyTemplate}` : ""}${typeof firstReq.confidence === "number" ? ` confidence=${firstReq.confidence.toFixed(2)}` : ""}`
+    ? `${firstReq.method} ${firstReq.fullUrlHint}${firstReq.bodyTemplate ? ` body=${firstReq.bodyTemplate}` : ""}`
     : generated.nextAction
       ? `Request candidate unavailable. ${generated.nextAction}`
       : "Request candidate unavailable. Provide workspace/class/method hints and rerun.";
@@ -177,7 +173,6 @@ export function buildRecipeTemplateModel(args: {
         generated.inferenceDiagnostics.request.source
           ? `inference_request_source=${generated.inferenceDiagnostics.request.source}`
           : "",
-        generated.routingNote ? `routing_note=${generated.routingNote}` : "",
         `success_criterion=${successCriterion}`,
         ...generated.notes,
         ...generated.auth.notes,

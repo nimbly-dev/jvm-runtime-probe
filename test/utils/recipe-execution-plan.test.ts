@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { buildRecipeExecutionPlan } = require("../../src/utils/recipe_execution_plan.util");
+const { buildRecipeExecutionPlan } = require("@/utils/recipe_execution_plan.util");
 
 const auth = {
   required: "unknown",

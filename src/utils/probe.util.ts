@@ -17,7 +17,7 @@ export function probeUnreachableMessage(url: string, err: unknown): string {
 export function parseProbeSnapshot(structuredContent: Record<string, unknown>): {
   key?: string;
   hitCount?: number;
-  lastHitEpochMs?: number;
+  lastHitMs?: number;
 } {
   const response = structuredContent.response as Record<string, unknown> | undefined;
   const json = response?.json as Record<string, unknown> | undefined;
@@ -25,12 +25,12 @@ export function parseProbeSnapshot(structuredContent: Record<string, unknown>): 
     json && typeof json.probe === "object" && json.probe !== null
       ? (json.probe as Record<string, unknown>)
       : json;
-  const out: { key?: string; hitCount?: number; lastHitEpochMs?: number } = {};
+  const out: { key?: string; hitCount?: number; lastHitMs?: number } = {};
   const key = probe?.key;
   const hitCount = probe?.hitCount;
-  const lastHitEpochMs = probe?.lastHitEpochMs;
+  const lastHitMs = typeof probe?.lastHitMs === "number" ? probe.lastHitMs : probe?.lastHitEpochMs;
   if (typeof key === "string") out.key = key;
   if (typeof hitCount === "number") out.hitCount = hitCount;
-  if (typeof lastHitEpochMs === "number") out.lastHitEpochMs = lastHitEpochMs;
+  if (typeof lastHitMs === "number") out.lastHitMs = lastHitMs;
   return out;
 }

@@ -4,7 +4,7 @@ const os = require("node:os");
 const path = require("node:path");
 const test = require("node:test");
 
-const { discoverClassMethods } = require("../../src/tools/core/target_infer/domain");
+const { discoverClassMethods } = require("@/tools/core/target_infer/domain");
 
 async function withTempDir(run: (dir: string) => Promise<void>) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "target-infer-"));
@@ -63,6 +63,7 @@ test("discoverClassMethods returns exact class methods with start/end line spans
         signature: "public void alpha() {",
         startLine: 4,
         endLine: 8,
+        firstExecutableLine: 5,
         probeKey: "com.example.CatalogEventController#alpha",
       },
       {
@@ -70,13 +71,14 @@ test("discoverClassMethods returns exact class methods with start/end line spans
         signature: "public String beta() {",
         startLine: 10,
         endLine: 12,
+        firstExecutableLine: 11,
         probeKey: "com.example.CatalogEventController#beta",
       },
     ]);
   });
 });
 
-test("discoverClassMethods supports partial class hint when exact match is unavailable", async () => {
+test("discoverClassMethods fails closed when class hint is not an exact class name/FQCN", async () => {
   await withTempDir(async (dir: string) => {
     const javaFile = path.join(dir, "src", "main", "java", "CatalogEventController.java");
     await fs.mkdir(path.dirname(javaFile), { recursive: true });
@@ -93,11 +95,8 @@ test("discoverClassMethods supports partial class hint when exact match is unava
       classHint: "CatalogEvent",
     });
 
-    assert.equal(out.matchMode, "partial");
-    assert.equal(out.classes.length, 1);
-    assert.equal(out.classes[0].className, "CatalogEventController");
-    assert.equal(out.classes[0].methods.length, 1);
-    assert.equal(out.classes[0].methods[0].methodName, "ping");
+    assert.equal(out.matchMode, "none");
+    assert.equal(out.classes.length, 0);
   });
 });
 
@@ -306,10 +305,13 @@ test("discoverClassMethods keeps methods sorted by start line for controller-lik
       ],
     );
     assert.equal(out.classes[0].methods[2].endLine, 22);
+    assert.equal(out.classes[0].methods[0].firstExecutableLine, 10);
+    assert.equal(out.classes[0].methods[1].firstExecutableLine, 14);
+    assert.equal(out.classes[0].methods[2].firstExecutableLine, 18);
   });
 });
 
-test("query-style: broad 'Controller' hint returns multiple classes for disambiguation", async () => {
+test("query-style: broad class tokens fail closed in exact-only mode", async () => {
   await withTempDir(async (dir: string) => {
     const controllerFile = path.join(
       dir,
@@ -361,12 +363,8 @@ test("query-style: broad 'Controller' hint returns multiple classes for disambig
       classHint: "Controller",
     });
 
-    assert.equal(out.matchMode, "partial");
-    assert.equal(out.classes.length, 2);
-    assert.deepEqual(
-      out.classes.map((c: { className: string }) => c.className),
-      ["CatalogEventController", "HealthController"],
-    );
+    assert.equal(out.matchMode, "none");
+    assert.equal(out.classes.length, 0);
   });
 });
 

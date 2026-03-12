@@ -5,7 +5,7 @@ Runtime-only probe agent for local JVMs. No application source code changes requ
 ### Build
 
 ```powershell
-mvn -f java-agent\pom.xml -DskipTests package
+mvn -f java-agent\pom.xml package
 ```
 
 Built artifacts:
@@ -67,10 +67,10 @@ Use JVM args (example):
 - `GET /__probe/status?key=<probe-key>`
   - Example key: `com.nimbly.phshoesbackend.catalog.core.repository.jpa.CatalogShoeSpecifications#finalPriceGte`
   - Example line key: `com.nimbly.phshoesbackend.catalog.core.repository.jpa.CatalogShoeSpecifications#finalPriceGte:87`
-  - Example response: `{ "contractVersion":"0.1.0v", "probe": { "key":"...#finalPriceGte:87", "hitCount":1, "lastHitEpochMs":1739671200000, "lineResolvable":true, "lineValidation":"resolvable" }, "capturePreview": { "available":true, "captureId":"abc123", "methodKey":"...#finalPriceGte", "capturedAtEpochMs":1739671200000, "redactionMode":"basic", "argsPreview":[{"index":0,"value":"{\"sku\":\"A1\"}","truncated":false,"originalLength":12,"redacted":false}], "returnPreview":{"value":"true","truncated":false,"originalLength":4,"redacted":false}, "thrownPreview":null, "truncatedAny":false }, "runtime": { "mode":"observe", "actuatorId":"", "actuateTargetKey":"", "actuateReturnBoolean":false, "serverEpochMs":1739671200123 } }`
+  - Example response: `{ "contractVersion":"0.1.0", "probe": { "key":"...#finalPriceGte:87", "hitCount":1, "lastHitEpochMs":1739671200000, "lineResolvable":true, "lineValidation":"resolvable" }, "capturePreview": { "available":true, "captureId":"abc123", "methodKey":"...#finalPriceGte", "capturedAtEpochMs":1739671200000, "redactionMode":"basic", "argsPreview":[{"index":0,"value":"{\"sku\":\"A1\"}","truncated":false,"originalLength":12,"redacted":false}], "returnPreview":{"value":"true","truncated":false,"originalLength":4,"redacted":false}, "thrownPreview":null, "truncatedAny":false }, "runtime": { "mode":"observe", "actuatorId":"", "actuateTargetKey":"", "actuateReturnBoolean":false, "serverEpochMs":1739671200123 } }`
 - `GET /__probe/capture?captureId=<capture-id>`
   - Returns fuller captured argument/return/throw payload for the requested `captureId`.
-  - Example response: `{ "contractVersion":"0.1.0v", "capture": { "captureId":"abc123", "methodKey":"...#finalPriceGte", "capturedAtEpochMs":1739671200000, "redactionMode":"basic", "args":[...], "returnValue":{...}, "thrownValue":null, "truncatedAny":false } }`
+  - Example response: `{ "contractVersion":"0.1.0", "capture": { "captureId":"abc123", "methodKey":"...#finalPriceGte", "capturedAtEpochMs":1739671200000, "redactionMode":"basic", "args":[...], "returnValue":{...}, "thrownValue":null, "truncatedAny":false } }`
 - `POST /__probe/reset`
   - Body: `{ "key":"com.nimbly.phshoesbackend.catalog.core.repository.jpa.CatalogShoeSpecifications#finalPriceGte" }`
   - Line-key reset works the same way using `Class#method:<line>`.

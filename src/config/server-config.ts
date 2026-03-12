@@ -1,8 +1,8 @@
 import * as path from "node:path";
 
-import { CliArgs } from "./cli-args";
-import { CONFIG_DEFAULTS } from "./defaults";
-import { MCP_ENV, type McpEnvVar } from "./env-vars";
+import { CliArgs } from "@/config/cli-args";
+import { CONFIG_DEFAULTS } from "@/config/defaults";
+import { MCP_ENV, type McpEnvVar } from "@/config/env-vars";
 
 export type ServerConfig = {
   workspaceRootAbs: string;

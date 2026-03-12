@@ -1,10 +1,10 @@
-import type { AuthResolution } from "../models/auth_resolution.model";
-import type { IntentMode } from "./recipe_constants.util";
+import type { AuthResolution } from "@/models/auth_resolution.model";
+import type { IntentMode } from "@/utils/recipe_constants.util";
 import type {
   ExecutionReadiness,
   MissingExecutionInput,
   RecipeCandidate,
-} from "./recipe_types.util";
+} from "@/utils/recipe_types.util";
 
 type ReadinessArgs = {
   selectedMode: IntentMode;

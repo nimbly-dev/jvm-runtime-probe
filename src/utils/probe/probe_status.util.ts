@@ -1,27 +1,27 @@
-import { fetchJson } from "../../lib/http";
-import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "../../lib/safety";
-import type { ToolTextResponse } from "../../models/tool_response.model";
-import { joinUrl, probeUnreachableMessage } from "../probe.util";
-import { classifyExecutionHitStrictLine, isLineKey, resolveProbeKey } from "./key.util";
+import { fetchJson } from "@/lib/http";
+import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "@/lib/safety";
+import type { ToolTextResponse } from "@/models/tool_response.model";
+import { joinUrl, probeUnreachableMessage } from "@/utils/probe.util";
+import { classifyExecutionHitStrictLine, isLineKey, resolveProbeKey } from "@/utils/probe/key.util";
 import {
   buildBatchResponse,
   buildLineKeyRequiredResponse,
   buildTextResponse,
-} from "./response_builders.util";
-import { GUIDANCE_RUNTIME_NOT_ALIGNED } from "./constants.util";
+} from "@/utils/probe/response_builders.util";
+import { GUIDANCE_RUNTIME_NOT_ALIGNED } from "@/utils/probe/constants.util";
 import {
   invalidLineTargetProbeHitMessage,
   normalizeStatusBatchPayload,
   normalizeStatusBatchRow,
   normalizeStatusJson,
   readLineValidation,
-} from "./status_normalize.util";
+} from "@/utils/probe/status_normalize.util";
 import {
   normalizeOptionalString,
   normalizeOptionalStringArray,
   validateSelectorCount,
-} from "./selector_batch.util";
-import { formatProbeOutput } from "./output.util";
+} from "@/utils/probe/selector_batch.util";
+import { formatProbeOutput } from "@/utils/probe/output.util";
 
 async function probeStatusSingle(args: {
   key: string;
@@ -77,7 +77,7 @@ async function probeStatusSingle(args: {
   const probeHit = lineValidation.invalidLineTarget
     ? invalidLineTargetProbeHitMessage(hitCount)
     : json !== null
-      ? `hitCount=${typeof json.hitCount === "number" ? json.hitCount : 0}, lastHitEpochMs=${typeof json.lastHitEpochMs === "number" ? json.lastHitEpochMs : 0}`
+    ? `hitCount=${typeof json.hitCount === "number" ? json.hitCount : 0}, lastHitMs=${typeof json.lastHitMs === "number" ? json.lastHitMs : typeof json.lastHitEpochMs === "number" ? json.lastHitEpochMs : 0}`
       : "No JSON probe payload";
   const guidance = lineValidation.invalidLineTarget ? GUIDANCE_RUNTIME_NOT_ALIGNED : undefined;
   if (guidance) {
@@ -192,7 +192,7 @@ async function probeStatusBatch(args: {
       reproStatus: lineValidation.invalidLineTarget ? "invalid_line_target" : "status_checked",
       probeHit: lineValidation.invalidLineTarget
         ? invalidLineTargetProbeHitMessage(hitCount)
-        : `hitCount=${hitCount}, lastHitEpochMs=${typeof row.lastHitEpochMs === "number" ? row.lastHitEpochMs : 0}`,
+          : `hitCount=${hitCount}, lastHitMs=${typeof row.lastHitMs === "number" ? row.lastHitMs : typeof row.lastHitEpochMs === "number" ? row.lastHitEpochMs : 0}`,
       ...(guidance ? { actionCode: guidance.actionCode, nextAction: guidance.nextAction } : {}),
       httpCode: remoteResponse?.status ?? 200,
       httpResponse: row,
