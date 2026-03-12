@@ -16,6 +16,7 @@
 
   <modules>
     <module>core</module>
-    <module>request-mapping-resolver</module>
+    <module>core-request-mapper</module>
+    <module>request-mapper-spring</module>
   </modules>
 </project>

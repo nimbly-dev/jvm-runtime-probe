@@ -31,7 +31,7 @@ public final class RequestMappingResolver {
     private final ExtractorRegistry extractorRegistry;
 
     public RequestMappingResolver() {
-        this(ExtractorRegistry.springOnlyDefault());
+        this(ExtractorRegistry.serviceLoaderDefault());
     }
 
     public RequestMappingResolver(ExtractorRegistry extractorRegistry) {
@@ -118,9 +118,24 @@ public final class RequestMappingResolver {
             );
         }
 
+        List<MappingExtractor> extractors = extractorRegistry.listExtractors();
+        if (extractors.isEmpty()) {
+            return failure(
+                    "mapper_plugin_unavailable",
+                    "extractor_plugin_discovery",
+                    "No mapping extractor plugin is loaded. Include request-mapper-spring on resolver classpath or build spring/all bundles and rerun request mapping resolution.",
+                    List.of(
+                            "loadedExtractors=0",
+                            "classHint=" + safe(request.classHint),
+                            "methodHint=" + safe(request.methodHint)
+                    ),
+                    List.of("java_ast_index_lookup", "service_loader_plugin_discovery")
+            );
+        }
+
         List<MethodContext> methodContexts = MethodSelector.collectMethodContexts(primaryType, primaryMethod, index);
         for (MethodContext context : methodContexts) {
-            for (MappingExtractor extractor : extractorRegistry.listExtractors()) {
+            for (MappingExtractor extractor : extractors) {
                 Optional<ResolvedMapping> resolved = extractor.resolve(context, index);
                 if (resolved.isEmpty()) {
                     continue;

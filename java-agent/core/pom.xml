@@ -20,6 +20,7 @@
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <bytebuddy.version>1.14.19</bytebuddy.version>
+    <agent.bundle.classifier>minimal</agent.bundle.classifier>
   </properties>
 
   <dependencies>
@@ -29,6 +30,54 @@
       <version>${bytebuddy.version}</version>
     </dependency>
   </dependencies>
+
+  <profiles>
+    <profile>
+      <id>minimal</id>
+      <properties>
+        <agent.bundle.classifier>minimal</agent.bundle.classifier>
+      </properties>
+    </profile>
+    <profile>
+      <id>spring</id>
+      <properties>
+        <agent.bundle.classifier>spring</agent.bundle.classifier>
+      </properties>
+      <dependencies>
+        <dependency>
+          <groupId>com.nimbly</groupId>
+          <artifactId>mcp-jvm-core-request-mapper</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>com.nimbly</groupId>
+          <artifactId>mcp-jvm-request-mapper-spring</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+    <profile>
+      <id>all</id>
+      <activation>
+        <activeByDefault>true</activeByDefault>
+      </activation>
+      <properties>
+        <agent.bundle.classifier>all</agent.bundle.classifier>
+      </properties>
+      <dependencies>
+        <dependency>
+          <groupId>com.nimbly</groupId>
+          <artifactId>mcp-jvm-core-request-mapper</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+        <dependency>
+          <groupId>com.nimbly</groupId>
+          <artifactId>mcp-jvm-request-mapper-spring</artifactId>
+          <version>${project.version}</version>
+        </dependency>
+      </dependencies>
+    </profile>
+  </profiles>
 
   <build>
     <resources>
@@ -51,7 +100,9 @@
             <configuration>
               <createDependencyReducedPom>false</createDependencyReducedPom>
               <shadedArtifactAttached>false</shadedArtifactAttached>
+              <finalName>${project.artifactId}-${project.version}-${agent.bundle.classifier}</finalName>
               <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <manifestEntries>
                     <Premain-Class>com.nimbly.mcpjvmdebugger.agent.ProbeAgent</Premain-Class>
