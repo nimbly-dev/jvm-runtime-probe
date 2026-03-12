@@ -3,7 +3,7 @@ const test = require("node:test");
 
 const {
   enrichRuntimeCapture,
-} = require("../../src/utils/recipe_generate/runtime_capture_enrich.util");
+} = require("@/utils/recipe_generate/runtime_capture_enrich.util");
 
 test("enrichRuntimeCapture returns unavailable when key/line is missing", async () => {
   const out = await enrichRuntimeCapture({
@@ -28,7 +28,7 @@ test("enrichRuntimeCapture returns available when capturePreview is present", as
         response: {
           status: 200,
           json: {
-            contractVersion: "0.1.0v",
+            contractVersion: "0.1.0",
             hitCount: 1,
             capturePreview: {
               available: true,

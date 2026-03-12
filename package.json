@@ -4,11 +4,11 @@
   "description": "",
   "main": "dist/server.js",
   "scripts": {
-    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json",
-    "build:java": "mvn -f java-agent\\pom.xml -DskipTests package",
+    "build": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.json && tsc-alias -p tsconfig.json",
+    "build:java": "mvn -f java-agent\\pom.xml package",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "start": "node dist/server.js",
-    "test": "node --test -r ts-node/register test/**/*.test.ts",
+    "test": "node --test -r ts-node/register -r tsconfig-paths/register test/**/*.test.ts",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
     "lint:fix": "eslint \"src/**/*.ts\" \"test/**/*.ts\" --fix",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\" \"docs/**/*.md\" \"README.md\"",
@@ -44,6 +44,8 @@
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.6.2",
     "ts-node": "^10.9.2",
+    "tsc-alias": "^1.8.16",
+    "tsconfig-paths": "^4.2.0",
     "ts-prune": "^0.10.3",
     "typescript": "^5.9.3"
   },

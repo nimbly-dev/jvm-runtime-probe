@@ -1,4 +1,4 @@
-import { ProjectContextValidateInputSchema } from "../../../models/inputs";
+import { ProjectContextValidateInputSchema } from "@/models/inputs";
 
 export const PROJECT_CONTEXT_VALIDATE_TOOL = {
   name: "project_context_validate",

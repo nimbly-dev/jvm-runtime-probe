@@ -1,8 +1,8 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { RecipeGenerateInputSchema } = require("../../src/models/inputs/recipe_generate.input.model");
-const { TargetInferInputSchema } = require("../../src/models/inputs/target_infer.input.model");
+const { RecipeGenerateInputSchema } = require("@/models/inputs/recipe_generate.input.model");
+const { TargetInferInputSchema } = require("@/models/inputs/target_infer.input.model");
 
 test("probe_recipe_create schema requires projectRootAbs and removes legacy selectors", () => {
   const keys = Object.keys(RecipeGenerateInputSchema);

@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { generateRecipe } = require("../../src/tools/core/recipe_generate/domain");
+const { generateRecipe } = require("@/tools/core/recipe_generate/domain");
 
 const okAuth = {
   required: "unknown",
@@ -11,7 +11,7 @@ const okAuth = {
   notes: [],
 };
 
-test("uses request fallback when target is not inferred in regression_api_only mode", async () => {
+test("fails closed when target is not inferred in regression_api_only mode", async () => {
   const result = await generateRecipe(
     {
       rootAbs: "C:\\repo\\service",
@@ -35,7 +35,6 @@ test("uses request fallback when target is not inferred in regression_api_only m
             path: "/v1/synonyms-rule",
             queryTemplate: "",
             fullUrlHint: "/v1/synonyms-rule",
-            confidence: 0.78,
             rationale: ["fallback"],
           },
           trigger: {
@@ -55,13 +54,15 @@ test("uses request fallback when target is not inferred in regression_api_only m
     },
   );
 
-  assert.equal(result.status, "regression_api_only_ready");
-  assert.equal(result.resultType, "recipe");
-  assert.equal(result.requestCandidates.length, 1);
-  assert.equal(result.failurePhase, undefined);
+  assert.equal(result.status, "target_not_inferred");
+  assert.equal(result.resultType, "report");
+  assert.equal(result.requestCandidates.length, 0);
+  assert.equal(result.failurePhase, "target_inference");
+  assert.equal(result.reasonCode, "target_candidate_missing");
+  assert.equal(result.failedStep, "target_inference");
   assert.equal(result.inferenceDiagnostics.target.matched, false);
-  assert.equal(result.inferenceDiagnostics.request.matched, true);
-  assert.equal(result.inferenceDiagnostics.request.source, "spring_mvc");
+  assert.equal(result.inferenceDiagnostics.request.attempted, true);
+  assert.equal(result.inferenceDiagnostics.request.matched, false);
 });
 
 test("keeps target_not_inferred for probe mode when strict line target is unavailable", async () => {
@@ -89,7 +90,6 @@ test("keeps target_not_inferred for probe mode when strict line target is unavai
             path: "/v1/synonyms-rule",
             queryTemplate: "",
             fullUrlHint: "/v1/synonyms-rule",
-            confidence: 0.78,
             rationale: ["fallback"],
           },
           trigger: {
@@ -112,8 +112,8 @@ test("keeps target_not_inferred for probe mode when strict line target is unavai
   assert.equal(result.status, "target_not_inferred");
   assert.equal(result.resultType, "report");
   assert.equal(result.failurePhase, "target_inference");
-  assert.equal(result.failureReasonCode, "line_target_required_for_probe_mode");
-  assert.equal(result.requestCandidates.length, 1);
+  assert.equal(result.failureReasonCode, "target_candidate_missing");
+  assert.equal(result.requestCandidates.length, 0);
   assert.equal(result.executionPlan.probeCallPlan.total, 0);
 });
 
@@ -136,7 +136,6 @@ test("reports request_inference failure when target is inferred but request cand
             methodName: "addSynonymRuleStages",
             line: 42,
             key: "com.example.SynonymRuleController#addSynonymRuleStages",
-            confidence: 87,
             reasons: ["method exact match"],
           },
         ],
@@ -182,7 +181,6 @@ test("reports auth_resolution when request exists but auth input is still requir
             methodName: "addSynonymRuleStages",
             line: 42,
             key: "com.example.SynonymRuleController#addSynonymRuleStages",
-            confidence: 87,
             reasons: ["method exact match"],
           },
         ],
@@ -197,7 +195,6 @@ test("reports auth_resolution when request exists but auth input is still requir
             path: "/v1/synonyms-rule",
             queryTemplate: "",
             fullUrlHint: "/v1/synonyms-rule",
-            confidence: 0.82,
             rationale: ["controller mapping"],
           },
           trigger: {
@@ -228,4 +225,182 @@ test("reports auth_resolution when request exists but auth input is still requir
   assert.equal(result.resultType, "report");
   assert.equal(result.failurePhase, "auth_resolution");
   assert.equal(result.failureReasonCode, "auth_input_required");
+});
+
+test("applies apiBasePath prefix to synthesized request candidate and trigger", async () => {
+  const result = await generateRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      classHint: "CatalogController",
+      methodHint: "listCatalogShoes",
+      apiBasePath: "/api/v1",
+      intentMode: "regression_api_only",
+    },
+    {
+      inferTargetsFn: async () => ({
+        scannedJavaFiles: 20,
+        candidates: [
+          {
+            file: "C:\\repo\\service\\src\\main\\java\\CatalogController.java",
+            className: "CatalogController",
+            methodName: "listCatalogShoes",
+            line: 42,
+            key: "com.example.CatalogController#listCatalogShoes",
+            reasons: ["method exact match"],
+          },
+        ],
+      }),
+      synthesizerRegistry: {
+        synthesize: async () => ({
+          status: "recipe",
+          synthesizerUsed: "spring",
+          framework: "spring",
+          requestCandidate: {
+            method: "GET",
+            path: "/catalog/shoes",
+            queryTemplate: "page=1",
+            fullUrlHint: "/catalog/shoes?page=1",
+            rationale: ["controller mapping"],
+          },
+          trigger: {
+            kind: "http",
+            method: "GET",
+            path: "/catalog/shoes",
+            queryTemplate: "page=1",
+            fullUrlHint: "/catalog/shoes?page=1",
+            headers: {},
+          },
+          requestSource: "spring_mvc",
+          evidence: ["resolver=stub"],
+          attemptedStrategies: ["stub_strategy"],
+        }),
+      },
+      resolveAuthForRecipeFn: async () => okAuth,
+    },
+  );
+
+  assert.equal(result.resultType, "recipe");
+  assert.equal(result.requestCandidates[0].path, "/api/v1/catalog/shoes");
+  assert.equal(result.requestCandidates[0].fullUrlHint, "/api/v1/catalog/shoes?page=1");
+  assert.equal(result.trigger.path, "/api/v1/catalog/shoes");
+  assert.equal(result.trigger.fullUrlHint, "/api/v1/catalog/shoes?page=1");
+});
+
+test("does not double-prefix apiBasePath when synthesized path already includes it", async () => {
+  const result = await generateRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      classHint: "CatalogController",
+      methodHint: "listCatalogShoes",
+      apiBasePath: "/api/v1",
+      intentMode: "regression_api_only",
+    },
+    {
+      inferTargetsFn: async () => ({
+        scannedJavaFiles: 20,
+        candidates: [
+          {
+            file: "C:\\repo\\service\\src\\main\\java\\CatalogController.java",
+            className: "CatalogController",
+            methodName: "listCatalogShoes",
+            line: 42,
+            key: "com.example.CatalogController#listCatalogShoes",
+            reasons: ["method exact match"],
+          },
+        ],
+      }),
+      synthesizerRegistry: {
+        synthesize: async () => ({
+          status: "recipe",
+          synthesizerUsed: "spring",
+          framework: "spring",
+          requestCandidate: {
+            method: "GET",
+            path: "/api/v1/catalog/shoes",
+            queryTemplate: "",
+            fullUrlHint: "/api/v1/catalog/shoes",
+            rationale: ["controller mapping"],
+          },
+          trigger: {
+            kind: "http",
+            method: "GET",
+            path: "/api/v1/catalog/shoes",
+            queryTemplate: "",
+            fullUrlHint: "/api/v1/catalog/shoes",
+            headers: {},
+          },
+          requestSource: "spring_mvc",
+          evidence: ["resolver=stub"],
+          attemptedStrategies: ["stub_strategy"],
+        }),
+      },
+      resolveAuthForRecipeFn: async () => okAuth,
+    },
+  );
+
+  assert.equal(result.resultType, "recipe");
+  assert.equal(result.requestCandidates[0].path, "/api/v1/catalog/shoes");
+  assert.equal(result.trigger.path, "/api/v1/catalog/shoes");
+});
+
+test("emits non-blocking context path hint when apiBasePath is not provided", async () => {
+  const result = await generateRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      classHint: "CatalogController",
+      methodHint: "listCatalogShoes",
+      intentMode: "regression_api_only",
+    },
+    {
+      inferTargetsFn: async () => ({
+        scannedJavaFiles: 20,
+        candidates: [
+          {
+            file: "C:\\repo\\service\\src\\main\\java\\CatalogController.java",
+            className: "CatalogController",
+            methodName: "listCatalogShoes",
+            line: 42,
+            key: "com.example.CatalogController#listCatalogShoes",
+            reasons: ["method exact match"],
+          },
+        ],
+      }),
+      synthesizerRegistry: {
+        synthesize: async () => ({
+          status: "recipe",
+          synthesizerUsed: "spring",
+          framework: "spring",
+          requestCandidate: {
+            method: "GET",
+            path: "/catalog/shoes",
+            queryTemplate: "",
+            fullUrlHint: "/catalog/shoes",
+            rationale: ["controller mapping"],
+          },
+          trigger: {
+            kind: "http",
+            method: "GET",
+            path: "/catalog/shoes",
+            queryTemplate: "",
+            fullUrlHint: "/catalog/shoes",
+            headers: {},
+          },
+          requestSource: "spring_mvc",
+          evidence: ["resolver=stub"],
+          attemptedStrategies: ["stub_strategy"],
+        }),
+      },
+      resolveAuthForRecipeFn: async () => okAuth,
+    },
+  );
+
+  assert.equal(result.resultType, "recipe");
+  assert.equal(result.executionReadiness, "ready");
+  assert.equal(
+    result.notes.some((note: string) => note.startsWith("context_path_hint=")),
+    true,
+  );
 });

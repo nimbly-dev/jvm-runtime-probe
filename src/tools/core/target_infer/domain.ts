@@ -1,16 +1,17 @@
 import * as path from "node:path";
-import { buildJavaIndex } from "../../../utils/inference/java_index.util";
+import { buildJavaIndex } from "@/utils/inference/java_index.util";
 
 export type InferredTarget = {
   file: string;
   className?: string;
   methodName?: string;
   line?: number;
+  declarationLine?: number;
+  firstExecutableLine?: number;
   signature?: string;
   returnsBoolean?: boolean;
   fqcn?: string;
   key?: string;
-  confidence: number;
   reasons: string[];
 };
 
@@ -19,6 +20,7 @@ export type ClassMethodSpan = {
   signature: string;
   startLine: number;
   endLine: number;
+  firstExecutableLine?: number;
   probeKey?: string;
 };
 
@@ -65,62 +67,57 @@ function scoreCandidate(args: {
   methodHint?: string;
   lineHint?: number;
   filePath: string;
+  fqcn?: string;
   className?: string;
   methodName?: string;
-  methodLine?: number;
+  declarationLine?: number;
+  firstExecutableLine?: number;
 }): { score: number; reasons: string[] } {
   const reasons: string[] = [];
-  let score = 0;
+  let score = 1;
 
   const classHint = normalize(args.classHint);
+  const classHintIsFqcn = classHint.includes(".");
   const methodHint = normalize(args.methodHint);
-  const fileBase = path.basename(args.filePath, ".java").toLowerCase();
+  const fqcn = normalize(args.fqcn);
   const className = normalize(args.className);
   const methodName = normalize(args.methodName);
-  let classMatched = false;
-  let methodMatched = false;
 
   if (classHint) {
-    if (className === classHint) {
-      score += 45;
+    if (classHintIsFqcn) {
+      if (fqcn === classHint) {
+        score += 100;
+        reasons.push("class fqcn exact match");
+      } else {
+        return { score: 0, reasons: [] };
+      }
+    } else if (className === classHint || path.basename(args.filePath, ".java").toLowerCase() === classHint) {
+      score += 90;
       reasons.push("class exact match");
-      classMatched = true;
-    } else if (className.includes(classHint) || fileBase.includes(classHint)) {
-      score += 25;
-      reasons.push("class partial match");
-      classMatched = true;
+    } else {
+      return { score: 0, reasons: [] };
     }
   }
 
   if (methodHint) {
     if (methodName === methodHint) {
-      score += 40;
+      score += 50;
       reasons.push("method exact match");
-      methodMatched = true;
-    } else if (methodName.includes(methodHint)) {
-      score += 22;
-      reasons.push("method partial match");
-      methodMatched = true;
+    } else {
+      return { score: 0, reasons: [] };
     }
   }
 
-  // Guardrail: when textual hints are provided, do not return line-only matches
-  // from unrelated classes/methods.
-  if ((classHint || methodHint) && !classMatched && !methodMatched) {
-    return { score: 0, reasons: [] };
-  }
-
-  if (typeof args.lineHint === "number" && typeof args.methodLine === "number") {
-    const d = Math.abs(args.lineHint - args.methodLine);
-    if (d === 0) {
-      score += 25;
+  if (typeof args.lineHint === "number") {
+    const matchesDeclaration =
+      typeof args.declarationLine === "number" && args.lineHint === args.declarationLine;
+    const matchesExecutable =
+      typeof args.firstExecutableLine === "number" && args.lineHint === args.firstExecutableLine;
+    if (matchesDeclaration || matchesExecutable) {
+      score += 10;
       reasons.push("line exact match");
-    } else if (d <= 3) {
-      score += 16;
-      reasons.push("line near match");
-    } else if (d <= 12) {
-      score += 8;
-      reasons.push("line loose match");
+    } else {
+      return { score: 0, reasons: [] };
     }
   }
 
@@ -142,7 +139,7 @@ export async function inferTargets(args: {
   if (args.classHint) indexArgs.classHint = args.classHint;
   const index = await buildJavaIndex(indexArgs);
 
-  const out: InferredTarget[] = [];
+  const out: Array<{ candidate: InferredTarget; score: number }> = [];
   for (const f of index) {
     if (f.methods.length === 0) continue;
 
@@ -150,12 +147,14 @@ export async function inferTargets(args: {
       const scoreArgs: Parameters<typeof scoreCandidate>[0] = {
         filePath: f.fileAbs,
         methodName: m.name,
-        methodLine: m.line,
+        declarationLine: m.declarationLine,
+        firstExecutableLine: m.firstExecutableLine,
       };
       if (args.classHint) scoreArgs.classHint = args.classHint;
       if (args.methodHint) scoreArgs.methodHint = args.methodHint;
       if (typeof args.lineHint === "number") scoreArgs.lineHint = args.lineHint;
       if (f.className) scoreArgs.className = f.className;
+      if (f.packageName && f.className) scoreArgs.fqcn = `${f.packageName}.${f.className}`;
       const scored = scoreCandidate(scoreArgs);
       if (scored.score <= 0) continue;
       const fqcn = f.packageName && f.className ? `${f.packageName}.${f.className}` : undefined;
@@ -164,29 +163,39 @@ export async function inferTargets(args: {
         methodName: m.name,
         signature: m.signature,
         returnsBoolean: inferReturnsBoolean(m.signature, m.name),
-        confidence: Math.min(100, scored.score),
         reasons: scored.reasons,
       };
       if (f.className) candidate.className = f.className;
-      candidate.line = m.line;
+      candidate.declarationLine = m.declarationLine;
+      candidate.firstExecutableLine = m.firstExecutableLine;
+      candidate.line = m.firstExecutableLine;
       if (fqcn) {
         candidate.fqcn = fqcn;
         candidate.key = `${fqcn}#${m.name}`;
       }
-      out.push(candidate);
+      out.push({ candidate, score: scored.score });
     }
   }
 
   out.sort((a, b) => {
-    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
-    const al = typeof a.line === "number" ? a.line : Number.MAX_SAFE_INTEGER;
-    const bl = typeof b.line === "number" ? b.line : Number.MAX_SAFE_INTEGER;
-    return al - bl;
+    if (b.score !== a.score) return b.score - a.score;
+    const af = (a.candidate.fqcn ?? a.candidate.className ?? "").toLowerCase();
+    const bf = (b.candidate.fqcn ?? b.candidate.className ?? "").toLowerCase();
+    if (af !== bf) return af.localeCompare(bf);
+    const am = (a.candidate.methodName ?? "").toLowerCase();
+    const bm = (b.candidate.methodName ?? "").toLowerCase();
+    if (am !== bm) return am.localeCompare(bm);
+    const al = typeof a.candidate.line === "number" ? a.candidate.line : Number.MAX_SAFE_INTEGER;
+    const bl = typeof b.candidate.line === "number" ? b.candidate.line : Number.MAX_SAFE_INTEGER;
+    if (al !== bl) return al - bl;
+    return a.candidate.file.localeCompare(b.candidate.file);
   });
 
   return {
     scannedJavaFiles: index.length,
-    candidates: out.slice(0, Math.max(1, Math.min(args.maxCandidates ?? 8, 20))),
+    candidates: out
+      .slice(0, Math.max(1, Math.min(args.maxCandidates ?? 8, 20)))
+      .map((entry) => entry.candidate),
   };
 }
 
@@ -196,7 +205,7 @@ export async function discoverClassMethods(args: {
   maxFiles?: number;
 }): Promise<{
   scannedJavaFiles: number;
-  matchMode: "exact" | "partial" | "none";
+  matchMode: "exact" | "none";
   classes: ClassDiscoveryCandidate[];
 }> {
   const classNeedle = normalize(args.classHint);
@@ -211,30 +220,23 @@ export async function discoverClassMethods(args: {
   });
 
   const exactMatches: ClassDiscoveryCandidate[] = [];
-  const partialMatches: ClassDiscoveryCandidate[] = [];
-
   for (const f of index) {
     if (!f.className) continue;
 
     const classNameLower = normalize(f.className);
-    const fileBaseLower = path.basename(f.fileAbs, ".java").toLowerCase();
     const fqcn = f.packageName ? `${f.packageName}.${f.className}` : undefined;
     const fqcnLower = normalize(fqcn);
     const isExact = classNameLower === classNeedle || fqcnLower === classNeedle;
-    const isPartial =
-      classNameLower.includes(classNeedle) ||
-      fileBaseLower.includes(classNeedle) ||
-      fqcnLower.includes(classNeedle);
-
-    if (!isExact && !isPartial) continue;
+    if (!isExact) continue;
 
     const methods = sortClassMethodsByStartLine(
       f.methods.map((m) => {
         const method: ClassMethodSpan = {
           methodName: m.name,
           signature: m.signature,
-          startLine: m.line,
+          startLine: m.declarationLine,
           endLine: m.endLine,
+          firstExecutableLine: m.firstExecutableLine,
         };
         if (fqcn) method.probeKey = `${fqcn}#${m.name}`;
         return method;
@@ -248,8 +250,7 @@ export async function discoverClassMethods(args: {
     };
     if (fqcn) candidate.fqcn = fqcn;
 
-    if (isExact) exactMatches.push(candidate);
-    else partialMatches.push(candidate);
+    exactMatches.push(candidate);
   }
 
   if (exactMatches.length > 0) {
@@ -257,14 +258,6 @@ export async function discoverClassMethods(args: {
       scannedJavaFiles: index.length,
       matchMode: "exact",
       classes: sortClassCandidates(exactMatches),
-    };
-  }
-
-  if (partialMatches.length > 0) {
-    return {
-      scannedJavaFiles: index.length,
-      matchMode: "partial",
-      classes: sortClassCandidates(partialMatches),
     };
   }
 

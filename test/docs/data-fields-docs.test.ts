@@ -40,3 +40,14 @@ test("data-fields tables include boolean required column values", () => {
   }
   assert.ok(rowsChecked > 0, "expected at least one documented data row");
 });
+
+test("data-fields docs reflect deterministic contract without confidence/downgrade fields", () => {
+  const doc = fs.readFileSync(DOC_PATH, "utf8");
+  assert.doesNotMatch(doc, /applicationType\.confidence/);
+  assert.doesNotMatch(doc, /appPort\.confidence/);
+  assert.doesNotMatch(doc, /downgradedFrom/);
+  assert.doesNotMatch(doc, /regression_api_only_downgraded_line_target_missing/);
+  assert.match(doc, /deterministic fields/i);
+  assert.match(doc, /hints\.apiBasePath/);
+  assert.match(doc, /context_path_hint=/);
+});

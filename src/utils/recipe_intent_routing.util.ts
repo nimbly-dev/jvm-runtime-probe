@@ -1,4 +1,4 @@
-import { LINE_TARGET_MISSING_NOTE, type IntentMode } from "./recipe_constants.util";
+import type { IntentMode } from "@/utils/recipe_constants.util";
 
 export type RoutingContext = {
   requestedIntentMode: IntentMode;
@@ -10,8 +10,6 @@ export type RoutingDecision = {
   selectedMode: IntentMode;
   lineTargetProvided: boolean;
   probeIntentRequested: boolean;
-  downgradedFrom?: IntentMode;
-  routingNote?: string;
   routingReason: string;
 };
 
@@ -36,19 +34,6 @@ export function requiresLineTarget(mode: IntentMode): boolean {
 export function resolveSelectedMode(ctx: RoutingContext): RoutingDecision {
   const lineTargetProvided = hasExplicitLineTarget(ctx);
   const probeIntentRequested = requiresLineTarget(ctx.requestedIntentMode);
-
-  if (probeIntentRequested && !lineTargetProvided) {
-    return {
-      requestedMode: ctx.requestedIntentMode,
-      selectedMode: "regression_api_only",
-      lineTargetProvided,
-      probeIntentRequested,
-      downgradedFrom: ctx.requestedIntentMode,
-      routingNote: LINE_TARGET_MISSING_NOTE,
-      routingReason:
-        "Probe intent requires explicit line target. Routing downgraded to regression API only.",
-    };
-  }
 
   return {
     requestedMode: ctx.requestedIntentMode,

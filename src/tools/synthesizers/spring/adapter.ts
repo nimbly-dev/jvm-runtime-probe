@@ -1,1 +1,1 @@
-export { springSynthesizerPlugin } from "./plugin";
+export { springSynthesizerPlugin } from "@/tools/synthesizers/spring/plugin";

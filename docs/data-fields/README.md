@@ -1,4 +1,4 @@
-# Data Fields Reference (0.1.0v)
+# Data Fields Reference (0.1.0)
 
 This document is the simple dictionary of JSON fields emitted to the orchestrator via MCP tool outputs.
 
@@ -8,6 +8,10 @@ Column meanings:
 - `toolUsedBy`: Tool that emits the field.
 - `required`: `true` when always present for that tool output shape, otherwise `false`.
 - `exampleValue`: Representative value.
+
+Deterministic contract policy:
+- Orchestration decisions must use deterministic fields (`resultType`, `status`, `reasonCode`, `failedStep`, `nextAction`).
+- Confidence/heuristic scores are not part of the public MCP output contract.
 
 ## debug_check
 
@@ -46,29 +50,36 @@ Column meanings:
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
-| `resultType` | Target infer response mode (`report`, `class_methods`, `disambiguation`). | `probe_target_infer` | false | `"class_methods"` |
-| `status` | Inference status code for next-step routing. | `probe_target_infer` | false | `"ok"` |
+| `resultType` | Target infer response mode (`report`, `ranked_candidates`, `class_methods`, `disambiguation`). | `probe_target_infer` | true | `"ranked_candidates"` |
+| `status` | Inference status code for deterministic next-step routing. | `probe_target_infer` | true | `"ok"` |
 | `projectRoot` | Absolute project root selected by orchestrator and used for scoped inference. | `probe_target_infer` | true | `"C:\\repo\\catalog-service"` |
-| `hints` | Input hints used for scoped inference. | `probe_target_infer` | true | `{"projectRootAbs":"C:\\repo\\catalog-service","classHint":"CatalogService"}` |
+| `hints` | Input hints used for scoped inference (`classHint` should be exact class/FQCN). | `probe_target_infer` | true | `{"projectRootAbs":"C:\\repo\\catalog-service","classHint":"com.example.CatalogService"}` |
 | `scannedJavaFiles` | Approximate Java file scan count. | `probe_target_infer` | false | `412` |
 | `candidates` | Ranked target candidates for runtime probe keying. | `probe_target_infer` | false | `[{"key":"com.example.Catalog#save"}]` |
+| `candidates[].line` | Preferred probe line for candidate selection (uses executable line when inferable). | `probe_target_infer` | false | `133` |
+| `candidates[].declarationLine` | Method declaration line for candidate metadata and strict disambiguation support. | `probe_target_infer` | false | `129` |
+| `candidates[].firstExecutableLine` | First executable line inside method body (used as default probe line when `lineHint` is omitted). | `probe_target_infer` | false | `133` |
 | `class` | Selected class block in `class_methods` mode. | `probe_target_infer` | false | `{"fqcn":"com.example.CatalogController"}` |
 | `methods` | Method spans for selected class in `class_methods` mode. | `probe_target_infer` | false | `[{"methodName":"save","startLine":42}]` |
+| `methods[].firstExecutableLine` | First executable line inside each discovered method body. | `probe_target_infer` | false | `45` |
 | `nextAction` | Required follow-up action when status is non-ready. | `probe_target_infer` | false | `"Refine classHint and rerun"` |
+| `reasonCode` | Deterministic failure/disambiguation code for fail-closed routing. | `probe_target_infer` | false | `"target_ambiguous"` |
+| `failedStep` | Stage where deterministic selection failed. | `probe_target_infer` | false | `"target_selection"` |
 
 ## probe_recipe_create
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
 | `projectRoot` | Absolute project root selected by orchestrator and used for scoped recipe generation. | `probe_recipe_create` | true | `"C:\\repo\\catalog-service"` |
-| `hints` | Effective input hints and actuation preferences. | `probe_recipe_create` | true | `{"classHint":"CatalogService","lineHint":88}` |
+| `hints` | Effective input hints and actuation preferences (`classHint` must be exact FQCN). | `probe_recipe_create` | true | `{"classHint":"com.example.catalog.CatalogService","lineHint":88}` |
+| `hints.apiBasePath` | Optional API context/base path provided by orchestrator and applied to request candidates/trigger paths (anti-duplication). | `probe_recipe_create` | false | `"/api/v1"` |
 | `inferredTarget` | Best inferred runtime target for probe verification. | `probe_recipe_create` | false | `{"key":"com.example.CatalogService#save","line":88}` |
 | `requestCandidates` | HTTP request candidates inferred from code-based synthesizer analysis. | `probe_recipe_create` | true | `[{"method":"POST","path":"/v1/catalog"}]` |
 | `executionPlan` | Step plan emitted for execution/verification tooling. Report mode emits compact action-code steps. | `probe_recipe_create` | true | `{"selectedMode":"single_line_probe"}` |
 | `executionPlan.routingReason` | Routing reason code for selected mode (`single_line_probe`, `regression_api_only_no_probe`, etc). | `probe_recipe_create` | true | `"regression_api_only_no_probe"` |
 | `executionPlan.steps[].actionCode` | Compact step action code in report mode (no verbose instruction strings). | `probe_recipe_create` | false | `"request_candidate_missing"` |
 | `resultType` | Output category (`recipe` or `report`). | `probe_recipe_create` | true | `"recipe"` |
-| `status` | Recipe generation status for orchestration decisions. | `probe_recipe_create` | true | `"single_line_probe_ready"` |
+| `status` | Recipe generation status for orchestration decisions (`*_ready` or fail-closed report status). | `probe_recipe_create` | true | `"single_line_probe_ready"` |
 | `reasonCode` | Deterministic synthesis/report reason code for fail-closed routing. | `probe_recipe_create` | false | `"spring_entrypoint_not_proven"` |
 | `failedStep` | Specific synthesis stage that failed proof. | `probe_recipe_create` | false | `"spring_entrypoint_resolution"` |
 | `selectedMode` | Final routed intent mode. | `probe_recipe_create` | true | `"single_line_probe"` |
@@ -80,6 +91,7 @@ Column meanings:
 | `trigger` | Protocol-aware trigger envelope emitted by synthesis. | `probe_recipe_create` | false | `{"kind":"http","method":"POST","path":"/v1/catalog"}` |
 | `auth` | Auth inference result and next-step hints. | `probe_recipe_create` | true | `{"status":"ok","strategy":"bearer"}` |
 | `notes` | Run notes and routing/inference diagnostics. Report mode is compact/failure-focused. | `probe_recipe_create` | true | `["execution_readiness=ready"]` |
+| `notes[] (context_path_hint=...)` | Optional non-blocking prompt note when `apiBasePath` is not provided but request synthesis succeeds. | `probe_recipe_create` | false | `"context_path_hint=Optional apiBasePath (for example /api/v1) can be supplied..."` |
 | `runtimeCapture` | Optional runtime capture preview from live probe status. | `probe_recipe_create` | false | `{"status":"available","capturePreview":{"captureId":"abc123"}}` |
 | `runtimeCapture.lineValidation` | Optional line-validation hint from runtime capture enrich pass. | `probe_recipe_create` | false | `"invalid_line_target"` |
 | `runtimeCapture.lineResolvable` | Optional line-resolvable hint from runtime capture enrich pass. | `probe_recipe_create` | false | `false` |
@@ -98,19 +110,18 @@ Column meanings:
 | --- | --- | --- | --- | --- |
 | `request` | Status request details (key, URL, timeout). | `probe_get_status` | true | `{"resolvedKey":"com.example.Catalog#save:88"}` |
 | `response` | Raw endpoint response after MCP normalization. | `probe_get_status` | true | `{"status":200,"json":{"hitCount":1}}` |
-| `response.json.contractVersion` | Probe contract marker. | `probe_get_status` | false | `"0.1.0v"` |
+| `response.json.contractVersion` | Probe contract marker. | `probe_get_status` | false | `"0.1.0"` |
 | `response.json.hitCount` | Probe hit counter for the line key. | `probe_get_status` | false | `1` |
-| `response.json.lastHitEpochMs` | Last hit timestamp in JVM host wall-clock epoch milliseconds. | `probe_get_status` | false | `1739671200000` |
+| `response.json.lastHitMs` | Last hit timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200000` |
 | `response.json.lineValidation` | Line validation verdict (`resolvable` or `invalid_line_target`). | `probe_get_status` | false | `"resolvable"` |
 | `response.json.capturePreview` | Lightweight runtime payload preview from Java agent. | `probe_get_status` | false | `{"available":true,"captureId":"abc123"}` |
+| `response.json.capturePreview.capturedAtMs` | Capture preview timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200456` |
 | `response.json.runtime` | Runtime actuation/observe mode payload. | `probe_get_status` | false | `{"mode":"observe"}` |
 | `response.json.runtime.applicationType.value` | Runtime application framework classification hint. | `probe_get_status` | false | `"spring-boot"` |
 | `response.json.runtime.applicationType.source` | Source used to infer application type. | `probe_get_status` | false | `"classpath:org.springframework.boot.SpringApplication"` |
-| `response.json.runtime.applicationType.confidence` | Confidence score (`0.0..1.0`) for application type hint. | `probe_get_status` | false | `0.9` |
-| `response.json.runtime.serverEpochMs` | JVM host wall-clock epoch milliseconds at status response build time. | `probe_get_status` | false | `1739671200123` |
+| `response.json.runtime.serverMs` | JVM host wall-clock milliseconds at status response build time. | `probe_get_status` | false | `1739671200123` |
 | `response.json.runtime.appPort.value` | Runtime application port hint when inferable (`null` when unknown). | `probe_get_status` | false | `8082` |
 | `response.json.runtime.appPort.source` | Source used to infer app port hint. | `probe_get_status` | false | `"system_property:server.port"` |
-| `response.json.runtime.appPort.confidence` | Confidence score (`0.0..1.0`) for app port hint. | `probe_get_status` | false | `0.95` |
 | `result` | Guidance block when runtime alignment fails. | `probe_get_status` | false | `{"reason":"invalid_line_target","actionCode":"runtime_not_aligned"}` |
 | `mode` | Batch marker when `keys[]` is used. | `probe_get_status` | false | `"probe_batch"` |
 | `operation` | Batch operation identifier. | `probe_get_status` | false | `"status"` |
@@ -144,7 +155,12 @@ Column meanings:
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
 | `request` | Polling request and retry configuration. | `probe_wait_for_hit` | true | `{"resolvedKey":"com.example.Catalog#save:88","maxRetries":1}` |
-| `baseline` | Baseline probe snapshot used for inline hit diffing. | `probe_wait_for_hit` | false | `{"hitCount":0,"lastHitEpochMs":0}` |
+| `request.waitStartMs` | Millisecond timestamp when current wait attempt started. | `probe_wait_for_hit` | false | `1773318672847` |
+| `request.waitStartIsoUtc` | ISO-8601 UTC timestamp for `waitStartMs`. | `probe_wait_for_hit` | false | `"2026-03-11T14:57:52.847Z"` |
+| `request.triggerWindowStartMs` | Reset-aware trigger window start used for strict inline classification. | `probe_wait_for_hit` | false | `1773318658526` |
+| `request.triggerWindowStartIsoUtc` | ISO-8601 UTC timestamp for `triggerWindowStartMs`. | `probe_wait_for_hit` | false | `"2026-03-11T14:57:38.526Z"` |
+| `request.triggerLeadMs` | Milliseconds between wait start and trigger window start (`waitStartMs - triggerWindowStartMs`). | `probe_wait_for_hit` | false | `14321` |
+| `baseline` | Baseline probe snapshot used for inline hit diffing. | `probe_wait_for_hit` | false | `{"hitCount":0,"lastHitMs":0}` |
 | `result.hit` | Whether a hit was detected in current wait window. | `probe_wait_for_hit` | true | `true` |
 | `result.inline` | Whether detected hit is inline to current execution window. | `probe_wait_for_hit` | true | `true` |
 | `result.reason` | Failure reason when no inline hit is confirmed. | `probe_wait_for_hit` | false | `"timeout_no_inline_hit"` |

@@ -8,6 +8,25 @@ This document provides an overview and guide on how to use the mcp-jvm-probe too
 - `MCP_PROBE_BASE_URL` points to the sidecar/probe endpoint.
 - If a request requires certain credentials, provide it on the prompt
 - Strict line probe runs use `Class#method:line` semantics.
+- Runtime route synthesis only scans runtime sources (`src/main/java` + generated-main roots), not `src/test/java`.
+- Orchestration decisions must use deterministic fields (`resultType`, `status`, `reasonCode`, `failedStep`) instead of confidence/heuristic scoring.
+
+Required recipe inputs:
+- `projectRootAbs`
+- exact FQCN in `classHint`
+- exact `methodHint`
+- `lineHint` for probe-intent modes (`single_line_probe`, `regression_plus_line_probe`)
+- auth input when endpoint auth is required
+
+Preferred additional inputs:
+- explicit API base URL / context path
+- explicit probe base URL
+- explicit application port
+
+Context path prompting policy:
+- Ask for context path (`apiBasePath`, for example `/api/v1`) at most once per run.
+- Reuse the same `apiBasePath` value across all endpoint recipes in that run.
+- Missing context path is a soft prompt, not a synthesis blocker.
 
 To know if the java agent is instrumenting your java classes, on startup you can see this logs:
 
@@ -36,7 +55,7 @@ Return the exact request plan and probe verification steps.
 
 1. Orchestrator selects the project root and passes `projectRootAbs`.
 2. `project_context_validate` optionally validates scoped project context for that exact root.
-3. `probe_recipe_create` is called with `projectRootAbs`, `intentMode=single_line_probe`, class/method/line hints, and bearer auth context.
+3. `probe_recipe_create` is called with `projectRootAbs`, `intentMode=single_line_probe`, exact FQCN in `classHint`, method/line hints, optional `apiBasePath`, and bearer auth context.
 4. `probe_recipe_create` performs code-based route inference through synthesizer plugins backed by the generic JVM AST request-mapping resolver and returns `executionReadiness`, `requestCandidates`, `inferredTarget`, and `selectedMode`.
 5. If `resultType=report`, treat output as fail-closed and read compact execution metadata (`executionPlan.routingReason`, `executionPlan.steps[].actionCode`) plus synthesis diagnostics.
 6. On ready state, `probe_reset` clears baseline counter/state for the strict line key.
@@ -78,7 +97,7 @@ Return endpoint-level HTTP results and any probe-verifiable evidence.
 
 1. Orchestrator resolves the API project and passes `projectRootAbs`.
 2. `project_context_validate` optionally validates scoped project context for that exact root.
-3. For each route under the controller scope, `probe_recipe_create` is called to produce executable request candidates from AST-backed request mapping resolution plus auth/readiness diagnostics.
+3. For each route under the controller scope, `probe_recipe_create` is called with exact FQCN class input (and shared `apiBasePath` when applicable) to produce executable request candidates from AST-backed request mapping resolution plus auth/readiness diagnostics.
 4. If `probe_recipe_create` returns `resultType=report`, stop that route as fail-closed and use compact execution metadata (`executionPlan.routingReason`, `executionPlan.steps[].actionCode`) with diagnostics for routing decisions.
 5. The orchestrator executes regression HTTP requests route-by-route with bearer auth and records request/response outcomes.
 6. Probe verification is applied only when strict line targets are available for an endpoint.
@@ -117,7 +136,7 @@ For every failed or flagged run, generate a reproducible recipe and include runt
 2. Filter endpoints into `failed` or `flagged` sets (for example non-2xx/contract mismatch/probe-miss).
 3. For each failed/flagged endpoint, call `probe_recipe_create` to emit a focused rerun recipe tied to the observed failure context.
 4. If strict line verification is possible for that endpoint, run `probe_reset` + targeted HTTP rerun + `probe_wait_for_hit`/`probe_get_status`.
-5. If capture preview exists, call `probe_get_capture` and attach capture evidence to that endpoint�s recipe package.
+5. If capture preview exists, call `probe_get_capture` and attach capture evidence to that endpoint's recipe package.
 6. If runtime route cannot be uniquely validated during rerun, emit fail-closed pushback artifact instead of speculative guidance.
 
 ### Expected Outputs and Artifacts

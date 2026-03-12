@@ -30,12 +30,18 @@ Use this workflow for regression runs at controller scope, service scope, or who
 ## Recipe Synthesis Policy
 
 1. Treat `probe_recipe_create` as deterministic and fail-closed.
-2. If `probe_recipe_create` returns `resultType=report`, stop endpoint execution for that route unless report indicates only missing user input.
-3. In report mode, prefer compact execution metadata:
+2. For `probe_recipe_create`, pass controller/service class as exact FQCN in `classHint`.
+3. Runtime synthesis scope is runtime-only (`src/main/java` + generated-main roots); test sources are excluded.
+4. Pass `apiBasePath` when runtime uses a context path (for example `/api/v1`).
+5. Prompt for context path at most once per run, then reuse the same `apiBasePath` value for all endpoints in that run.
+6. If `probe_recipe_create` returns `resultType=report`, stop endpoint execution for that route unless report indicates only missing user input.
+7. In report mode, prefer compact execution metadata:
    - `executionPlan.routingReason` (code)
    - `executionPlan.steps[].actionCode` (code)
    - avoid depending on verbose instruction text.
-4. Capture and propagate synthesis diagnostics for every fail-closed report:
+8. Route only by deterministic contract fields (`resultType`, `status`, `reasonCode`, `failedStep`).
+9. Never use confidence/heuristic scoring for routing decisions.
+10. Capture and propagate synthesis diagnostics for every fail-closed report:
    - `reasonCode`
    - `failedStep`
    - `evidence`
@@ -72,8 +78,13 @@ Always include:
 3. `Endpoint Results` (method/path/http code)
 4. `Probe Coverage` (which endpoints were probe-verified vs HTTP-only)
 5. `Probe Verification`
-6. `Synthesis Diagnostics` (aggregate reason/failure fields for blocked endpoints)
-7. `Repro Steps` (ordered, executable, numbered)
-8. `Cleanup`
-9. `Trust Note`
+6. `Run Timing`:
+   - `runStartMs` (Unix ms)
+   - `runEndMs` (Unix ms)
+   - `runDurationMs` (`runEndMs - runStartMs`)
+   - optional human-readable UTC timestamps for operator readability
+7. `Synthesis Diagnostics` (aggregate reason/failure fields for blocked endpoints)
+8. `Repro Steps` (ordered, executable, numbered)
+9. `Cleanup`
+10. `Trust Note`
 

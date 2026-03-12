@@ -2,17 +2,25 @@ import * as path from "node:path";
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import { renderRecipeTemplate } from "../../../lib/recipe_template";
-import { buildRecipeTemplateModel } from "../../../models/recipe_output_model";
-import { validateProjectRootAbs } from "../../../utils/project_root_validate.util";
-import { enrichRuntimeCapture } from "../../../utils/recipe_generate/runtime_capture_enrich.util";
-import { generateRecipe } from "./domain";
-import { RECIPE_CREATE_TOOL } from "./contract";
+import { renderRecipeTemplate } from "@/lib/recipe_template";
+import { buildRecipeTemplateModel } from "@/models/recipe_output_model";
+import { validateProjectRootAbs } from "@/utils/project_root_validate.util";
+import { enrichRuntimeCapture } from "@/utils/recipe_generate/runtime_capture_enrich.util";
+import { generateRecipe } from "@/tools/core/recipe_generate/domain";
+import { RECIPE_CREATE_TOOL } from "@/tools/core/recipe_generate/contract";
 
 export type RecipeGenerateHandlerDeps = {
   probeBaseUrl: string;
   probeStatusPath: string;
 };
+
+function isFqcn(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed.includes(".")) return false;
+  const segments = trimmed.split(".");
+  if (segments.some((segment) => segment.length === 0)) return false;
+  return segments.every((segment) => /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(segment));
+}
 
 function toActionCode(step: { title: string }): string {
   const title = step.title.trim().toLowerCase();
@@ -72,13 +80,34 @@ export function registerRecipeCreateTool(
       inputSchema: RECIPE_CREATE_TOOL.inputSchema,
     },
     async (input) => {
+      const inputHints = {
+        classHint: typeof input.classHint === "string" ? input.classHint : undefined,
+        methodHint: typeof input.methodHint === "string" ? input.methodHint : undefined,
+        lineHint: typeof input.lineHint === "number" ? input.lineHint : undefined,
+        apiBasePath: typeof input.apiBasePath === "string" ? input.apiBasePath : undefined,
+        actuationEnabled:
+          typeof input.actuationEnabled === "boolean" ? input.actuationEnabled : undefined,
+        actuationReturnBoolean:
+          typeof input.actuationReturnBoolean === "boolean"
+            ? input.actuationReturnBoolean
+            : undefined,
+        actuationActuatorId:
+          typeof input.actuationActuatorId === "string" ? input.actuationActuatorId : undefined,
+      };
       const deprecatedUsed = deprecatedSelectorKeys.filter(
         (key) => key in (input as Record<string, unknown>),
       );
       if (deprecatedUsed.length > 0) {
         const structuredContent = {
+          projectRoot:
+            typeof input.projectRootAbs === "string" ? input.projectRootAbs : "(project_root_unset)",
+          hints: inputHints,
           resultType: "report",
           status: "project_selector_invalid",
+          reasonCode: "project_selector_invalid",
+          failedStep: "input_validation",
+          evidence: [`unsupportedSelectors=${deprecatedUsed.join(",")}`],
+          attemptedStrategies: ["selector_input_validation"],
           reason: `Unsupported selector inputs: ${deprecatedUsed.join(", ")}`,
           nextAction:
             "Remove legacy selector fields and provide only projectRootAbs as the project selector.",
@@ -94,6 +123,7 @@ export function registerRecipeCreateTool(
         classHint,
         methodHint,
         lineHint,
+        apiBasePath,
         intentMode,
         authToken,
         authUsername,
@@ -107,10 +137,15 @@ export function registerRecipeCreateTool(
       const validated = await validateProjectRootAbs(projectRootAbs);
       if (!validated.ok) {
         const structuredContent = {
+          projectRoot: validated.value ?? projectRootAbs ?? "(project_root_unset)",
+          hints: inputHints,
           resultType: "report",
           status: validated.status,
+          reasonCode: validated.status,
+          failedStep: "project_root_validation",
+          evidence: [validated.reason],
+          attemptedStrategies: ["project_root_validation"],
           reason: validated.reason,
-          ...(validated.value ? { projectRootAbs: validated.value } : {}),
           nextAction: validated.nextAction,
         };
         return {
@@ -120,6 +155,26 @@ export function registerRecipeCreateTool(
       }
 
       const projectRoot = validated.projectRootAbs;
+      if (!isFqcn(classHint)) {
+        const structuredContent = {
+          projectRoot,
+          hints: inputHints,
+          resultType: "report",
+          status: "class_hint_not_fqcn",
+          reasonCode: "class_hint_not_fqcn",
+          failedStep: "input_validation",
+          evidence: [`classHint=${classHint}`],
+          attemptedStrategies: ["class_hint_validation"],
+          reason: "classHint must be a fully qualified class name (FQCN).",
+          nextAction:
+            "Provide exact FQCN in classHint (for example: com.acme.catalog.web.controller.CatalogShoeController) and rerun probe_recipe_create.",
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
+
       const generateArgs: Parameters<typeof generateRecipe>[0] = {
         rootAbs: projectRoot,
         workspaceRootAbs: projectRoot,
@@ -128,6 +183,7 @@ export function registerRecipeCreateTool(
         intentMode,
       };
       if (typeof lineHint === "number") generateArgs.lineHint = lineHint;
+      if (typeof apiBasePath === "string") generateArgs.apiBasePath = apiBasePath;
       if (authToken) generateArgs.authToken = authToken;
       if (authUsername) generateArgs.authUsername = authUsername;
       if (authPassword) generateArgs.authPassword = authPassword;
@@ -170,6 +226,7 @@ export function registerRecipeCreateTool(
           classHint,
           methodHint,
           lineHint,
+          apiBasePath,
           actuationEnabled,
           actuationReturnBoolean,
           actuationActuatorId,
@@ -188,12 +245,10 @@ export function registerRecipeCreateTool(
         resultType: generated.resultType,
         status: generated.status,
         selectedMode: generated.selectedMode,
-        ...(generated.downgradedFrom ? { downgradedFrom: generated.downgradedFrom } : {}),
         lineTargetProvided: generated.lineTargetProvided,
         probeIntentRequested: generated.probeIntentRequested,
         executionReadiness: generated.executionReadiness,
         missingInputs: generated.missingInputs,
-        ...(generated.routingNote ? { routingNote: generated.routingNote } : {}),
         ...(generated.nextAction ? { nextAction: generated.nextAction } : {}),
         ...(generated.failurePhase ? { failurePhase: generated.failurePhase } : {}),
         ...(generated.failureReasonCode ? { failureReasonCode: generated.failureReasonCode } : {}),
@@ -214,12 +269,10 @@ export function registerRecipeCreateTool(
         resultType: generated.resultType,
         status: generated.status,
         selectedMode: generated.selectedMode,
-        ...(generated.downgradedFrom ? { downgradedFrom: generated.downgradedFrom } : {}),
         lineTargetProvided: generated.lineTargetProvided,
         probeIntentRequested: generated.probeIntentRequested,
         executionReadiness: generated.executionReadiness,
         missingInputs: generated.missingInputs,
-        ...(generated.routingNote ? { routingNote: generated.routingNote } : {}),
         ...(generated.nextAction ? { nextAction: generated.nextAction } : {}),
         ...(generated.failurePhase ? { failurePhase: generated.failurePhase } : {}),
         ...(generated.failureReasonCode ? { failureReasonCode: generated.failureReasonCode } : {}),

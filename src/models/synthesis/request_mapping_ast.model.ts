@@ -1,7 +1,7 @@
 import type {
   SynthesisRecipeCandidate,
   SynthesisRequestInferenceSource,
-} from "./synthesizer_output.model";
+} from "@/models/synthesis/synthesizer_output.model";
 
 export type JvmAstRequestMappingReasonCode =
   | "ast_resolver_unavailable"

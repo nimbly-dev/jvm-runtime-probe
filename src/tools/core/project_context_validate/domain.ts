@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
-import { validateProjectRootAbs } from "../../../utils/project_root_validate.util";
+import { validateProjectRootAbs } from "@/utils/project_root_validate.util";
 
 async function dirExists(abs: string): Promise<boolean> {
   try {

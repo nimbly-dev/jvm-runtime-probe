@@ -1,4 +1,4 @@
-import type { SynthesizerPlugin } from "./plugin.contract";
+import type { SynthesizerPlugin } from "@/tools/synthesizers/registry/plugin.contract";
 
 export const SYNTHESIZER_PLUGIN_API_VERSION = "1.0.0";
 

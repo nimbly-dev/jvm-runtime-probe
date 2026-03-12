@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { buildRecipeTemplateModel } = require("../../src/models/recipe_output_model");
+const { buildRecipeTemplateModel } = require("@/models/recipe_output_model");
 
 test("recipe template model always reports selected mode", () => {
   const model = buildRecipeTemplateModel({
@@ -34,7 +34,7 @@ test("recipe template model always reports selected mode", () => {
       lineTargetProvided: false,
       probeIntentRequested: false,
       inferenceDiagnostics: {
-        target: { attempted: true, matched: true, candidateCount: 1, topConfidence: 45 },
+        target: { attempted: true, matched: true, candidateCount: 1 },
         request: { attempted: true, matched: true, source: "spring_mvc" },
       },
       auth: {

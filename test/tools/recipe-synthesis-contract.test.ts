@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
 
-const { generateRecipe } = require("../../src/tools/core/recipe_generate/domain");
+const { generateRecipe } = require("@/tools/core/recipe_generate/domain");
 
 const okAuth = {
   required: "unknown",
@@ -30,7 +30,6 @@ test("recipe domain emits fail-closed synthesis diagnostics", async () => {
             methodName: "finalPriceLte",
             line: 42,
             key: "com.example.CatalogService#finalPriceLte",
-            confidence: 90,
             reasons: ["exact"],
           },
         ],

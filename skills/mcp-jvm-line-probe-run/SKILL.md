@@ -24,26 +24,31 @@ Use this workflow only for strict one-line verification runs.
 ## Execution Sequence
 
 1. Call `project_context_validate` with orchestrator-selected `projectRootAbs`.
-2. Call `probe_recipe_create` with probe intent and line target context.
-3. If `probe_recipe_create` returns `resultType=report`, treat it as fail-closed synthesis pushback and stop unless the report indicates only missing user input.
-4. In report mode, read compact execution metadata:
+2. Call `probe_recipe_create` with probe intent, strict line target context, and exact FQCN in `classHint`.
+3. Provide `apiBasePath` when runtime is deployed with a context path (for example `/api/v1`).
+4. Ask for context path at most once per run; reuse the same `apiBasePath` for subsequent attempts in that run.
+5. Runtime synthesis scope is runtime-only (`src/main/java` + generated-main roots); test sources are excluded.
+6. If `probe_recipe_create` returns `resultType=report`, treat it as fail-closed synthesis pushback and stop unless the report indicates only missing user input.
+7. In report mode, read compact execution metadata:
    - `executionPlan.routingReason` (code)
    - `executionPlan.steps[].actionCode` (code)
    - avoid depending on verbose instruction text.
-5. On report outputs, always capture synthesis diagnostics:
+8. Route only by deterministic contract fields (`resultType`, `status`, `reasonCode`, `failedStep`).
+9. Never use or request confidence/heuristic scoring for routing decisions.
+10. On report outputs, always capture synthesis diagnostics:
    - `reasonCode`
    - `failedStep`
    - `evidence`
    - `attemptedStrategies`
    - `synthesizerUsed`
-6. Resolve route dynamically from runtime candidates.
-7. Validate exactly one route using:
+11. Resolve route dynamically from runtime candidates.
+12. Validate exactly one route using:
    - probe reachability
    - API reachability
    - strict target alignment (`Class#method:line` resolvability or class-scoped line discovery)
-8. Execute probe flow:
+13. Execute probe flow:
    - `probe_reset` -> trigger HTTP request -> `probe_wait_for_hit` / `probe_get_status`
-9. Cleanup (disable actuation when used).
+14. Cleanup (disable actuation when used).
 
 ## Route Pushback
 
@@ -73,8 +78,13 @@ Always include:
 3. `Trigger Request`
 4. `HTTP Result`
 5. `Probe Verification`
-6. `Synthesis Diagnostics` (`synthesizerUsed`, `reasonCode`, `failedStep` when present)
-7. `Repro Steps` (ordered, executable, numbered)
-8. `Cleanup`
-9. `Trust Note`
+6. `Run Timing`:
+   - `runStartMs` (Unix ms)
+   - `runEndMs` (Unix ms)
+   - `runDurationMs` (`runEndMs - runStartMs`)
+   - optional human-readable UTC timestamps for operator readability
+7. `Synthesis Diagnostics` (`synthesizerUsed`, `reasonCode`, `failedStep` when present)
+8. `Repro Steps` (ordered, executable, numbered)
+9. `Cleanup`
+10. `Trust Note`
 

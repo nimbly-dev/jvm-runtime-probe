@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 final class ProbeHttpServer {
-  private static final String CONTRACT_VERSION = "0.1.0v";
+  private static final String CONTRACT_VERSION = ContractVersion.value();
 
   private final HttpServer server;
 
