@@ -10,21 +10,8 @@ function sanitizeRuntime(runtime: unknown): Record<string, unknown> | undefined 
 
   // serverEpochMs is a remote host clock and can be misleading in mixed-host setups.
   delete out.serverEpochMs;
-
-  const applicationType =
-    typeof out.applicationType === "object" && out.applicationType !== null
-      ? (out.applicationType as Record<string, unknown>)
-      : undefined;
-  if (applicationType) {
-    const value = typeof applicationType.value === "string" ? applicationType.value : "";
-    delete applicationType.confidence;
-    const shouldHide = value.toLowerCase() === "unknown";
-    if (shouldHide) {
-      delete out.applicationType;
-    } else {
-      out.applicationType = applicationType;
-    }
-  }
+  // Runtime applicationType is intentionally omitted from MCP diagnostics.
+  delete out.applicationType;
 
   const appPort =
     typeof out.appPort === "object" && out.appPort !== null

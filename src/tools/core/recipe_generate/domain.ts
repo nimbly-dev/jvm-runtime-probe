@@ -51,6 +51,7 @@ export type GenerateRecipeResult = {
   reasonCode?: string;
   failedStep?: string;
   synthesizerUsed?: string;
+  applicationType?: string;
   attemptedStrategies: string[];
   evidence: string[];
   trigger?: SynthesisHttpTrigger;
@@ -58,6 +59,14 @@ export type GenerateRecipeResult = {
   auth: AuthResolution;
   notes: string[];
 };
+
+function deriveApplicationTypeFromSynthesizer(synthesizerUsed?: string): string | undefined {
+  if (!synthesizerUsed) return undefined;
+  const normalized = synthesizerUsed.trim().toLowerCase();
+  if (!normalized) return undefined;
+  if (normalized === "spring") return "spring";
+  return normalized;
+}
 
 export type GenerateRecipeDeps = {
   inferTargetsFn?: typeof inferTargets;
@@ -345,6 +354,7 @@ export async function generateRecipe(
   const matchedBranchCondition = synthesisSuccess?.matchedBranchCondition;
   const authRootAbs = synthesisSuccess?.matchedRootAbs ?? normalized.rootAbs;
   const synthesizerUsed = synthesisSuccess?.synthesizerUsed ?? synthesisFailure?.synthesizerUsed;
+  const applicationType = deriveApplicationTypeFromSynthesizer(synthesizerUsed);
   const attemptedStrategies =
     synthesisSuccess?.attemptedStrategies ?? synthesisFailure?.attemptedStrategies ?? [];
   const evidence = synthesisSuccess?.evidence ?? synthesisFailure?.evidence ?? [];
@@ -463,6 +473,7 @@ export async function generateRecipe(
   if (reasonCode) runNotes.push(`synthesis_reason_code=${reasonCode}`);
   if (failedStep) runNotes.push(`synthesis_failed_step=${failedStep}`);
   if (synthesizerUsed) runNotes.push(`synthesizer_used=${synthesizerUsed}`);
+  if (applicationType) runNotes.push(`application_type=${applicationType}`);
   if (bestRequest && !normalized.apiBasePath) {
     runNotes.push(
       "context_path_hint=Optional apiBasePath (for example /api/v1) can be supplied when runtime uses a context path.",
@@ -501,6 +512,7 @@ export async function generateRecipe(
     ...(reasonCode ? { reasonCode } : {}),
     ...(failedStep ? { failedStep } : {}),
     ...(synthesizerUsed ? { synthesizerUsed } : {}),
+    ...(applicationType ? { applicationType } : {}),
     ...(trigger ? { trigger } : {}),
     attemptedStrategies,
     evidence,

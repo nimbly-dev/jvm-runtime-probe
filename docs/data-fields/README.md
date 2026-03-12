@@ -86,6 +86,7 @@ Deterministic contract policy:
 | `executionReadiness` | Execution gate (`ready` or `needs_user_input`). | `probe_recipe_create` | true | `"ready"` |
 | `missingInputs` | Missing runtime/auth inputs blocking execution. | `probe_recipe_create` | true | `[]` |
 | `synthesizerUsed` | Internal synthesizer plugin selected for request synthesis. | `probe_recipe_create` | false | `"spring"` |
+| `applicationType` | Framework type derived from selected synthesizer (not runtime introspection). | `probe_recipe_create` | false | `"spring"` |
 | `attemptedStrategies` | Ordered synthesis strategies attempted by the selected plugin. | `probe_recipe_create` | true | `["spring_annotation_mapping","spring_call_chain_resolution"]` |
 | `evidence` | Compact evidence lines used for deterministic synthesis and pushback context. | `probe_recipe_create` | true | `["request_source=spring_mvc"]` |
 | `trigger` | Protocol-aware trigger envelope emitted by synthesis. | `probe_recipe_create` | false | `{"kind":"http","method":"POST","path":"/v1/catalog"}` |
@@ -117,8 +118,6 @@ Deterministic contract policy:
 | `response.json.capturePreview` | Lightweight runtime payload preview from Java agent. | `probe_get_status` | false | `{"available":true,"captureId":"abc123"}` |
 | `response.json.capturePreview.capturedAtMs` | Capture preview timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200456` |
 | `response.json.runtime` | Runtime actuation/observe mode payload. | `probe_get_status` | false | `{"mode":"observe"}` |
-| `response.json.runtime.applicationType.value` | Runtime application framework classification hint. | `probe_get_status` | false | `"spring-boot"` |
-| `response.json.runtime.applicationType.source` | Source used to infer application type. | `probe_get_status` | false | `"classpath:org.springframework.boot.SpringApplication"` |
 | `response.json.runtime.serverMs` | JVM host wall-clock milliseconds at status response build time. | `probe_get_status` | false | `1739671200123` |
 | `response.json.runtime.appPort.value` | Runtime application port hint when inferable (`null` when unknown). | `probe_get_status` | false | `8082` |
 | `response.json.runtime.appPort.source` | Source used to infer app port hint. | `probe_get_status` | false | `"system_property:server.port"` |

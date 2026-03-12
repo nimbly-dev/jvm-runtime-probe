@@ -18,14 +18,8 @@ function sanitizeRuntimeHints(runtime: Record<string, unknown>): Record<string, 
     out.serverMs = out.serverEpochMs;
     delete out.serverEpochMs;
   }
-  const applicationType =
-    typeof out.applicationType === "object" && out.applicationType !== null
-      ? { ...(out.applicationType as Record<string, unknown>) }
-      : undefined;
-  if (applicationType) {
-    delete applicationType.confidence;
-    out.applicationType = applicationType;
-  }
+  // Runtime applicationType is intentionally omitted from MCP status payloads.
+  delete out.applicationType;
   const appPort =
     typeof out.appPort === "object" && out.appPort !== null
       ? { ...(out.appPort as Record<string, unknown>) }

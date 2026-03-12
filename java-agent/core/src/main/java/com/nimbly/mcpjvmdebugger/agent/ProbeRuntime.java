@@ -47,7 +47,8 @@ public final class ProbeRuntime {
   private static volatile int CAPTURE_PREVIEW_MAX_CHARS = 1024;
   private static volatile int CAPTURE_STORED_MAX_CHARS = 16384;
   private static volatile String CAPTURE_REDACTION_MODE = "basic";
-  private static final RuntimeStringSignal APPLICATION_TYPE_SIGNAL = detectApplicationType();
+  private static volatile RuntimeStringSignal APPLICATION_TYPE_SIGNAL =
+      new RuntimeStringSignal("unknown", "runtime_introspection", 0.1);
 
   private ProbeRuntime() {}
 
@@ -191,7 +192,17 @@ public final class ProbeRuntime {
   }
 
   static RuntimeStringSignal getApplicationTypeSignal() {
-    return APPLICATION_TYPE_SIGNAL;
+    RuntimeStringSignal detected = detectApplicationType();
+    if (!isUnknownApplicationType(detected)) {
+      APPLICATION_TYPE_SIGNAL = detected;
+      return detected;
+    }
+    RuntimeStringSignal cached = APPLICATION_TYPE_SIGNAL;
+    if (!isUnknownApplicationType(cached)) {
+      return cached;
+    }
+    APPLICATION_TYPE_SIGNAL = detected;
+    return detected;
   }
 
   static RuntimePortSignal getAppPortSignal() {
@@ -336,9 +347,12 @@ public final class ProbeRuntime {
   private static RuntimePortSignal detectAppPort() {
     String[] propertyKeys = new String[] {
         "server.port",
+        "local.server.port",
+        "management.server.port",
         "micronaut.server.port",
         "quarkus.http.port",
-        "jetty.http.port"
+        "jetty.http.port",
+        "server.netty.port"
     };
     for (String key : propertyKeys) {
       Integer port = parsePort(System.getProperty(key));
@@ -364,7 +378,16 @@ public final class ProbeRuntime {
     if (fromCommand != null) {
       return new RuntimePortSignal(fromCommand, "system_property:sun.java.command", 0.7);
     }
+    Integer fromJavaToolOptions = parsePortFromCommand(System.getenv("JAVA_TOOL_OPTIONS"));
+    if (fromJavaToolOptions != null) {
+      return new RuntimePortSignal(fromJavaToolOptions, "env:JAVA_TOOL_OPTIONS", 0.68);
+    }
     return new RuntimePortSignal(null, "runtime_introspection", 0.0);
+  }
+
+  private static boolean isUnknownApplicationType(RuntimeStringSignal signal) {
+    if (signal == null) return true;
+    return "unknown".equalsIgnoreCase(signal.value);
   }
 
   private static boolean classPresent(String className) {
@@ -372,6 +395,14 @@ public final class ProbeRuntime {
     if (context != null) {
       try {
         Class.forName(className, false, context);
+        return true;
+      } catch (Throwable ignored) {
+      }
+    }
+    ClassLoader system = ClassLoader.getSystemClassLoader();
+    if (system != null) {
+      try {
+        Class.forName(className, false, system);
         return true;
       } catch (Throwable ignored) {
       }

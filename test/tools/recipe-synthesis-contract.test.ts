@@ -53,6 +53,7 @@ test("recipe domain emits fail-closed synthesis diagnostics", async () => {
   assert.equal(result.reasonCode, "spring_entrypoint_not_proven");
   assert.equal(result.failedStep, "spring_entrypoint_resolution");
   assert.equal(result.synthesizerUsed, "spring");
+  assert.equal(result.applicationType, "spring");
   assert.deepEqual(result.evidence, ["call_chain_missing=true"]);
   assert.deepEqual(result.attemptedStrategies, ["spring_annotation_mapping"]);
 });

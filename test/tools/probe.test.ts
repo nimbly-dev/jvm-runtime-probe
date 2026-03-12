@@ -115,13 +115,9 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
     assert.equal(out.structuredContent.response.json.capturePreview.captureId, "abc123");
     assert.equal(out.structuredContent.response.json.capturePreview.capturedAtMs, 5555);
     assert.equal(out.structuredContent.response.json.capturePreview.capturedAtEpochMs, undefined);
-    assert.equal(
-      out.structuredContent.response.json.runtime.applicationType.value,
-      "spring-boot",
-    );
+    assert.equal(out.structuredContent.response.json.runtime.applicationType, undefined);
     assert.equal(out.structuredContent.response.json.runtime.serverMs, 7777);
     assert.equal(out.structuredContent.response.json.runtime.serverEpochMs, undefined);
-    assert.equal(out.structuredContent.response.json.runtime.applicationType.confidence, undefined);
     assert.equal(out.structuredContent.response.json.runtime.appPort.value, 8082);
     assert.equal(out.structuredContent.response.json.runtime.appPort.confidence, undefined);
   });
@@ -462,8 +458,7 @@ test("probe_get_status supports 0.1.0 batch rows with nested probe payload", asy
     assert.equal(responseRows[0].lastHitMs, 2222);
     assert.equal(responseRows[0].runtime.serverMs, 3333);
     assert.equal(responseRows[0].runtime.serverEpochMs, undefined);
-    assert.equal(responseRows[0].runtime.applicationType.value, "spring-boot");
-    assert.equal(responseRows[0].runtime.applicationType.confidence, undefined);
+    assert.equal(responseRows[0].runtime.applicationType, undefined);
     assert.equal(responseRows[0].runtime.appPort.value, 8082);
     assert.equal(responseRows[0].runtime.appPort.confidence, undefined);
   });
