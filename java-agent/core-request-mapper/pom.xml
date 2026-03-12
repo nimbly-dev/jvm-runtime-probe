@@ -11,10 +11,10 @@
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>mcp-jvm-request-mapping-resolver</artifactId>
+  <artifactId>mcp-jvm-core-request-mapper</artifactId>
   <version>0.1.0</version>
   <packaging>jar</packaging>
-  <name>mcp-jvm-request-mapping-resolver</name>
+  <name>mcp-jvm-core-request-mapper</name>
 
   <properties>
     <maven.compiler.release>17</maven.compiler.release>

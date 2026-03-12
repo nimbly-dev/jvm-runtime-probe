@@ -31,7 +31,8 @@ public final class PathMaterializer implements TransportMaterializer {
             }
             ResolvedParameter param = resolvedParameter.get();
             if (param.getKind().equals("query")) {
-                queryParts.add(param.getName() + "=" + ParameterTemplateBuilder.sampleValueForType(param.getType()));
+                queryParts.add(param.getName() + "="
+                        + ParameterTemplateBuilder.sampleValueForParameter(param.getName(), param.getType()));
             } else if (param.getKind().equals("path")) {
                 String value = ParameterTemplateBuilder.sampleValueForType(param.getType());
                 resolvedPath = resolvedPath

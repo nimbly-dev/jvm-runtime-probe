@@ -54,7 +54,9 @@
   },
   "files": [
     "dist/**",
-    "java-agent/request-mapping-resolver/target/*.jar",
+    "java-agent/core/target/*.jar",
+    "java-agent/core-request-mapper/target/*.jar",
+    "java-agent/request-mapper-spring/target/*.jar",
     "README.md"
   ]
 }

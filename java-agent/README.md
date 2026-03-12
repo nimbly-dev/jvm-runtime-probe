@@ -2,6 +2,12 @@
 
 Runtime-only probe agent for local JVMs. No application source code changes required.
 
+### Module Map
+
+- `core`: javaagent runtime, probe HTTP server, instrumentation, and profile-based bundle packaging.
+- `core-request-mapper`: framework-agnostic request-mapping resolver core plus mapper SPI.
+- `request-mapper-spring`: Spring MVC mapper plugin loaded via `ServiceLoader`.
+
 ### Build
 
 ```powershell
@@ -11,11 +17,22 @@ mvn -f java-agent\pom.xml package
 Built artifacts:
 
 ```text
-java-agent\core\target\mcp-jvm-probe-agent-0.1.0.jar
-java-agent\request-mapping-resolver\target\mcp-jvm-request-mapping-resolver-0.1.0-all.jar
+java-agent\core\target\mcp-jvm-probe-agent-0.1.0-minimal.jar
+java-agent\core\target\mcp-jvm-probe-agent-0.1.0-spring.jar
+java-agent\core\target\mcp-jvm-probe-agent-0.1.0-all.jar
+java-agent\core-request-mapper\target\mcp-jvm-core-request-mapper-0.1.0-all.jar
+java-agent\request-mapper-spring\target\mcp-jvm-request-mapper-spring-0.1.0.jar
 ```
 
-The request-mapping resolver is a generic JVM AST helper consumed by synthesizers through a `stdin/stdout` JSON contract. Spring MVC and JAX-RS are the first built-in framework resolvers.
+Profile-specific build examples:
+
+```powershell
+mvn -f java-agent\pom.xml -pl core -am -Pminimal -DskipTests package
+mvn -f java-agent\pom.xml -pl core -am -Pspring -DskipTests package
+mvn -f java-agent\pom.xml -pl core -am -Pall -DskipTests package
+```
+
+The request-mapping resolver is a generic JVM AST helper consumed by synthesizers through a `stdin/stdout` JSON contract. Spring MVC support is provided by `request-mapper-spring`.
 
 ### Run With Spring Boot
 

@@ -9,6 +9,7 @@ export type JvmAstRequestMappingReasonCode =
   | "target_type_not_found"
   | "target_type_ambiguous"
   | "target_method_not_found"
+  | "mapper_plugin_unavailable"
   | "request_mapping_not_proven";
 
 export type JvmAstRequestMappingInput = {
