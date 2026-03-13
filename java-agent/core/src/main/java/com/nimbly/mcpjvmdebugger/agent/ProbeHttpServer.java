@@ -288,7 +288,8 @@ final class ProbeHttpServer {
         + "\"argsPreview\":" + buildCaptureValuesJson(preview.argsPreview) + ","
         + "\"returnPreview\":" + buildNullableCaptureValueJson(preview.returnPreview) + ","
         + "\"thrownPreview\":" + buildNullableCaptureValueJson(preview.thrownPreview) + ","
-        + "\"truncatedAny\":" + preview.truncatedAny
+        + "\"truncatedAny\":" + preview.truncatedAny + ","
+        + "\"executionPaths\":" + buildStringArrayJson(preview.executionPaths)
         + "}";
   }
 
@@ -301,7 +302,8 @@ final class ProbeHttpServer {
         + "\"args\":" + buildCaptureValuesJson(capture.args) + ","
         + "\"returnValue\":" + buildNullableCaptureValueJson(capture.returnValue) + ","
         + "\"thrownValue\":" + buildNullableCaptureValueJson(capture.thrownValue) + ","
-        + "\"truncatedAny\":" + capture.truncatedAny
+        + "\"truncatedAny\":" + capture.truncatedAny + ","
+        + "\"executionPaths\":" + buildStringArrayJson(capture.executionPaths)
         + "}";
   }
 
@@ -343,6 +345,15 @@ final class ProbeHttpServer {
           + "\"index\":" + i + ","
           + buildCaptureValueBodyJson(values.get(i))
           + "}");
+    }
+    return "[" + String.join(",", rows) + "]";
+  }
+
+  private static String buildStringArrayJson(List<String> values) {
+    if (values == null || values.isEmpty()) return "[]";
+    List<String> rows = new ArrayList<>();
+    for (String value : values) {
+      rows.add("\"" + esc(value) + "\"");
     }
     return "[" + String.join(",", rows) + "]";
   }

@@ -47,6 +47,16 @@ public final class ProbeRuntime {
   private static volatile int CAPTURE_PREVIEW_MAX_CHARS = 1024;
   private static volatile int CAPTURE_STORED_MAX_CHARS = 16384;
   private static volatile String CAPTURE_REDACTION_MODE = "basic";
+  private static final int CAPTURE_EXECUTION_PATH_MAX_FRAMES = 12;
+  private static final int EXECUTION_PATH_ROOT_PACKAGE_SEGMENTS = 2;
+  private static final String[] EXECUTION_PATH_EXCLUDED_PREFIXES = new String[] {
+      "com.nimbly.mcpjvmdebugger.agent.",
+      "java.",
+      "javax.",
+      "jdk.",
+      "sun.",
+      "net.bytebuddy."
+  };
   private static volatile RuntimeStringSignal APPLICATION_TYPE_SIGNAL =
       new RuntimeStringSignal("unknown", "runtime_introspection", 0.1);
 
@@ -118,6 +128,7 @@ public final class ProbeRuntime {
     List<CaptureValue> capturedArgs = serializeArguments(allArguments);
     CaptureValue capturedReturn = serializeSingleValue(returnValue, null);
     CaptureValue capturedThrown = thrown == null ? null : serializeSingleValue(thrown, null);
+    List<String> executionPaths = captureExecutionPaths(dottedClassName, methodName);
 
     CaptureEntry entry = new CaptureEntry(
         captureId,
@@ -126,6 +137,7 @@ public final class ProbeRuntime {
         capturedArgs,
         capturedReturn,
         capturedThrown,
+        executionPaths,
         CAPTURE_REDACTION_MODE
     );
 
@@ -701,6 +713,107 @@ public final class ProbeRuntime {
     }
   }
 
+  private static List<String> captureExecutionPaths(String dottedClassName, String methodName) {
+    StackTraceElement[] stack = Thread.currentThread().getStackTrace();
+    if (stack == null || stack.length == 0) {
+      return Collections.singletonList(
+          formatExecutionFrame(
+              dottedClassName,
+              methodName,
+              -1,
+              deriveExecutionPathRootPackage(dottedClassName)
+          )
+      );
+    }
+
+    List<StackTraceElement> frames = new ArrayList<>();
+    int fallbackLine = -1;
+    for (StackTraceElement frame : stack) {
+      if (frame == null) continue;
+      String className = frame.getClassName();
+      if (className == null || className.isBlank()) continue;
+      if (fallbackLine <= 0
+          && dottedClassName.equals(className)
+          && methodName.equals(frame.getMethodName())
+          && frame.getLineNumber() > 0) {
+        fallbackLine = frame.getLineNumber();
+      }
+      if (isExecutionPathExcludedClass(className)) continue;
+      frames.add(frame);
+    }
+
+    Collections.reverse(frames);
+    String rootPackage = !frames.isEmpty()
+        ? deriveExecutionPathRootPackage(frames.get(0).getClassName())
+        : deriveExecutionPathRootPackage(dottedClassName);
+
+    List<String> out = new ArrayList<>();
+    String previous = null;
+    for (StackTraceElement frame : frames) {
+      String rendered = formatExecutionFrame(
+          frame.getClassName(),
+          frame.getMethodName(),
+          frame.getLineNumber(),
+          rootPackage
+      );
+      if (rendered.equals(previous)) continue;
+      out.add(rendered);
+      previous = rendered;
+    }
+
+    if (out.size() > CAPTURE_EXECUTION_PATH_MAX_FRAMES) {
+      out = new ArrayList<>(out.subList(out.size() - CAPTURE_EXECUTION_PATH_MAX_FRAMES, out.size()));
+    }
+    if (out.isEmpty()) {
+      out.add(formatExecutionFrame(dottedClassName, methodName, fallbackLine, rootPackage));
+    }
+    return out;
+  }
+
+  private static boolean isExecutionPathExcludedClass(String className) {
+    for (String prefix : EXECUTION_PATH_EXCLUDED_PREFIXES) {
+      if (className.startsWith(prefix)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static String deriveExecutionPathRootPackage(String className) {
+    if (className == null || className.isBlank()) return "";
+    int classDot = className.lastIndexOf('.');
+    if (classDot <= 0) return "";
+    String packageName = className.substring(0, classDot);
+    String[] segments = packageName.split("\\.");
+    if (segments.length == 0) return "";
+    int keep = Math.min(EXECUTION_PATH_ROOT_PACKAGE_SEGMENTS, segments.length);
+    StringBuilder out = new StringBuilder();
+    for (int i = 0; i < keep; i++) {
+      if (i > 0) out.append('.');
+      out.append(segments[i]);
+    }
+    return out.toString();
+  }
+
+  private static String formatExecutionFrame(
+      String className,
+      String methodName,
+      int lineNumber,
+      String rootPackage
+  ) {
+    String cls = (className == null || className.isBlank()) ? "UnknownClass" : className;
+    String method = (methodName == null || methodName.isBlank()) ? "<unknown>" : methodName;
+    String line = lineNumber > 0 ? String.valueOf(lineNumber) : "?";
+    String prefix = cls;
+    if (rootPackage != null && !rootPackage.isBlank()) {
+      String compactClass = cls.startsWith(rootPackage + ".")
+          ? cls.substring(rootPackage.length() + 1)
+          : cls;
+      prefix = rootPackage + "..." + compactClass;
+    }
+    return prefix + "." + method + "()#" + line;
+  }
+
   private static int clamp(int value, int min, int max, int defaultValue) {
     if (value < min || value > max) return defaultValue;
     return value;
@@ -755,6 +868,7 @@ public final class ProbeRuntime {
     final CaptureValueView returnPreview;
     final CaptureValueView thrownPreview;
     final boolean truncatedAny;
+    final List<String> executionPaths;
 
     private CapturePreviewView(
         boolean available,
@@ -765,7 +879,8 @@ public final class ProbeRuntime {
         List<CaptureValueView> argsPreview,
         CaptureValueView returnPreview,
         CaptureValueView thrownPreview,
-        boolean truncatedAny
+        boolean truncatedAny,
+        List<String> executionPaths
     ) {
       this.available = available;
       this.captureId = captureId;
@@ -776,6 +891,7 @@ public final class ProbeRuntime {
       this.returnPreview = returnPreview;
       this.thrownPreview = thrownPreview;
       this.truncatedAny = truncatedAny;
+      this.executionPaths = executionPaths;
     }
 
     static CapturePreviewView unavailable(String redactionMode) {
@@ -788,7 +904,8 @@ public final class ProbeRuntime {
           Collections.emptyList(),
           null,
           null,
-          false
+          false,
+          Collections.emptyList()
       );
     }
   }
@@ -802,6 +919,7 @@ public final class ProbeRuntime {
     final CaptureValueView returnValue;
     final CaptureValueView thrownValue;
     final boolean truncatedAny;
+    final List<String> executionPaths;
 
     CaptureRecordView(
         String captureId,
@@ -811,7 +929,8 @@ public final class ProbeRuntime {
         List<CaptureValueView> args,
         CaptureValueView returnValue,
         CaptureValueView thrownValue,
-        boolean truncatedAny
+        boolean truncatedAny,
+        List<String> executionPaths
     ) {
       this.captureId = captureId;
       this.methodKey = methodKey;
@@ -821,6 +940,7 @@ public final class ProbeRuntime {
       this.returnValue = returnValue;
       this.thrownValue = thrownValue;
       this.truncatedAny = truncatedAny;
+      this.executionPaths = executionPaths;
     }
   }
 
@@ -831,6 +951,7 @@ public final class ProbeRuntime {
     private final List<CaptureValue> args;
     private final CaptureValue returnValue;
     private final CaptureValue thrownValue;
+    private final List<String> executionPaths;
     private final String redactionMode;
 
     private CaptureEntry(
@@ -840,6 +961,7 @@ public final class ProbeRuntime {
         List<CaptureValue> args,
         CaptureValue returnValue,
         CaptureValue thrownValue,
+        List<String> executionPaths,
         String redactionMode
     ) {
       this.captureId = captureId;
@@ -848,6 +970,7 @@ public final class ProbeRuntime {
       this.args = args;
       this.returnValue = returnValue;
       this.thrownValue = thrownValue;
+      this.executionPaths = executionPaths == null ? Collections.emptyList() : executionPaths;
       this.redactionMode = redactionMode;
     }
 
@@ -873,7 +996,8 @@ public final class ProbeRuntime {
           previewArgs,
           returnPreview,
           thrownPreview,
-          truncatedAny
+          truncatedAny,
+          executionPaths
       );
     }
 
@@ -898,7 +1022,8 @@ public final class ProbeRuntime {
           outArgs,
           outReturn,
           outThrown,
-          truncatedAny
+          truncatedAny,
+          executionPaths
       );
     }
   }

@@ -33,6 +33,7 @@ test("enrichRuntimeCapture returns available when capturePreview is present", as
             capturePreview: {
               available: true,
               captureId: "abc123",
+              executionPaths: ["com.example...catalog.web.CatalogController.listCatalogShoes()#42"],
             },
           },
         },
@@ -41,6 +42,9 @@ test("enrichRuntimeCapture returns available when capturePreview is present", as
   });
   assert.equal(out.status, "available");
   assert.equal(out.capturePreview.captureId, "abc123");
+  assert.deepEqual(out.capturePreview.executionPaths, [
+    "com.example...catalog.web.CatalogController.listCatalogShoes()#42",
+  ]);
 });
 
 test("enrichRuntimeCapture returns not_captured_yet when preview is absent", async () => {
@@ -66,6 +70,7 @@ test("enrichRuntimeCapture returns not_captured_yet when preview is absent", asy
   });
   assert.equal(out.status, "not_captured_yet");
   assert.equal(out.reason, "status_checked_but_capture_unavailable");
+  assert.equal((out as any).capturePreview, undefined);
 });
 
 test("enrichRuntimeCapture returns unavailable on probe status errors", async () => {

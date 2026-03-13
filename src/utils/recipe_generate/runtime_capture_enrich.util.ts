@@ -1,9 +1,10 @@
 import { probeStatus } from "@/utils/probe/probe_status.util";
+import type { ProbeCapturePreviewPayload } from "@/models/probe_runtime_capture.model";
 
 export type RuntimeCaptureSummary =
   | {
       status: "available";
-      capturePreview: Record<string, unknown>;
+      capturePreview: ProbeCapturePreviewPayload;
       lineValidation?: string;
       lineResolvable?: boolean;
     }
@@ -39,8 +40,13 @@ export async function enrichRuntimeCapture(args: {
       null) as Record<string, unknown> | null;
     const capturePreview =
       statusJson && typeof statusJson.capturePreview === "object"
-        ? (statusJson.capturePreview as Record<string, unknown>)
+        ? (statusJson.capturePreview as ProbeCapturePreviewPayload)
         : null;
+    if (capturePreview && Array.isArray(capturePreview.executionPaths)) {
+      capturePreview.executionPaths = capturePreview.executionPaths.filter(
+        (value): value is string => typeof value === "string",
+      );
+    }
     if (capturePreview && capturePreview.available === true) {
       const lineValidation =
         typeof statusJson?.lineValidation === "string" ? statusJson.lineValidation : undefined;

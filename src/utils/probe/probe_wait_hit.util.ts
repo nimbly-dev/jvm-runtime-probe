@@ -100,8 +100,8 @@ export async function probeWaitHit(args: {
       unreachableRetryEnabled,
       unreachableMaxRetries,
       attempt,
-      waitStartMs: window.waitStartMs,
-      triggerWindowStartMs: window.triggerWindowStartMs,
+      waitStartEpochMs: window.waitStartMs,
+      triggerWindowStartEpochMs: window.triggerWindowStartMs,
     };
 
     const baselineStatus = await probeStatusWithUnreachablePolicy({
@@ -128,7 +128,7 @@ export async function probeWaitHit(args: {
     const baselineLineValidation = readLineValidation(baselineJson);
     const baseline = parseProbeSnapshot(baselineRes.structuredContent);
     const baselineHitCount = baseline.hitCount ?? 0;
-    const baselineLastHitMs = baseline.lastHitMs ?? 0;
+    const baselineLastHitEpochMs = baseline.lastHitMs ?? 0;
 
     if (baselineLineValidation.invalidLineTarget) {
       return buildInvalidLineTargetResponse({
@@ -144,7 +144,7 @@ export async function probeWaitHit(args: {
     if (
       hasBaselineInlineHit({
         baselineHitCount,
-        baselineLastHitMs,
+        baselineLastHitMs: baselineLastHitEpochMs,
         triggerWindowStartMs: window.triggerWindowStartMs,
       })
     ) {
@@ -152,7 +152,7 @@ export async function probeWaitHit(args: {
         request: requestCtx,
         pollUrl,
         baselineHitCount,
-        baselineLastHitMs,
+        baselineLastHitEpochMs,
         lastStatus: (baselineJson ?? {}) as Record<string, unknown>,
       });
     }
@@ -172,7 +172,7 @@ export async function probeWaitHit(args: {
         return buildServiceUnreachableResponse({
           request: requestCtx,
           stage: "poll_status_check",
-          baseline: { hitCount: baselineHitCount, lastHitMs: baselineLastHitMs },
+          baseline: { hitCount: baselineHitCount, lastHitEpochMs: baselineLastHitEpochMs },
           details: polledStatus.details,
         });
       }
@@ -189,12 +189,12 @@ export async function probeWaitHit(args: {
           lineValidation: lineValidation.lineValidation ?? "invalid_line_target",
           lastStatus: json ?? null,
           runNotes: "probe_wait_for_hit invalid line target detected during poll",
-          baseline: { hitCount: baselineHitCount, lastHitMs: baselineLastHitMs },
+          baseline: { hitCount: baselineHitCount, lastHitEpochMs: baselineLastHitEpochMs },
         });
       }
 
       const hitCount = typeof json?.hitCount === "number" ? json.hitCount : null;
-      const lastHitMs =
+      const lastHitEpochMs =
         typeof json?.lastHitMs === "number"
           ? json.lastHitMs
           : typeof json?.lastHitEpochMs === "number"
@@ -203,13 +203,13 @@ export async function probeWaitHit(args: {
       if (hitCount !== null) {
         const hitDelta = hitCount - baselineHitCount;
         const inlineByCount = hitDelta > 0;
-        const inlineByTime = isInlineByTime(lastHitMs, window.triggerWindowStartMs);
+        const inlineByTime = isInlineByTime(lastHitEpochMs, window.triggerWindowStartMs);
         if (inlineByCount && inlineByTime) {
           return buildPolledInlineHitResponse({
             request: requestCtx,
             pollUrl,
             baselineHitCount,
-            baselineLastHitMs,
+            baselineLastHitEpochMs,
             hitCount,
             hitDelta,
             lastStatus: json ?? {},
@@ -219,7 +219,7 @@ export async function probeWaitHit(args: {
           staleCandidate = {
             hitCount,
             hitDelta,
-            lastHitMs,
+            lastHitEpochMs,
             reason: "hit_count_changed_but_not_inline_to_current_wait_window",
           };
         }

@@ -113,12 +113,13 @@ Deterministic contract policy:
 | `response` | Raw endpoint response after MCP normalization. | `probe_get_status` | true | `{"status":200,"json":{"hitCount":1}}` |
 | `response.json.contractVersion` | Probe contract marker. | `probe_get_status` | false | `"0.1.0"` |
 | `response.json.hitCount` | Probe hit counter for the line key. | `probe_get_status` | false | `1` |
-| `response.json.lastHitMs` | Last hit timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200000` |
+| `response.json.lastHitEpochMs` | Last hit Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200000` |
 | `response.json.lineValidation` | Line validation verdict (`resolvable` or `invalid_line_target`). | `probe_get_status` | false | `"resolvable"` |
 | `response.json.capturePreview` | Lightweight runtime payload preview from Java agent. | `probe_get_status` | false | `{"available":true,"captureId":"abc123"}` |
-| `response.json.capturePreview.capturedAtMs` | Capture preview timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200456` |
+| `response.json.capturePreview.capturedAtEpochMs` | Capture preview Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200456` |
+| `response.json.capturePreview.executionPaths` | Optional compact execution-path frames captured at runtime (`root...Class.method()#line`). | `probe_get_status` | false | `["com.example...catalog.web.CatalogController.listCatalogShoes()#42"]` |
 | `response.json.runtime` | Runtime actuation/observe mode payload. | `probe_get_status` | false | `{"mode":"observe"}` |
-| `response.json.runtime.serverMs` | JVM host wall-clock milliseconds at status response build time. | `probe_get_status` | false | `1739671200123` |
+| `response.json.runtime.serverEpochMs` | JVM host wall-clock Unix epoch milliseconds at status response build time. | `probe_get_status` | false | `1739671200123` |
 | `response.json.runtime.appPort.value` | Runtime application port hint when inferable (`null` when unknown). | `probe_get_status` | false | `8082` |
 | `response.json.runtime.appPort.source` | Source used to infer app port hint. | `probe_get_status` | false | `"system_property:server.port"` |
 | `result` | Guidance block when runtime alignment fails. | `probe_get_status` | false | `{"reason":"invalid_line_target","actionCode":"runtime_not_aligned"}` |
@@ -135,6 +136,7 @@ Deterministic contract policy:
 | `response` | Raw `/__probe/capture` HTTP response payload. | `probe_get_capture` | true | `{"status":200,"json":{"capture":{"captureId":"abc123"}}}` |
 | `result.found` | Whether capture payload exists and was returned. | `probe_get_capture` | true | `true` |
 | `result.capture` | Full stored capture payload when found. | `probe_get_capture` | false | `{"methodKey":"com.example.Catalog#save","args":[...]}` |
+| `result.capture.executionPaths` | Optional compact execution-path frames captured for the method invocation. | `probe_get_capture` | false | `["com.example...catalog.service.CatalogService.save()#88"]` |
 | `result.reason` | Error reason when capture is unavailable. | `probe_get_capture` | false | `"capture_not_found"` |
 
 ## probe_reset
@@ -154,12 +156,12 @@ Deterministic contract policy:
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
 | `request` | Polling request and retry configuration. | `probe_wait_for_hit` | true | `{"resolvedKey":"com.example.Catalog#save:88","maxRetries":1}` |
-| `request.waitStartMs` | Millisecond timestamp when current wait attempt started. | `probe_wait_for_hit` | false | `1773318672847` |
-| `request.waitStartIsoUtc` | ISO-8601 UTC timestamp for `waitStartMs`. | `probe_wait_for_hit` | false | `"2026-03-11T14:57:52.847Z"` |
-| `request.triggerWindowStartMs` | Reset-aware trigger window start used for strict inline classification. | `probe_wait_for_hit` | false | `1773318658526` |
-| `request.triggerWindowStartIsoUtc` | ISO-8601 UTC timestamp for `triggerWindowStartMs`. | `probe_wait_for_hit` | false | `"2026-03-11T14:57:38.526Z"` |
-| `request.triggerLeadMs` | Milliseconds between wait start and trigger window start (`waitStartMs - triggerWindowStartMs`). | `probe_wait_for_hit` | false | `14321` |
-| `baseline` | Baseline probe snapshot used for inline hit diffing. | `probe_wait_for_hit` | false | `{"hitCount":0,"lastHitMs":0}` |
+| `request.waitStartEpochMs` | Unix-epoch millisecond timestamp when current wait attempt started. | `probe_wait_for_hit` | false | `1773318672847` |
+| `request.waitStartIsoUtc` | ISO-8601 UTC timestamp for `waitStartEpochMs`. | `probe_wait_for_hit` | false | `"2026-03-11T14:57:52.847Z"` |
+| `request.triggerWindowStartEpochMs` | Reset-aware Unix-epoch start used for strict inline classification. | `probe_wait_for_hit` | false | `1773318658526` |
+| `request.triggerWindowStartIsoUtc` | ISO-8601 UTC timestamp for `triggerWindowStartEpochMs`. | `probe_wait_for_hit` | false | `"2026-03-11T14:57:38.526Z"` |
+| `request.triggerLeadMs` | Milliseconds between wait start and trigger window start (`waitStartEpochMs - triggerWindowStartEpochMs`). | `probe_wait_for_hit` | false | `14321` |
+| `baseline` | Baseline probe snapshot used for inline hit diffing. | `probe_wait_for_hit` | false | `{"hitCount":0,"lastHitEpochMs":0}` |
 | `result.hit` | Whether a hit was detected in current wait window. | `probe_wait_for_hit` | true | `true` |
 | `result.inline` | Whether detected hit is inline to current execution window. | `probe_wait_for_hit` | true | `true` |
 | `result.reason` | Failure reason when no inline hit is confirmed. | `probe_wait_for_hit` | false | `"timeout_no_inline_hit"` |

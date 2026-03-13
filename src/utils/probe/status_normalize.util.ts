@@ -14,9 +14,9 @@ export function readLineValidation(json: Record<string, unknown> | null): {
 
 function sanitizeRuntimeHints(runtime: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...runtime };
-  if (typeof out.serverEpochMs === "number") {
-    out.serverMs = out.serverEpochMs;
-    delete out.serverEpochMs;
+  if (typeof out.serverMs === "number" && typeof out.serverEpochMs !== "number") {
+    out.serverEpochMs = out.serverMs;
+    delete out.serverMs;
   }
   // Runtime applicationType is intentionally omitted from MCP status payloads.
   delete out.applicationType;
@@ -33,9 +33,12 @@ function sanitizeRuntimeHints(runtime: Record<string, unknown>): Record<string, 
 
 function sanitizeCapturePreview(capturePreview: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = { ...capturePreview };
-  if (typeof out.capturedAtEpochMs === "number") {
-    out.capturedAtMs = out.capturedAtEpochMs;
-    delete out.capturedAtEpochMs;
+  if (typeof out.capturedAtMs === "number" && typeof out.capturedAtEpochMs !== "number") {
+    out.capturedAtEpochMs = out.capturedAtMs;
+    delete out.capturedAtMs;
+  }
+  if (Array.isArray(out.executionPaths)) {
+    out.executionPaths = out.executionPaths.filter((value) => typeof value === "string");
   }
   return out;
 }
@@ -53,9 +56,9 @@ export function normalizeStatusJson(
       ? (raw.runtime as Record<string, unknown>)
       : null;
   const out: Record<string, unknown> = { ...probe };
-  if (typeof out.lastHitEpochMs === "number") {
-    out.lastHitMs = out.lastHitEpochMs;
-    delete out.lastHitEpochMs;
+  if (typeof out.lastHitMs === "number" && typeof out.lastHitEpochMs !== "number") {
+    out.lastHitEpochMs = out.lastHitMs;
+    delete out.lastHitMs;
   }
   if (typeof raw.contractVersion === "string") out.contractVersion = raw.contractVersion;
   if (typeof raw.capturePreview === "object" && raw.capturePreview !== null) {
@@ -74,9 +77,9 @@ export function normalizeStatusBatchRow(raw: Record<string, unknown>): Record<st
   const out: Record<string, unknown> = {
     ...(raw.probe as Record<string, unknown>),
   };
-  if (typeof out.lastHitEpochMs === "number") {
-    out.lastHitMs = out.lastHitEpochMs;
-    delete out.lastHitEpochMs;
+  if (typeof out.lastHitMs === "number" && typeof out.lastHitEpochMs !== "number") {
+    out.lastHitEpochMs = out.lastHitMs;
+    delete out.lastHitMs;
   }
   if (typeof raw.ok === "boolean") out.ok = raw.ok;
   if (typeof raw.capturePreview === "object" && raw.capturePreview !== null) {

@@ -47,6 +47,7 @@ Use this workflow for regression runs at controller scope, service scope, or who
    - `evidence`
    - `attemptedStrategies`
    - `synthesizerUsed`
+11. Prefer runtime-provided `capturePreview.executionPaths` / `probe_get_capture.capture.executionPaths` as call-path evidence when present; avoid heuristic reconstruction.
 
 ## Route Resolution (Probe-Capable Endpoints)
 
@@ -79,12 +80,50 @@ Always include:
 4. `Probe Coverage` (which endpoints were probe-verified vs HTTP-only)
 5. `Probe Verification`
 6. `Run Timing`:
-   - `runStartMs` (Unix ms)
-   - `runEndMs` (Unix ms)
-   - `runDurationMs` (`runEndMs - runStartMs`)
+   - `runStartEpochMs` (Unix epoch in milliseconds)
+   - `runEndEpochMs` (Unix epoch in milliseconds)
+   - `runDurationMs` (`runEndEpochMs - runStartEpochMs`)
    - optional human-readable UTC timestamps for operator readability
 7. `Synthesis Diagnostics` (aggregate reason/failure fields for blocked endpoints)
-8. `Repro Steps` (ordered, executable, numbered)
-9. `Cleanup`
-10. `Trust Note`
+8. `Runtime Evidence` (`capturePreview.executionPaths` and `probe_get_capture.capture.executionPaths` when available)
+9. `Repro Steps` (ordered, executable, numbered, per-recipe)
+10. `Cleanup`
+11. `Trust Note`
+
+## Repro Steps Format
+
+When writing `Repro Steps`, prioritize human actions over MCP internals:
+
+1. Start with the exact HTTP request(s) to send (method, URL, query/body, required headers).
+2. Include expected observable outcomes per step (HTTP code and key response checks).
+3. Keep steps directly runnable by a developer with curl/Postman/browser.
+4. Do not list MCP tool calls as the primary repro path.
+5. If needed, add a separate optional section named `Toolchain Steps` for MCP diagnostics.
+
+## Repro Steps Template (Per Recipe)
+
+Use this exact structure per recipe/endpoint when reporting execution movement:
+
+Recipe `<short-name-or-index>`
+
+1. Execute controller with this request:
+   - Method: `<HTTP_METHOD>`
+   - URL: `<BASE_URL><PATH>`
+   - Path Params: `<none | key=value, ...>`
+   - Query Params: `<none | key=value, ...>`
+   - Headers: `<none required | header list>`
+   - Body: `<none | JSON payload>`
+
+2. Execution reaches method:
+   - `<FQCN#controllerMethod>`
+
+3. Execution reaches method:
+   - `<FQCN#downstreamMethod>`
+
+4. Encounter this line:
+   - `<FQCN#method:line>`
+   - Branch/Condition: `<condition text>`
+   - Probe Verification: `<hit=true|false, inline=true|false, lineValidation=...>`
+
+When multiple endpoints are tested, create separate recipe blocks and repeat steps 1-4 inside each block.
 

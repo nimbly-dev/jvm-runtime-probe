@@ -1,5 +1,6 @@
 import { fetchJson } from "@/lib/http";
 import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "@/lib/safety";
+import type { ProbeCaptureRecordPayload } from "@/models/probe_runtime_capture.model";
 import type { ToolTextResponse } from "@/models/tool_response.model";
 import { joinUrl, probeUnreachableMessage } from "@/utils/probe.util";
 import { buildTextResponse } from "@/utils/probe/response_builders.util";
@@ -28,8 +29,13 @@ export async function probeCaptureGet(args: {
   const json = (res.json as Record<string, unknown> | null) ?? null;
   const capture =
     json && typeof json.capture === "object" && json.capture !== null
-      ? (json.capture as Record<string, unknown>)
+      ? ({ ...(json.capture as ProbeCaptureRecordPayload) } as ProbeCaptureRecordPayload)
       : null;
+  if (capture && Array.isArray(capture.executionPaths)) {
+    capture.executionPaths = capture.executionPaths.filter(
+      (value): value is string => typeof value === "string",
+    );
+  }
   const found = res.status >= 200 && res.status < 300 && capture !== null;
 
   const structuredContent: Record<string, unknown> = {

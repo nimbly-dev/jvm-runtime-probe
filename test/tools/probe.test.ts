@@ -83,6 +83,10 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
         available: true,
         captureId: "abc123",
         capturedAtEpochMs: 5555,
+        executionPaths: [
+          "com.example...catalog.web.CatalogController.listCatalogShoes()#42",
+          "com.example...catalog.service.CatalogService.listCatalogShoes()#101",
+        ],
       },
       runtime: {
         mode: "observe",
@@ -113,11 +117,15 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
     assert.equal(parsed.executionHit, "line_hit");
     assert.equal(out.structuredContent.response.json.contractVersion, "0.1.0");
     assert.equal(out.structuredContent.response.json.capturePreview.captureId, "abc123");
-    assert.equal(out.structuredContent.response.json.capturePreview.capturedAtMs, 5555);
-    assert.equal(out.structuredContent.response.json.capturePreview.capturedAtEpochMs, undefined);
+    assert.equal(out.structuredContent.response.json.capturePreview.capturedAtEpochMs, 5555);
+    assert.equal(out.structuredContent.response.json.capturePreview.capturedAtMs, undefined);
+    assert.deepEqual(out.structuredContent.response.json.capturePreview.executionPaths, [
+      "com.example...catalog.web.CatalogController.listCatalogShoes()#42",
+      "com.example...catalog.service.CatalogService.listCatalogShoes()#101",
+    ]);
     assert.equal(out.structuredContent.response.json.runtime.applicationType, undefined);
-    assert.equal(out.structuredContent.response.json.runtime.serverMs, 7777);
-    assert.equal(out.structuredContent.response.json.runtime.serverEpochMs, undefined);
+    assert.equal(out.structuredContent.response.json.runtime.serverEpochMs, 7777);
+    assert.equal(out.structuredContent.response.json.runtime.serverMs, undefined);
     assert.equal(out.structuredContent.response.json.runtime.appPort.value, 8082);
     assert.equal(out.structuredContent.response.json.runtime.appPort.confidence, undefined);
   });
@@ -321,8 +329,8 @@ test("probe_wait_for_hit emits minimal non-duplicative epoch fields", async () =
       });
       assert.equal(out.structuredContent.result.hit, true);
       assert.equal(out.structuredContent.result.inline, true);
-      assert.equal(out.structuredContent.request.waitStartMs, 2_000);
-      assert.equal(out.structuredContent.request.triggerWindowStartMs, 1_000);
+      assert.equal(out.structuredContent.request.waitStartEpochMs, 2_000);
+      assert.equal(out.structuredContent.request.triggerWindowStartEpochMs, 1_000);
       assert.equal(out.structuredContent.request.inlineStartEpochMs, undefined);
       assert.equal(out.structuredContent.request.lastResetEpochMs, undefined);
     });
@@ -351,6 +359,7 @@ test("probe_get_status remains backward-compatible when line validation fields a
     const parsed = parseProbeText(out);
     assert.equal(parsed.reproStatus, "status_checked");
     assert.equal(parsed.executionHit, "not_hit");
+    assert.equal(out.structuredContent.response.json.capturePreview, undefined);
   });
 });
 
@@ -418,6 +427,7 @@ test("probe_get_status supports 0.1.0 batch rows with nested probe payload", asy
             available: true,
             captureId: "cap-1",
             capturedAtEpochMs: 4444,
+            executionPaths: ["com.example...catalog.web.CatalogController.listCatalogShoes()#42"],
           },
           runtime: {
             mode: "observe",
@@ -449,15 +459,18 @@ test("probe_get_status supports 0.1.0 batch rows with nested probe payload", asy
     const results = parsed.results as Array<Record<string, unknown>>;
     const first = results[0];
     if (!first) throw new Error("expected first batch row");
-    assert.equal(first.probeHit, "hitCount=3, lastHitMs=2222");
+    assert.equal(first.probeHit, "hitCount=3, lastHitEpochMs=2222");
     assert.equal(first.runtimeMode, "observe");
     assert.equal((first as any).capturePreview.captureId, "cap-1");
-    assert.equal((first as any).capturePreview.capturedAtMs, 4444);
-    assert.equal((first as any).capturePreview.capturedAtEpochMs, undefined);
+    assert.equal((first as any).capturePreview.capturedAtEpochMs, 4444);
+    assert.equal((first as any).capturePreview.capturedAtMs, undefined);
+    assert.deepEqual((first as any).capturePreview.executionPaths, [
+      "com.example...catalog.web.CatalogController.listCatalogShoes()#42",
+    ]);
     const responseRows = (out.structuredContent.response.json as any).results;
-    assert.equal(responseRows[0].lastHitMs, 2222);
-    assert.equal(responseRows[0].runtime.serverMs, 3333);
-    assert.equal(responseRows[0].runtime.serverEpochMs, undefined);
+    assert.equal(responseRows[0].lastHitEpochMs, 2222);
+    assert.equal(responseRows[0].runtime.serverEpochMs, 3333);
+    assert.equal(responseRows[0].runtime.serverMs, undefined);
     assert.equal(responseRows[0].runtime.applicationType, undefined);
     assert.equal(responseRows[0].runtime.appPort.value, 8082);
     assert.equal(responseRows[0].runtime.appPort.confidence, undefined);
@@ -477,6 +490,7 @@ test("probe_get_capture returns capture payload when available", async () => {
         returnValue: { value: "{\"ok\":true}", truncated: false, originalLength: 11, redacted: false },
         thrownValue: null,
         truncatedAny: false,
+        executionPaths: ["com.example...catalog.core.repository.CatalogRepo.save()#88"],
       },
     });
   }, async () => {
@@ -487,6 +501,9 @@ test("probe_get_capture returns capture payload when available", async () => {
     });
     assert.equal(out.structuredContent.result.found, true);
     assert.equal(out.structuredContent.result.capture.captureId, "abc123");
+    assert.deepEqual(out.structuredContent.result.capture.executionPaths, [
+      "com.example...catalog.core.repository.CatalogRepo.save()#88",
+    ]);
   });
 });
 

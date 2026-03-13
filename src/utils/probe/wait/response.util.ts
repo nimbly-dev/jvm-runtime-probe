@@ -19,14 +19,14 @@ type WaitRequestArgs = {
   unreachableRetryEnabled: boolean;
   unreachableMaxRetries: number;
   attempt: number;
-  waitStartMs: number;
-  triggerWindowStartMs: number;
+  waitStartEpochMs: number;
+  triggerWindowStartEpochMs: number;
 };
 
 type WaitStage = "baseline_status_check" | "poll_status_check";
 
 function buildWaitRequest(args: WaitRequestArgs, options?: { includeUnreachable?: boolean; stage?: WaitStage }) {
-  const triggerLeadMs = Math.max(0, args.waitStartMs - args.triggerWindowStartMs);
+  const triggerLeadMs = Math.max(0, args.waitStartEpochMs - args.triggerWindowStartEpochMs);
   const request: Record<string, unknown> = {
     key: args.key,
     resolvedKey: args.resolvedKey,
@@ -34,10 +34,10 @@ function buildWaitRequest(args: WaitRequestArgs, options?: { includeUnreachable?
     pollIntervalMs: args.pollIntervalMs,
     maxRetries: args.maxRetries,
     attempt: args.attempt,
-    waitStartMs: args.waitStartMs,
-    waitStartIsoUtc: new Date(args.waitStartMs).toISOString(),
-    triggerWindowStartMs: args.triggerWindowStartMs,
-    triggerWindowStartIsoUtc: new Date(args.triggerWindowStartMs).toISOString(),
+    waitStartEpochMs: args.waitStartEpochMs,
+    waitStartIsoUtc: new Date(args.waitStartEpochMs).toISOString(),
+    triggerWindowStartEpochMs: args.triggerWindowStartEpochMs,
+    triggerWindowStartIsoUtc: new Date(args.triggerWindowStartEpochMs).toISOString(),
     triggerLeadMs,
   };
   if (options?.includeUnreachable) {
@@ -52,7 +52,7 @@ export function buildServiceUnreachableResponse(args: {
   request: WaitRequestArgs;
   stage: WaitStage;
   details: ProbeStatusUnreachableDetails;
-  baseline?: { hitCount: number; lastHitMs: number };
+  baseline?: { hitCount: number; lastHitEpochMs: number };
 }): ToolTextResponse {
   const structuredContent: Record<string, unknown> = {
     request: buildWaitRequest(args.request, { includeUnreachable: true, stage: args.stage }),
@@ -72,7 +72,7 @@ export function buildServiceUnreachableResponse(args: {
   if (args.baseline) {
     structuredContent.baseline = {
       hitCount: args.baseline.hitCount,
-      lastHitMs: args.baseline.lastHitMs,
+      lastHitEpochMs: args.baseline.lastHitEpochMs,
     };
   }
   const text = formatProbeOutput({
@@ -98,7 +98,7 @@ export function buildServiceUnreachableResponse(args: {
     httpResponse: structuredContent.result,
     actionCode: GUIDANCE_PROBE_CONNECTIVITY_ISSUE.actionCode,
     nextAction: GUIDANCE_PROBE_CONNECTIVITY_ISSUE.nextAction,
-    runDuration: `${Date.now() - args.request.waitStartMs}ms`,
+    runDuration: `${Date.now() - args.request.waitStartEpochMs}ms`,
     runNotes: `probe_wait_for_hit service unreachable during ${args.stage}`,
   });
   return buildTextResponse(structuredContent, text);
@@ -111,7 +111,7 @@ export function buildInvalidLineTargetResponse(args: {
   lineValidation: string;
   lastStatus: Record<string, unknown> | null;
   runNotes: string;
-  baseline?: { hitCount: number; lastHitMs: number };
+  baseline?: { hitCount: number; lastHitEpochMs: number };
 }): ToolTextResponse {
   const structuredContent: Record<string, unknown> = {
     request: buildWaitRequest(args.request, { includeUnreachable: true }),
@@ -128,7 +128,7 @@ export function buildInvalidLineTargetResponse(args: {
   if (args.baseline) {
     structuredContent.baseline = {
       hitCount: args.baseline.hitCount,
-      lastHitMs: args.baseline.lastHitMs,
+      lastHitEpochMs: args.baseline.lastHitEpochMs,
     };
   }
   const text = formatProbeOutput({
@@ -151,7 +151,7 @@ export function buildInvalidLineTargetResponse(args: {
     httpCode: 422,
     httpResponse: structuredContent.result,
     runtimeMode: typeof args.lastStatus?.mode === "string" ? args.lastStatus.mode : undefined,
-    runDuration: `${Date.now() - args.request.waitStartMs}ms`,
+    runDuration: `${Date.now() - args.request.waitStartEpochMs}ms`,
     runNotes: args.runNotes,
   });
   return buildTextResponse(structuredContent, text);
@@ -161,12 +161,12 @@ export function buildBaselineInlineHitResponse(args: {
   request: WaitRequestArgs;
   pollUrl: string;
   baselineHitCount: number;
-  baselineLastHitMs: number;
+  baselineLastHitEpochMs: number;
   lastStatus: Record<string, unknown>;
 }): ToolTextResponse {
   const structuredContent: Record<string, unknown> = {
     request: buildWaitRequest(args.request),
-    baseline: { hitCount: args.baselineHitCount, lastHitMs: args.baselineLastHitMs },
+    baseline: { hitCount: args.baselineHitCount, lastHitEpochMs: args.baselineLastHitEpochMs },
     result: {
       hit: true,
       inline: true,
@@ -194,7 +194,7 @@ export function buildBaselineInlineHitResponse(args: {
     httpCode: 200,
     httpResponse: structuredContent.result,
     runtimeMode: typeof args.lastStatus.mode === "string" ? args.lastStatus.mode : undefined,
-    runDuration: `${Date.now() - args.request.waitStartMs}ms`,
+    runDuration: `${Date.now() - args.request.waitStartEpochMs}ms`,
     runNotes: "probe_wait_for_hit detected baseline inline hit",
   });
   return buildTextResponse(structuredContent, text);
@@ -204,14 +204,14 @@ export function buildPolledInlineHitResponse(args: {
   request: WaitRequestArgs;
   pollUrl: string;
   baselineHitCount: number;
-  baselineLastHitMs: number;
+  baselineLastHitEpochMs: number;
   hitCount: number;
   hitDelta: number;
   lastStatus: Record<string, unknown>;
 }): ToolTextResponse {
   const structuredContent: Record<string, unknown> = {
     request: buildWaitRequest(args.request, { includeUnreachable: true }),
-    baseline: { hitCount: args.baselineHitCount, lastHitMs: args.baselineLastHitMs },
+    baseline: { hitCount: args.baselineHitCount, lastHitEpochMs: args.baselineLastHitEpochMs },
     result: { hit: true, inline: true, hitCount: args.hitCount, hitDelta: args.hitDelta, lastStatus: args.lastStatus },
   };
   const text = formatProbeOutput({
@@ -232,7 +232,7 @@ export function buildPolledInlineHitResponse(args: {
     httpCode: 200,
     httpResponse: structuredContent.result,
     runtimeMode: typeof args.lastStatus.mode === "string" ? args.lastStatus.mode : undefined,
-    runDuration: `${Date.now() - args.request.waitStartMs}ms`,
+    runDuration: `${Date.now() - args.request.waitStartEpochMs}ms`,
     runNotes: "probe_wait_for_hit detected inline hit during poll",
   });
   return buildTextResponse(structuredContent, text);
