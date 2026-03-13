@@ -13,6 +13,11 @@ Deterministic contract policy:
 - Orchestration decisions must use deterministic fields (`resultType`, `status`, `reasonCode`, `failedStep`, `nextAction`).
 - Confidence/heuristic scores are not part of the public MCP output contract.
 
+Text vs structured content policy (probe tools):
+- `structuredContent` is the canonical machine-readable payload and remains the source of truth.
+- `content[0].text` is intentionally compact for context efficiency and may omit large diagnostic bodies.
+- For full capture/status/reset details, parse `structuredContent` instead of relying on text mirrors.
+
 ## debug_check
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
@@ -116,6 +121,9 @@ Deterministic contract policy:
 | `response.json.lastHitEpochMs` | Last hit Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200000` |
 | `response.json.lineValidation` | Line validation verdict (`resolvable` or `invalid_line_target`). | `probe_get_status` | false | `"resolvable"` |
 | `response.json.capturePreview` | Lightweight runtime payload preview from Java agent. | `probe_get_status` | false | `{"available":true,"captureId":"abc123"}` |
+| `response.json.capturePreview.argsPreview` | Preview argument metadata only (`index`, `truncated`, `originalLength`, `redacted`), intentionally excludes serialized values. | `probe_get_status` | false | `[{"index":0,"truncated":false,"originalLength":12,"redacted":false}]` |
+| `response.json.capturePreview.returnPreview` | Preview return metadata only (`truncated`, `originalLength`, `redacted`), intentionally excludes serialized value body. | `probe_get_status` | false | `{"truncated":false,"originalLength":896,"redacted":false}` |
+| `response.json.capturePreview.thrownPreview` | Preview thrown-value metadata only (`truncated`, `originalLength`, `redacted`) when an exception is captured. | `probe_get_status` | false | `null` |
 | `response.json.capturePreview.capturedAtEpochMs` | Capture preview Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200456` |
 | `response.json.capturePreview.executionPaths` | Optional compact execution-path frames captured at runtime (`root...Class.method()#line`). | `probe_get_status` | false | `["com.example...catalog.web.CatalogController.listCatalogShoes()#42"]` |
 | `response.json.runtime` | Runtime actuation/observe mode payload. | `probe_get_status` | false | `{"mode":"observe"}` |

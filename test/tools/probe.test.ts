@@ -62,6 +62,9 @@ test("probe_get_status returns invalid_line_target for unresolved runtime line",
     assert.match(parsed.probeHit, /cannot be resolved to executable bytecode/i);
     assert.equal(parsed.actionCode, "runtime_not_aligned");
     assert.equal(parsed.nextAction, "rebuild_app_artifact_and_restart_jvm_then_rerun_probe");
+    assert.equal((parsed as any).httpResponse, undefined);
+    assert.equal((parsed as any).requestDetails?.headers, undefined);
+    assert.equal((parsed as any).requestDetails?.body, undefined);
     assert.equal(out.structuredContent.response.json.lineValidation, "invalid_line_target");
     assert.equal(out.structuredContent.result.actionCode, "runtime_not_aligned");
   });
@@ -115,6 +118,9 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
     const parsed = parseProbeText(out);
     assert.equal(parsed.reproStatus, "status_checked");
     assert.equal(parsed.executionHit, "line_hit");
+    assert.equal((parsed as any).httpResponse, undefined);
+    assert.equal((parsed as any).requestDetails?.headers, undefined);
+    assert.equal((parsed as any).requestDetails?.body, undefined);
     assert.equal(out.structuredContent.response.json.contractVersion, "0.1.0");
     assert.equal(out.structuredContent.response.json.capturePreview.captureId, "abc123");
     assert.equal(out.structuredContent.response.json.capturePreview.capturedAtEpochMs, 5555);
@@ -180,6 +186,7 @@ test("probe_wait_for_hit exits immediately for invalid_line_target", async () =>
     assert.equal(parsed.httpCode, 422);
     assert.equal(parsed.actionCode, "runtime_not_aligned");
     assert.equal(parsed.nextAction, "rebuild_app_artifact_and_restart_jvm_then_rerun_probe");
+    assert.equal((parsed as any).httpResponse, undefined);
     assert.equal(out.structuredContent.result.reason, "invalid_line_target");
     assert.equal(out.structuredContent.result.actionCode, "runtime_not_aligned");
   });
@@ -400,6 +407,13 @@ test("probe_get_status supports keys[] batch with partial success semantics", as
     assert.equal(summary.total, 2);
     assert.equal(summary.ok, 1);
     assert.equal(summary.failed, 1);
+    const failures = parsed.failures as Array<Record<string, unknown>>;
+    assert.equal(Array.isArray(failures), true);
+    assert.equal(failures.length, 1);
+    const firstFailure = failures[0];
+    if (!firstFailure) throw new Error("expected first failure row");
+    assert.equal(firstFailure.key, nonLineKey);
+    assert.equal(firstFailure.reproStatus, "line_key_required");
   });
 
   assert.equal(calls, 1);
@@ -456,17 +470,10 @@ test("probe_get_status supports 0.1.0 batch rows with nested probe payload", asy
       statusPath: "/__probe/status",
     });
     const parsed = parseProbeText(out);
-    const results = parsed.results as Array<Record<string, unknown>>;
-    const first = results[0];
-    if (!first) throw new Error("expected first batch row");
-    assert.equal(first.probeHit, "hitCount=3, lastHitEpochMs=2222");
-    assert.equal(first.runtimeMode, "observe");
-    assert.equal((first as any).capturePreview.captureId, "cap-1");
-    assert.equal((first as any).capturePreview.capturedAtEpochMs, 4444);
-    assert.equal((first as any).capturePreview.capturedAtMs, undefined);
-    assert.deepEqual((first as any).capturePreview.executionPaths, [
-      "com.example...catalog.web.CatalogController.listCatalogShoes()#42",
-    ]);
+    const failures = parsed.failures as Array<Record<string, unknown>>;
+    assert.equal(Array.isArray(failures), true);
+    assert.deepEqual(failures, []);
+    assert.equal(parsed.notes, "Use structuredContent.results for full per-key payload.");
     const responseRows = (out.structuredContent.response.json as any).results;
     assert.equal(responseRows[0].lastHitEpochMs, 2222);
     assert.equal(responseRows[0].runtime.serverEpochMs, 3333);
@@ -499,6 +506,14 @@ test("probe_get_capture returns capture payload when available", async () => {
       baseUrl: "http://127.0.0.1:9191",
       capturePath: "/__probe/capture",
     });
+    const parsed = parseProbeText(out);
+    assert.equal(parsed.mode, "probe_get_capture");
+    assert.equal((parsed as any).result.found, true);
+    assert.equal((parsed as any).result.captureId, "abc123");
+    assert.equal((parsed as any).result.argsCount, 1);
+    assert.equal((parsed as any).result.executionPathCount, 1);
+    assert.equal((parsed as any).result.capture, undefined);
+    assert.equal(parsed.notes, "Use structuredContent.result.capture for full payload.");
     assert.equal(out.structuredContent.result.found, true);
     assert.equal(out.structuredContent.result.capture.captureId, "abc123");
     assert.deepEqual(out.structuredContent.result.capture.executionPaths, [
@@ -520,6 +535,10 @@ test("probe_get_capture returns not found state when capture is missing", async 
       baseUrl: "http://127.0.0.1:9191",
       capturePath: "/__probe/capture",
     });
+    const parsed = parseProbeText(out);
+    assert.equal(parsed.mode, "probe_get_capture");
+    assert.equal((parsed as any).result.found, false);
+    assert.equal((parsed as any).result.reason, "capture_not_found");
     assert.equal(out.structuredContent.result.found, false);
     assert.equal(out.structuredContent.result.reason, "capture_not_found");
   });
@@ -567,8 +586,8 @@ test("probe_reset supports keys[] batch with partial success semantics", async (
     assert.equal(summary.total, 3);
     assert.equal(summary.ok, 1);
     assert.equal(summary.failed, 2);
-    const results = parsed.results as Array<Record<string, unknown>>;
-    const invalidRow = results.find((row) => row.key === invalidLineKey);
+    const failures = parsed.failures as Array<Record<string, unknown>>;
+    const invalidRow = failures.find((row) => row.key === invalidLineKey);
     if (!invalidRow) throw new Error("expected invalid line row in batch response");
     assert.equal(invalidRow.apiOutcome, "error");
     assert.equal(invalidRow.reproStatus, "invalid_line_target");
@@ -598,12 +617,12 @@ test("probe_reset supports className selector and class_not_found no-op response
     });
     const parsed = parseProbeText(out);
     const summary = parsed.summary as Record<string, unknown>;
-    const response = parsed.response as Record<string, unknown>;
-    const responseJson = response.json as Record<string, unknown>;
     assert.equal(parsed.mode, "probe_batch");
     assert.equal(parsed.operation, "reset");
     assert.equal(summary.total, 0);
-    assert.equal(responseJson.reason, "class_not_found");
+    const failures = parsed.failures as Array<Record<string, unknown>>;
+    assert.deepEqual(failures, []);
+    assert.equal((out.structuredContent.response.json as any).reason, "class_not_found");
   });
   assert.equal(calls, 1);
 });

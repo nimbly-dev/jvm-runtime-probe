@@ -35,21 +35,22 @@ Use this workflow only for strict one-line verification runs.
    - avoid depending on verbose instruction text.
 8. Route only by deterministic contract fields (`resultType`, `status`, `reasonCode`, `failedStep`).
 9. Never use or request confidence/heuristic scoring for routing decisions.
-10. On report outputs, always capture synthesis diagnostics:
+10. Probe tool outputs use compact text summaries; treat `structuredContent` as canonical for full payload details.
+11. On report outputs, always capture synthesis diagnostics:
    - `reasonCode`
    - `failedStep`
    - `evidence`
    - `attemptedStrategies`
    - `synthesizerUsed`
-11. Resolve route dynamically from runtime candidates.
-12. Validate exactly one route using:
+12. Resolve route dynamically from runtime candidates.
+13. Validate exactly one route using:
    - probe reachability
    - API reachability
    - strict target alignment (`Class#method:line` resolvability or class-scoped line discovery)
-13. When capture preview is available, use `capturePreview.executionPaths` as runtime evidence; do not re-derive call paths heuristically.
-14. Execute probe flow:
+14. When capture preview is available, use `capturePreview.executionPaths` as runtime evidence; do not re-derive call paths heuristically.
+15. Execute probe flow:
    - `probe_reset` -> trigger HTTP request -> `probe_wait_for_hit` / `probe_get_status`
-15. Cleanup (disable actuation when used).
+16. Cleanup (disable actuation when used).
 
 ## Route Pushback
 

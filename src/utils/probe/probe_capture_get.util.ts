@@ -59,8 +59,25 @@ export async function probeCaptureGet(args: {
   const textPayload = {
     mode: "probe_get_capture",
     request: structuredContent.request,
-    response: structuredContent.response,
-    result: structuredContent.result,
+    response: {
+      status: res.status,
+    },
+    result: found
+      ? {
+          found: true,
+          captureId: capture?.captureId,
+          methodKey: capture?.methodKey,
+          capturedAtEpochMs: capture?.capturedAtEpochMs,
+          argsCount: Array.isArray(capture?.args) ? capture.args.length : 0,
+          hasReturnValue: capture?.returnValue != null,
+          hasThrownValue: capture?.thrownValue != null,
+          executionPathCount: Array.isArray(capture?.executionPaths) ? capture.executionPaths.length : 0,
+        }
+      : {
+          found: false,
+          reason: typeof json?.error === "string" ? json.error : "capture_unavailable",
+        },
+    notes: "Use structuredContent.result.capture for full payload.",
   };
   return buildTextResponse(structuredContent, JSON.stringify(textPayload, null, 2));
 }

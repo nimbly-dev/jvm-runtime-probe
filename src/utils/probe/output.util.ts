@@ -61,12 +61,9 @@ export function formatProbeOutput(args: {
       requestDetails: {
         method: requestMethod,
         url: requestUrl,
-        headers: args.requestHeaders ?? {},
-        body: typeof args.requestBody === "undefined" ? null : args.requestBody,
       },
       responseDetails: {
         code: args.httpCode,
-        ...(args.mirrorHttpResponseInResponseDetails ? { body: args.httpResponse } : {}),
       },
       targetKey: args.probeKey,
       executionHit: args.executionHit,
@@ -81,7 +78,6 @@ export function formatProbeOutput(args: {
         warning: syntheticWarning ?? null,
       },
       httpCode: args.httpCode,
-      httpResponse: args.httpResponse,
       runDuration: args.runDuration,
       notes: toText(args.runNotes, "-"),
     },

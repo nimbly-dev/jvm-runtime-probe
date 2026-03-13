@@ -41,13 +41,14 @@ Use this workflow for regression runs at controller scope, service scope, or who
    - avoid depending on verbose instruction text.
 8. Route only by deterministic contract fields (`resultType`, `status`, `reasonCode`, `failedStep`).
 9. Never use confidence/heuristic scoring for routing decisions.
-10. Capture and propagate synthesis diagnostics for every fail-closed report:
+10. Probe tool outputs use compact text summaries; treat `structuredContent` as canonical for full payload details.
+11. Capture and propagate synthesis diagnostics for every fail-closed report:
    - `reasonCode`
    - `failedStep`
    - `evidence`
    - `attemptedStrategies`
    - `synthesizerUsed`
-11. Prefer runtime-provided `capturePreview.executionPaths` / `probe_get_capture.capture.executionPaths` as call-path evidence when present; avoid heuristic reconstruction.
+12. Prefer runtime-provided `capturePreview.executionPaths` / `probe_get_capture.capture.executionPaths` as call-path evidence when present; avoid heuristic reconstruction.
 
 ## Route Resolution (Probe-Capable Endpoints)
 

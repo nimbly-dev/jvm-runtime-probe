@@ -54,10 +54,34 @@ function buildBatchSummary(results: Array<{ apiOutcome: string }>): {
   return { total: results.length, ok, failed: results.length - ok };
 }
 
+type BatchResultRow = Record<string, unknown> & { apiOutcome: string };
+
+function summarizeBatchRequest(request: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (typeof request.url === "string") out.url = request.url;
+  if (typeof request.timeoutMs === "number") out.timeoutMs = request.timeoutMs;
+  if (Array.isArray(request.keys)) out.keyCount = request.keys.length;
+  if (typeof request.className === "string") out.className = request.className;
+  return out;
+}
+
+function summarizeBatchResults(results: BatchResultRow[]): Array<Record<string, unknown>> {
+  const failed = results.filter((row) => row.apiOutcome !== "ok");
+  return failed.slice(0, 10).map((row) => {
+    const summary: Record<string, unknown> = {};
+    if (typeof row.key === "string") summary.key = row.key;
+    summary.apiOutcome = row.apiOutcome;
+    if (typeof row.reproStatus === "string") summary.reproStatus = row.reproStatus;
+    if (typeof row.actionCode === "string") summary.actionCode = row.actionCode;
+    if (typeof row.nextAction === "string") summary.nextAction = row.nextAction;
+    return summary;
+  });
+}
+
 export function buildBatchResponse(args: {
   operation: "status" | "reset";
   request: Record<string, unknown>;
-  results: Array<Record<string, unknown> & { apiOutcome: string }>;
+  results: Array<BatchResultRow>;
   response?: unknown;
 }): ToolTextResponse {
   const summary = buildBatchSummary(args.results);
@@ -69,5 +93,13 @@ export function buildBatchResponse(args: {
     results: args.results,
     ...(typeof args.response !== "undefined" ? { response: args.response } : {}),
   };
-  return buildTextResponse(payload, JSON.stringify(payload, null, 2));
+  const compactTextPayload = {
+    mode: "probe_batch",
+    operation: args.operation,
+    request: summarizeBatchRequest(args.request),
+    summary,
+    failures: summarizeBatchResults(args.results),
+    notes: "Use structuredContent.results for full per-key payload.",
+  };
+  return buildTextResponse(payload, JSON.stringify(compactTextPayload, null, 2));
 }

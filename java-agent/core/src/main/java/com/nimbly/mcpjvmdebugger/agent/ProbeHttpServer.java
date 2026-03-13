@@ -285,9 +285,9 @@ final class ProbeHttpServer {
         + "\"methodKey\":\"" + esc(preview.methodKey) + "\","
         + "\"capturedAtEpochMs\":" + preview.capturedAtEpochMs + ","
         + "\"redactionMode\":\"" + esc(preview.redactionMode) + "\","
-        + "\"argsPreview\":" + buildCaptureValuesJson(preview.argsPreview) + ","
-        + "\"returnPreview\":" + buildNullableCaptureValueJson(preview.returnPreview) + ","
-        + "\"thrownPreview\":" + buildNullableCaptureValueJson(preview.thrownPreview) + ","
+        + "\"argsPreview\":" + buildCaptureValuesMetaJson(preview.argsPreview) + ","
+        + "\"returnPreview\":" + buildNullableCaptureValueMetaJson(preview.returnPreview) + ","
+        + "\"thrownPreview\":" + buildNullableCaptureValueMetaJson(preview.thrownPreview) + ","
         + "\"truncatedAny\":" + preview.truncatedAny + ","
         + "\"executionPaths\":" + buildStringArrayJson(preview.executionPaths)
         + "}";
@@ -349,6 +349,18 @@ final class ProbeHttpServer {
     return "[" + String.join(",", rows) + "]";
   }
 
+  private static String buildCaptureValuesMetaJson(List<ProbeRuntime.CaptureValueView> values) {
+    if (values == null || values.isEmpty()) return "[]";
+    List<String> rows = new ArrayList<>();
+    for (int i = 0; i < values.size(); i++) {
+      rows.add("{"
+          + "\"index\":" + i + ","
+          + buildCaptureValueMetaBodyJson(values.get(i))
+          + "}");
+    }
+    return "[" + String.join(",", rows) + "]";
+  }
+
   private static String buildStringArrayJson(List<String> values) {
     if (values == null || values.isEmpty()) return "[]";
     List<String> rows = new ArrayList<>();
@@ -363,9 +375,20 @@ final class ProbeHttpServer {
     return "{" + buildCaptureValueBodyJson(value) + "}";
   }
 
+  private static String buildNullableCaptureValueMetaJson(ProbeRuntime.CaptureValueView value) {
+    if (value == null) return "null";
+    return "{" + buildCaptureValueMetaBodyJson(value) + "}";
+  }
+
   private static String buildCaptureValueBodyJson(ProbeRuntime.CaptureValueView value) {
     return "\"value\":\"" + esc(value.value) + "\","
         + "\"truncated\":" + value.truncated + ","
+        + "\"originalLength\":" + value.originalLength + ","
+        + "\"redacted\":" + value.redacted;
+  }
+
+  private static String buildCaptureValueMetaBodyJson(ProbeRuntime.CaptureValueView value) {
+    return "\"truncated\":" + value.truncated + ","
         + "\"originalLength\":" + value.originalLength + ","
         + "\"redacted\":" + value.redacted;
   }
