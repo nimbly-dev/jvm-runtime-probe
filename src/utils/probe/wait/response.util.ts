@@ -27,9 +27,12 @@ type WaitStage = "baseline_status_check" | "poll_status_check";
 
 function buildWaitRequest(args: WaitRequestArgs, options?: { includeUnreachable?: boolean; stage?: WaitStage }) {
   const triggerLeadMs = Math.max(0, args.waitStartEpochMs - args.triggerWindowStartEpochMs);
+  const keyFields =
+    args.key === args.resolvedKey
+      ? { key: args.resolvedKey }
+      : { key: args.key, resolvedKey: args.resolvedKey };
   const request: Record<string, unknown> = {
-    ...(args.key !== args.resolvedKey ? { key: args.key } : {}),
-    resolvedKey: args.resolvedKey,
+    ...keyFields,
     timeoutMs: args.timeoutMs,
     pollIntervalMs: args.pollIntervalMs,
     maxRetries: args.maxRetries,
@@ -250,10 +253,13 @@ export function buildTimeoutNoInlineHitResponse(args: {
   last: Record<string, unknown> | null;
   staleCandidate: Record<string, unknown> | undefined;
 }): ToolTextResponse {
+  const keyFields =
+    args.key === args.resolvedKey
+      ? { key: args.resolvedKey }
+      : { key: args.key, resolvedKey: args.resolvedKey };
   const structuredContent: Record<string, unknown> = {
     request: {
-      ...(args.key !== args.resolvedKey ? { key: args.key } : {}),
-      resolvedKey: args.resolvedKey,
+      ...keyFields,
       timeoutMs: args.timeoutMs,
       pollIntervalMs: args.pollIntervalMs,
       maxRetries: args.maxRetries,

@@ -15,11 +15,22 @@ Use this workflow for regression runs at controller scope, service scope, or who
 
 ## MCP-First Requirement
 
-1. Mandatory tools: `project_context_validate`, `probe_recipe_create` (per endpoint or representative target), plus probe tools when probe verification is requested/available.
+1. Mandatory tools: `probe_check`, `project_context_validate`, `probe_recipe_create` (per endpoint or representative target), plus probe tools when probe verification is requested/available.
 2. If MCP toolchain is unavailable, stop immediately and return:
    - `reasonCode=toolchain_unavailable`
    - `nextAction=enable_mcp_jvm_debugger_tools_then_rerun`
 3. Never fallback to direct `curl`/raw HTTP-only execution.
+4. If synthesis fails but MCP probe tools are healthy, continue with manual probe-verified execution using gathered missing inputs.
+
+## Environment Discovery
+
+At run start, discover and persist once:
+
+1. API base URL (or host/port).
+2. Probe base URL (or host/port).
+3. Optional `apiBasePath`.
+4. Auth requirement/token only if needed.
+5. Validate probe base with `probe_check` before endpoint loop.
 
 ## Probe Policy
 
@@ -34,7 +45,10 @@ Use this workflow for regression runs at controller scope, service scope, or who
 3. Runtime synthesis scope is runtime-only (`src/main/java` + generated-main roots); test sources are excluded.
 4. Pass `apiBasePath` when runtime uses a context path (for example `/api/v1`).
 5. Prompt for context path at most once per run, then reuse the same `apiBasePath` value for all endpoints in that run.
-6. If `probe_recipe_create` returns `resultType=report`, stop endpoint execution for that route unless report indicates only missing user input.
+6. If `probe_recipe_create` returns `resultType=report`, do not hard-stop the whole run:
+   - keep fail-closed diagnostics for that endpoint
+   - gather only missing execution inputs
+   - continue endpoint with manual probe-verified flow when feasible.
 7. In report mode, prefer compact execution metadata:
    - `executionPlan.routingReason` (code)
    - `executionPlan.steps[].actionCode` (code)
@@ -70,6 +84,20 @@ Use this workflow for regression runs at controller scope, service scope, or who
    - `evidence`
    - `nextAction`
    - `Repro Steps`
+
+## Fallback: Manual Endpoint Continuation
+
+When auto-inference fails for an endpoint:
+
+1. Collect missing context once:
+   - HTTP method/path
+   - query/body shape
+   - auth token if required.
+2. Execute endpoint with probe verification:
+   - `probe_reset`
+   - trigger HTTP request
+   - `probe_wait_for_hit` or `probe_get_status`.
+3. Record deterministic per-endpoint outcome; continue remaining endpoints.
 
 ## Required Human Run Summary
 

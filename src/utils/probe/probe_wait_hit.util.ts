@@ -36,9 +36,12 @@ function buildSelectorRequest(args: {
   unreachableRetryEnabled: boolean;
   unreachableMaxRetries: number;
 }): Record<string, unknown> {
+  const keyFields =
+    args.key === args.resolvedKey
+      ? { key: args.resolvedKey }
+      : { key: args.key, resolvedKey: args.resolvedKey };
   return {
-    key: args.key,
-    resolvedKey: args.resolvedKey,
+    ...keyFields,
     timeoutMs: args.timeoutMs,
     pollIntervalMs: args.pollIntervalMs,
     maxRetries: args.maxRetries,

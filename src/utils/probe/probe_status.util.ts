@@ -30,9 +30,12 @@ function buildSelectorRequest(args: {
   timeoutMs: number;
   url?: string;
 }): Record<string, unknown> {
+  const keyFields =
+    args.key === args.resolvedKey
+      ? { key: args.resolvedKey }
+      : { key: args.key, resolvedKey: args.resolvedKey };
   return {
-    ...(args.key !== args.resolvedKey ? { key: args.key } : {}),
-    resolvedKey: args.resolvedKey,
+    ...keyFields,
     ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
     ...(typeof args.url === "string" ? { url: args.url } : {}),
     timeoutMs: args.timeoutMs,

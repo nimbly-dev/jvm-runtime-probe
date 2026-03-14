@@ -15,21 +15,30 @@ Use this workflow only for strict one-line verification runs.
 
 ## MCP-First Requirement
 
-1. Mandatory tools: `project_context_validate`, `probe_recipe_create`, `probe_reset`, `probe_wait_for_hit` or `probe_get_status`.
+1. Mandatory tools: `probe_check`, `project_context_validate`, `probe_recipe_create`, `probe_reset`, `probe_wait_for_hit` or `probe_get_status`.
 2. If MCP toolchain is unavailable, stop immediately and return:
    - `reasonCode=toolchain_unavailable`
    - `nextAction=enable_mcp_jvm_debugger_tools_then_rerun`
 3. Never fallback to direct `curl`/raw HTTP-only execution.
+4. If recipe synthesis fails but MCP probe tools are reachable, do not stop immediately:
+   - gather only missing execution inputs
+   - continue with manual probe-verified execution flow
+   - preserve fail-closed reporting fields.
 
 ## Execution Sequence
 
-1. Call `project_context_validate` with orchestrator-selected `projectRootAbs`.
-2. Call `probe_recipe_create` with probe intent, strict line target context, and exact FQCN in `classHint`.
-3. Provide `apiBasePath` when runtime is deployed with a context path (for example `/api/v1`).
-4. Ask for context path at most once per run; reuse the same `apiBasePath` for subsequent attempts in that run.
-5. Runtime synthesis scope is runtime-only (`src/main/java` + generated-main roots); test sources are excluded.
-6. If `probe_recipe_create` returns `resultType=report`, treat it as fail-closed synthesis pushback and stop unless the report indicates only missing user input.
-7. In report mode, read compact execution metadata:
+0. Discover execution environment once per run (orchestrator-owned):
+   - API base URL (or API port)
+   - probe base URL (or probe port)
+   - optional `apiBasePath`
+   - auth requirement/token only if needed.
+1. Validate probe connectivity first with `probe_check` on the selected probe base URL.
+2. Call `project_context_validate` with orchestrator-selected `projectRootAbs`.
+3. Call `probe_recipe_create` with probe intent, strict line target context, and exact FQCN in `classHint`.
+4. Provide `apiBasePath` when runtime is deployed with a context path (for example `/api/v1`).
+5. Ask for context path at most once per run; reuse the same `apiBasePath` for subsequent attempts in that run.
+6. Runtime synthesis scope is runtime-only (`src/main/java` + generated-main roots); test sources are excluded.
+7. If `probe_recipe_create` returns `resultType=report`, read compact execution metadata:
    - `executionPlan.routingReason` (code)
    - `executionPlan.steps[].actionCode` (code)
    - avoid depending on verbose instruction text.
@@ -42,15 +51,43 @@ Use this workflow only for strict one-line verification runs.
    - `evidence`
    - `attemptedStrategies`
    - `synthesizerUsed`
-12. Resolve route dynamically from runtime candidates.
-13. Validate exactly one route using:
+12. If report indicates unresolved request inputs (for example `target_not_inferred`/`api_request_not_inferred`/`execution_input_required`):
+   - gather missing request/auth input once
+   - continue with manual probe-verified flow (see fallback section).
+13. Resolve route dynamically from runtime candidates.
+14. Validate exactly one route using:
    - probe reachability
    - API reachability
    - strict target alignment (`Class#method:line` resolvability or class-scoped line discovery)
-14. When capture preview is available, use `capturePreview.executionPaths` as runtime evidence; do not re-derive call paths heuristically.
-15. Execute probe flow:
+15. When capture preview is available, use `capturePreview.executionPaths` as runtime evidence; do not re-derive call paths heuristically.
+16. Execute probe flow:
    - `probe_reset` -> trigger HTTP request -> `probe_wait_for_hit` / `probe_get_status`
-16. Cleanup (disable actuation when used).
+17. Cleanup (disable actuation when used).
+
+## Prerequisites
+
+Before starting execution:
+
+1. Probe endpoint must be reachable (`probe_check` succeeds for selected probe base URL).
+2. API and probe endpoints must be explicitly known and must not be assumed identical unless validated.
+3. Strict target must be provided (`Class#method:line` or inferable from exact `classHint` + `methodHint` + `lineHint`).
+4. Auth input must be present only when required by synthesis/auth diagnostics.
+
+## Fallback: Manual Probe-Verified Execution
+
+If `probe_recipe_create` does not infer a request candidate, continue manually:
+
+1. Gather only missing inputs:
+   - endpoint path/method from user or runtime docs
+   - request body/query shape from DTO/controller contract
+   - auth token only if required.
+2. Keep probe verification strict:
+   - `probe_reset` on target line key
+   - execute trigger HTTP request against discovered API base URL
+   - verify with `probe_wait_for_hit` (or `probe_get_status`).
+3. Report deterministic outcome:
+   - include `reasonCode`, `failedStep`, `evidence`, `attemptedStrategies`
+   - include executable human `Repro Steps`.
 
 ## Route Pushback
 
