@@ -5,6 +5,10 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { ServerConfig } from "@/config/server-config";
 import { clampInt } from "@/lib/safety";
 import { validateProjectRootAbs } from "@/utils/project_root_validate.util";
+import {
+  RuntimeProbeUnreachableError,
+  selectRuntimeValidatedLine,
+} from "@/utils/inference/runtime_line_selection.util";
 import { discoverClassMethods, inferTargets } from "@/tools/core/target_infer/domain";
 import { TARGET_INFER_TOOL } from "@/tools/core/target_infer/contract";
 
@@ -12,9 +16,61 @@ export type TargetInferHandlerDeps = {
   config: ServerConfig;
 };
 
+function runtimeUnavailableResponse(args: {
+  rootAbs: string;
+  hints: Record<string, unknown>;
+  reason: string;
+}) {
+  const structuredContent = {
+    resultType: "report",
+    status: "runtime_unreachable",
+    reasonCode: "runtime_unreachable",
+    failedStep: "line_validation",
+    projectRoot: args.rootAbs,
+    hints: args.hints,
+    reason: args.reason,
+    nextAction:
+      "Verify probe runtime reachability (probe base URL/port) and rerun probe_target_infer.",
+    evidence: [args.reason],
+    attemptedStrategies: ["runtime_line_validation"],
+  };
+  return {
+    content: [{ type: "text" as const, text: JSON.stringify(structuredContent, null, 2) }],
+    structuredContent,
+  };
+}
+
 export function registerTargetInferTool(server: McpServer, deps: TargetInferHandlerDeps): void {
   const deprecatedSelectorKeys = ["serviceHint", "projectId", "workspaceRoot"] as const;
-  void deps;
+  const selectLine = async (args: {
+    probeKey?: string;
+    startLine: number;
+    endLine: number;
+  }): Promise<{
+    firstExecutableLine: number | null;
+    lineSelectionStatus: "validated" | "unresolved";
+    lineSelectionSource?: "runtime_probe_validation";
+  }> => {
+    if (!args.probeKey) {
+      return {
+        firstExecutableLine: null,
+        lineSelectionStatus: "unresolved",
+      };
+    }
+    if (!deps.config.probeBaseUrl || !deps.config.probeStatusPath) {
+      throw new RuntimeProbeUnreachableError(
+        "Probe runtime config unavailable (missing probeBaseUrl/probeStatusPath).",
+      );
+    }
+    return await selectRuntimeValidatedLine({
+      probeBaseUrl: deps.config.probeBaseUrl,
+      probeStatusPath: deps.config.probeStatusPath,
+      probeKey: args.probeKey,
+      startLine: args.startLine,
+      endLine: args.endLine,
+      maxScanLines: deps.config.probeLineSelectionMaxScanLines,
+    });
+  };
   server.registerTool(
     TARGET_INFER_TOOL.name,
     {
@@ -120,6 +176,34 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
         }
 
         const selected = chosenMatches[0]!;
+        const validatedMethods: typeof selected.methods = [];
+        try {
+          for (const method of selected.methods) {
+            const runtimeSelection = await selectLine({
+              ...(method.probeKey ? { probeKey: method.probeKey } : {}),
+              startLine: method.startLine,
+              endLine: method.endLine,
+            });
+            validatedMethods.push({
+              ...method,
+              firstExecutableLine: runtimeSelection.firstExecutableLine,
+              lineSelectionStatus: runtimeSelection.lineSelectionStatus,
+              ...(runtimeSelection.lineSelectionSource
+                ? { lineSelectionSource: runtimeSelection.lineSelectionSource }
+                : {}),
+            });
+          }
+        } catch (err) {
+          if (err instanceof RuntimeProbeUnreachableError) {
+            return runtimeUnavailableResponse({
+              rootAbs,
+              hints: { projectRootAbs: rootAbs, classHint, discoveryMode: selectedDiscoveryMode },
+              reason: err.message,
+            });
+          }
+          throw err;
+        }
+
         const structuredContent = {
           resultType: "class_methods",
           status: "ok",
@@ -131,7 +215,7 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
             ...(selected.fqcn ? { fqcn: selected.fqcn } : {}),
             file: path.relative(rootAbs, selected.file) || selected.file,
           },
-          methods: selected.methods,
+          methods: validatedMethods,
         };
         return {
           content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
@@ -183,15 +267,103 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
         };
       }
 
+      const validatedCandidates = [] as typeof inferred.candidates;
+      try {
+        for (const candidate of inferred.candidates) {
+          const runtimeSelection = await selectLine({
+            ...(candidate.key ? { probeKey: candidate.key } : {}),
+            startLine:
+              typeof candidate.declarationLine === "number"
+                ? candidate.declarationLine
+                : typeof candidate.line === "number"
+                  ? candidate.line
+                  : 1,
+            endLine:
+              typeof candidate.endLine === "number"
+                ? candidate.endLine
+                : typeof candidate.declarationLine === "number"
+                  ? candidate.declarationLine
+                  : typeof candidate.line === "number"
+                    ? candidate.line
+                    : 1,
+          });
+          validatedCandidates.push({
+            ...candidate,
+            line: runtimeSelection.firstExecutableLine,
+            firstExecutableLine: runtimeSelection.firstExecutableLine,
+            lineSelectionStatus: runtimeSelection.lineSelectionStatus,
+            ...(runtimeSelection.lineSelectionSource
+              ? { lineSelectionSource: runtimeSelection.lineSelectionSource }
+              : {}),
+          });
+        }
+      } catch (err) {
+        if (err instanceof RuntimeProbeUnreachableError) {
+          return runtimeUnavailableResponse({
+            rootAbs,
+            hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint },
+            reason: err.message,
+          });
+        }
+        throw err;
+      }
+
+      const runtimeResolvedCandidates = validatedCandidates.filter(
+        (candidate) =>
+          candidate.lineSelectionStatus === "validated" && typeof candidate.line === "number",
+      );
+      if (runtimeResolvedCandidates.length === 0) {
+        const structuredContent = {
+          resultType: "report",
+          status: "target_not_found",
+          reasonCode: "runtime_line_unresolved",
+          failedStep: "line_validation",
+          projectRoot: rootAbs,
+          hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint },
+          scannedJavaFiles: inferred.scannedJavaFiles,
+          evidence: [
+            `candidateCount=${validatedCandidates.length}`,
+            `maxScanLines=${deps.config.probeLineSelectionMaxScanLines}`,
+          ],
+          attemptedStrategies: ["target_inference_exact_match", "runtime_line_validation"],
+          nextAction:
+            "No runtime-resolvable line was found for inferred candidates. Verify runtime/source alignment and rerun probe_target_infer.",
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
+
       const lineMatches =
         typeof lineHint === "number"
-          ? inferred.candidates.filter(
-              (candidate) =>
-                candidate.line === lineHint || candidate.declarationLine === lineHint,
-            )
+          ? runtimeResolvedCandidates.filter((candidate) => candidate.line === lineHint)
           : [];
+      if (typeof lineHint === "number" && lineMatches.length === 0) {
+        const structuredContent = {
+          resultType: "report",
+          status: "target_not_found",
+          reasonCode: "line_hint_not_resolvable",
+          failedStep: "line_validation",
+          projectRoot: rootAbs,
+          hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint },
+          scannedJavaFiles: inferred.scannedJavaFiles,
+          evidence: [
+            `lineHint=${lineHint}`,
+            `resolvedCandidateCount=${runtimeResolvedCandidates.length}`,
+          ],
+          attemptedStrategies: ["target_inference_exact_match", "runtime_line_validation"],
+          nextAction:
+            "Provided lineHint is not runtime-resolvable for inferred candidates. Use class_methods output to select a validated line and rerun.",
+        };
+        return {
+          content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
+          structuredContent,
+        };
+      }
+
       const selectedCandidates =
-        typeof lineHint === "number" && lineMatches.length === 1 ? lineMatches : inferred.candidates;
+        typeof lineHint === "number" ? lineMatches : runtimeResolvedCandidates;
 
       if (selectedCandidates.length > 1) {
         const structuredContent = {

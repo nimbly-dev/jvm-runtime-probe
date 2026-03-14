@@ -46,7 +46,7 @@ test("data-fields docs reflect deterministic contract without confidence/downgra
   assert.doesNotMatch(doc, /applicationType\.confidence/);
   assert.doesNotMatch(doc, /appPort\.confidence/);
   assert.doesNotMatch(doc, /downgradedFrom/);
-  assert.doesNotMatch(doc, /regression_api_only_downgraded_line_target_missing/);
+  assert.doesNotMatch(doc, /regression_http_only_downgraded_line_target_missing/);
   assert.match(doc, /deterministic fields/i);
   assert.match(doc, /hints\.apiBasePath/);
   assert.match(doc, /context_path_hint=/);

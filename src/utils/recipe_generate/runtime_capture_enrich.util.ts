@@ -1,5 +1,6 @@
 import { probeStatus } from "@/utils/probe/probe_status.util";
 import type { ProbeCapturePreviewPayload } from "@/models/probe_runtime_capture.model";
+import { compactCapturePreview } from "@/utils/probe/compact_payload.util";
 
 export type RuntimeCaptureSummary =
   | {
@@ -40,7 +41,7 @@ export async function enrichRuntimeCapture(args: {
       null) as Record<string, unknown> | null;
     const capturePreview =
       statusJson && typeof statusJson.capturePreview === "object"
-        ? (statusJson.capturePreview as ProbeCapturePreviewPayload)
+        ? (compactCapturePreview(statusJson.capturePreview as Record<string, unknown>) as ProbeCapturePreviewPayload)
         : null;
     if (capturePreview && Array.isArray(capturePreview.executionPaths)) {
       capturePreview.executionPaths = capturePreview.executionPaths.filter(

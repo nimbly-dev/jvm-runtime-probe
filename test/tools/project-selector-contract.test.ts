@@ -11,6 +11,33 @@ type RegisteredToolHandler = (input: Record<string, unknown>) => Promise<{
   structuredContent: Record<string, unknown>;
 }>;
 
+const TARGET_INFER_CONFIG = {
+  workspaceRootAbs: "C:\\repo",
+  workspaceRootSource: "cwd",
+  probeBaseUrl: "http://127.0.0.1:9193",
+  probeStatusPath: "/__probe/status",
+  probeResetPath: "/__probe/reset",
+  probeCapturePath: "/__probe/capture",
+  probeLineSelectionMaxScanLines: 120,
+  probeWaitMaxRetries: 1,
+  probeWaitUnreachableRetryEnabled: false,
+  probeWaitUnreachableMaxRetries: 3,
+};
+
+async function withMockedFetch(
+  mockFetch: typeof globalThis.fetch,
+  fn: () => Promise<void>,
+): Promise<void> {
+  const originalFetch = globalThis.fetch;
+  if (!originalFetch) throw new Error("global fetch is unavailable in this Node runtime");
+  globalThis.fetch = mockFetch;
+  try {
+    await fn();
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
 function captureRegisteredHandler(
   registerToolFn: (server: any) => void,
 ): RegisteredToolHandler {
@@ -46,7 +73,7 @@ test("probe_recipe_create fails closed when legacy selector fields are provided"
     projectRootAbs: "C:\\repo\\service",
     classHint: "CatalogService",
     methodHint: "save",
-    intentMode: "regression_api_only",
+    intentMode: "regression_http_only",
     workspaceRoot: "C:\\repo",
   });
 
@@ -61,7 +88,7 @@ test("probe_recipe_create fails closed when legacy selector fields are provided"
 test("probe_target_infer fails closed when legacy selector fields are provided", async () => {
   const handler = captureRegisteredHandler((server: any) =>
     registerTargetInferTool(server, {
-      config: {},
+      config: TARGET_INFER_CONFIG,
     }),
   );
 
@@ -88,7 +115,7 @@ test("probe_recipe_create requires explicit projectRootAbs", async () => {
   const out = await handler({
     classHint: "CatalogService",
     methodHint: "save",
-    intentMode: "regression_api_only",
+    intentMode: "regression_http_only",
   });
 
   assert.equal(out.structuredContent.status, "project_selector_required");
@@ -99,7 +126,7 @@ test("probe_recipe_create requires explicit projectRootAbs", async () => {
 test("probe_target_infer requires explicit projectRootAbs", async () => {
   const handler = captureRegisteredHandler((server: any) =>
     registerTargetInferTool(server, {
-      config: {},
+      config: TARGET_INFER_CONFIG,
     }),
   );
 
@@ -123,7 +150,7 @@ test("probe_recipe_create fails closed when classHint is not an FQCN", async () 
     projectRootAbs: path.resolve(__dirname, "..", ".."),
     classHint: "CatalogService",
     methodHint: "save",
-    intentMode: "regression_api_only",
+    intentMode: "regression_http_only",
   });
 
   assert.equal(out.structuredContent.status, "class_hint_not_fqcn");
@@ -139,7 +166,7 @@ test("probe_recipe_create fails closed when classHint is not an FQCN", async () 
 test("probe_target_infer ranked_candidates requires exact classHint", async () => {
   const handler = captureRegisteredHandler((server: any) =>
     registerTargetInferTool(server, {
-      config: {},
+      config: TARGET_INFER_CONFIG,
     }),
   );
 
@@ -157,7 +184,7 @@ test("probe_target_infer ranked success emits explicit resultType and status", a
   await withTempDir(async (dir: string) => {
     const handler = captureRegisteredHandler((server: any) =>
       registerTargetInferTool(server, {
-        config: {},
+        config: TARGET_INFER_CONFIG,
       }),
     );
     const javaFile = path.join(dir, "src", "main", "java", "com", "example", "CatalogService.java");
@@ -176,16 +203,135 @@ test("probe_target_infer ranked success emits explicit resultType and status", a
       "utf8",
     );
 
-    const out = await handler({
-      projectRootAbs: dir,
-      classHint: "com.example.CatalogService",
-      methodHint: "save",
-    });
+    let calls = 0;
+    await withMockedFetch(async () => {
+      calls += 1;
+      return new Response(
+        JSON.stringify({
+          key: "com.example.CatalogService#save:3",
+          hitCount: 0,
+          lastHitEpochMs: 0,
+          lineResolvable: calls === 1 ? false : true,
+          lineValidation: calls === 1 ? "invalid_line_target" : "resolvable",
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } },
+      );
+    }, async () => {
+      const out = await handler({
+        projectRootAbs: dir,
+        classHint: "com.example.CatalogService",
+        methodHint: "save",
+      });
 
-    assert.equal(out.structuredContent.resultType, "ranked_candidates");
-    assert.equal(out.structuredContent.status, "ok");
-    const candidates = out.structuredContent.candidates as unknown[];
-    assert.equal(Array.isArray(candidates), true);
-    assert.equal(candidates.length, 1);
+      assert.equal(out.structuredContent.resultType, "ranked_candidates");
+      assert.equal(out.structuredContent.status, "ok");
+      const candidates = out.structuredContent.candidates as unknown[];
+      assert.equal(Array.isArray(candidates), true);
+      assert.equal(candidates.length, 1);
+      assert.equal((candidates[0] as any).firstExecutableLine, 4);
+      assert.equal((candidates[0] as any).lineSelectionStatus, "validated");
+      assert.equal((candidates[0] as any).lineSelectionSource, "runtime_probe_validation");
+    });
+  });
+});
+
+test("probe_target_infer fails closed when runtime probe is unreachable", async () => {
+  await withTempDir(async (dir: string) => {
+    const handler = captureRegisteredHandler((server: any) =>
+      registerTargetInferTool(server, {
+        config: TARGET_INFER_CONFIG,
+      }),
+    );
+    const javaFile = path.join(dir, "src", "main", "java", "com", "example", "CatalogService.java");
+    await fs.mkdir(path.dirname(javaFile), { recursive: true });
+    await fs.writeFile(
+      javaFile,
+      [
+        "package com.example;",
+        "public class CatalogService {",
+        "  public boolean save() {",
+        "    return true;",
+        "  }",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    await withMockedFetch(async () => {
+      throw new Error("fetch failed");
+    }, async () => {
+      const out = await handler({
+        projectRootAbs: dir,
+        classHint: "com.example.CatalogService",
+        methodHint: "save",
+      });
+
+      assert.equal(out.structuredContent.resultType, "report");
+      assert.equal(out.structuredContent.status, "runtime_unreachable");
+      assert.equal(out.structuredContent.reasonCode, "runtime_unreachable");
+      assert.equal(out.structuredContent.failedStep, "line_validation");
+    });
+  });
+});
+
+test("probe_target_infer class_methods returns unresolved line selection when no line is resolvable", async () => {
+  await withTempDir(async (dir: string) => {
+    const handler = captureRegisteredHandler((server: any) =>
+      registerTargetInferTool(server, {
+        config: TARGET_INFER_CONFIG,
+      }),
+    );
+    const javaFile = path.join(
+      dir,
+      "src",
+      "main",
+      "java",
+      "com",
+      "example",
+      "CatalogService.java",
+    );
+    await fs.mkdir(path.dirname(javaFile), { recursive: true });
+    await fs.writeFile(
+      javaFile,
+      [
+        "package com.example;",
+        "public class CatalogService {",
+        "  public boolean save() {",
+        "    return true;",
+        "  }",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    await withMockedFetch(async () => {
+      return new Response(
+        JSON.stringify({
+          key: "com.example.CatalogService#save:3",
+          hitCount: 0,
+          lastHitEpochMs: 0,
+          lineResolvable: false,
+          lineValidation: "invalid_line_target",
+        }),
+        { status: 200, headers: { "content-type": "application/json; charset=utf-8" } },
+      );
+    }, async () => {
+      const out = await handler({
+        projectRootAbs: dir,
+        discoveryMode: "class_methods",
+        classHint: "com.example.CatalogService",
+      });
+
+      assert.equal(out.structuredContent.resultType, "class_methods");
+      assert.equal(out.structuredContent.status, "ok");
+      const methods = out.structuredContent.methods as Array<Record<string, unknown>>;
+      assert.equal(Array.isArray(methods), true);
+      assert.equal(methods.length, 1);
+      assert.equal(methods[0]?.firstExecutableLine, null);
+      assert.equal(methods[0]?.lineSelectionStatus, "unresolved");
+      assert.equal(methods[0]?.lineSelectionSource, undefined);
+    });
   });
 });

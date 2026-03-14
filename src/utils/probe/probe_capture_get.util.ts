@@ -2,6 +2,7 @@ import { fetchJson } from "@/lib/http";
 import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "@/lib/safety";
 import type { ProbeCaptureRecordPayload } from "@/models/probe_runtime_capture.model";
 import type { ToolTextResponse } from "@/models/tool_response.model";
+import { compactCaptureRecord } from "@/utils/probe/compact_payload.util";
 import { joinUrl, probeUnreachableMessage } from "@/utils/probe.util";
 import { buildTextResponse } from "@/utils/probe/response_builders.util";
 
@@ -31,12 +32,12 @@ export async function probeCaptureGet(args: {
     json && typeof json.capture === "object" && json.capture !== null
       ? ({ ...(json.capture as ProbeCaptureRecordPayload) } as ProbeCaptureRecordPayload)
       : null;
-  if (capture && Array.isArray(capture.executionPaths)) {
-    capture.executionPaths = capture.executionPaths.filter(
-      (value): value is string => typeof value === "string",
-    );
-  }
   const found = res.status >= 200 && res.status < 300 && capture !== null;
+  const compactCapture = capture ? compactCaptureRecord(capture) : null;
+  const executionPathCount =
+    capture && Array.isArray((capture as Record<string, unknown>).executionPaths)
+      ? ((capture as Record<string, unknown>).executionPaths as unknown[]).filter((v) => typeof v === "string").length
+      : 0;
 
   const structuredContent: Record<string, unknown> = {
     request: {
@@ -44,11 +45,11 @@ export async function probeCaptureGet(args: {
       url: url.toString(),
       timeoutMs,
     },
-    response: { status: res.status, json, text: json ? undefined : res.text },
+    response: { status: res.status },
     result: found
       ? {
           found: true,
-          capture,
+          capture: compactCapture,
         }
       : {
           found: false,
@@ -65,13 +66,13 @@ export async function probeCaptureGet(args: {
     result: found
       ? {
           found: true,
-          captureId: capture?.captureId,
-          methodKey: capture?.methodKey,
-          capturedAtEpochMs: capture?.capturedAtEpochMs,
-          argsCount: Array.isArray(capture?.args) ? capture.args.length : 0,
-          hasReturnValue: capture?.returnValue != null,
-          hasThrownValue: capture?.thrownValue != null,
-          executionPathCount: Array.isArray(capture?.executionPaths) ? capture.executionPaths.length : 0,
+          captureId: compactCapture?.captureId,
+          methodKey: compactCapture?.methodKey,
+          capturedAtEpochMs: compactCapture?.capturedAtEpochMs,
+          argsCount: compactCapture?.argsCount,
+          hasReturnValue: compactCapture?.hasReturnValue,
+          hasThrownValue: compactCapture?.hasThrownValue,
+          executionPathCount,
         }
       : {
           found: false,

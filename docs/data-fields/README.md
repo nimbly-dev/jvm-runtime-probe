@@ -16,7 +16,8 @@ Deterministic contract policy:
 Text vs structured content policy (probe tools):
 - `structuredContent` is the canonical machine-readable payload and remains the source of truth.
 - `content[0].text` is intentionally compact for context efficiency and may omit large diagnostic bodies.
-- For full capture/status/reset details, parse `structuredContent` instead of relying on text mirrors.
+- Probe payloads are compact-by-default (metadata first); heavy capture internals are intentionally omitted.
+- `executionPaths` are omitted by default. Set `MCP_PROBE_INCLUDE_EXECUTION_PATHS=true` to include them.
 
 ## debug_check
 
@@ -61,15 +62,20 @@ Text vs structured content policy (probe tools):
 | `hints` | Input hints used for scoped inference (`classHint` should be exact class/FQCN). | `probe_target_infer` | true | `{"projectRootAbs":"C:\\repo\\catalog-service","classHint":"com.example.CatalogService"}` |
 | `scannedJavaFiles` | Approximate Java file scan count. | `probe_target_infer` | false | `412` |
 | `candidates` | Ranked target candidates for runtime probe keying. | `probe_target_infer` | false | `[{"key":"com.example.Catalog#save"}]` |
-| `candidates[].line` | Preferred probe line for candidate selection (uses executable line when inferable). | `probe_target_infer` | false | `133` |
+| `candidates[].line` | Runtime-validated strict probe line used for candidate selection (`null` when unresolved). | `probe_target_infer` | false | `133` |
 | `candidates[].declarationLine` | Method declaration line for candidate metadata and strict disambiguation support. | `probe_target_infer` | false | `129` |
-| `candidates[].firstExecutableLine` | First executable line inside method body (used as default probe line when `lineHint` is omitted). | `probe_target_infer` | false | `133` |
+| `candidates[].firstExecutableLine` | First runtime-probe-validated executable line (`null` when no resolvable line is found in scan window). | `probe_target_infer` | false | `133` |
+| `candidates[].lineSelectionStatus` | Runtime line selection outcome (`validated` or `unresolved`). | `probe_target_infer` | false | `"validated"` |
+| `candidates[].lineSelectionSource` | Source of validated executable line when available. | `probe_target_infer` | false | `"runtime_probe_validation"` |
 | `class` | Selected class block in `class_methods` mode. | `probe_target_infer` | false | `{"fqcn":"com.example.CatalogController"}` |
 | `methods` | Method spans for selected class in `class_methods` mode. | `probe_target_infer` | false | `[{"methodName":"save","startLine":42}]` |
-| `methods[].firstExecutableLine` | First executable line inside each discovered method body. | `probe_target_infer` | false | `45` |
+| `methods[].firstExecutableLine` | First runtime-probe-validated executable line for each method (`null` when unresolved). | `probe_target_infer` | false | `45` |
+| `methods[].lineSelectionStatus` | Runtime line selection outcome per method (`validated` or `unresolved`). | `probe_target_infer` | false | `"unresolved"` |
+| `methods[].lineSelectionSource` | Source of validated executable line per method when available. | `probe_target_infer` | false | `"runtime_probe_validation"` |
 | `nextAction` | Required follow-up action when status is non-ready. | `probe_target_infer` | false | `"Refine classHint and rerun"` |
 | `reasonCode` | Deterministic failure/disambiguation code for fail-closed routing. | `probe_target_infer` | false | `"target_ambiguous"` |
 | `failedStep` | Stage where deterministic selection failed. | `probe_target_infer` | false | `"target_selection"` |
+| `status=runtime_unreachable` | Fail-closed status when runtime line validation cannot reach probe endpoint. | `probe_target_infer` | false | `"runtime_unreachable"` |
 
 ## probe_recipe_create
 
@@ -81,7 +87,7 @@ Text vs structured content policy (probe tools):
 | `inferredTarget` | Best inferred runtime target for probe verification. | `probe_recipe_create` | false | `{"key":"com.example.CatalogService#save","line":88}` |
 | `requestCandidates` | HTTP request candidates inferred from code-based synthesizer analysis. | `probe_recipe_create` | true | `[{"method":"POST","path":"/v1/catalog"}]` |
 | `executionPlan` | Step plan emitted for execution/verification tooling. Report mode emits compact action-code steps. | `probe_recipe_create` | true | `{"selectedMode":"single_line_probe"}` |
-| `executionPlan.routingReason` | Routing reason code for selected mode (`single_line_probe`, `regression_api_only_no_probe`, etc). | `probe_recipe_create` | true | `"regression_api_only_no_probe"` |
+| `executionPlan.routingReason` | Routing reason code for selected mode (`single_line_probe`, `regression_http_only_no_probe`, etc). | `probe_recipe_create` | true | `"regression_http_only_no_probe"` |
 | `executionPlan.steps[].actionCode` | Compact step action code in report mode (no verbose instruction strings). | `probe_recipe_create` | false | `"request_candidate_missing"` |
 | `resultType` | Output category (`recipe` or `report`). | `probe_recipe_create` | true | `"recipe"` |
 | `status` | Recipe generation status for orchestration decisions (`*_ready` or fail-closed report status). | `probe_recipe_create` | true | `"single_line_probe_ready"` |
@@ -117,19 +123,15 @@ Text vs structured content policy (probe tools):
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
 | `request` | Status request details (canonical `key`, URL, timeout; `resolvedKey` appears only when canonicalization differs). | `probe_get_status` | true | `{"key":"com.example.Catalog#save:88"}` |
-| `response` | Raw endpoint response after MCP normalization. | `probe_get_status` | true | `{"status":200,"json":{"hitCount":1}}` |
+| `response` | Compact normalized status payload (`status` + essential `json` fields). | `probe_get_status` | true | `{"status":200,"json":{"hitCount":1}}` |
 | `response.json.contractVersion` | Probe contract marker. | `probe_get_status` | false | `"0.1.0"` |
 | `response.json.hitCount` | Probe hit counter for the line key. | `probe_get_status` | false | `1` |
 | `response.json.lastHitEpochMs` | Last hit Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200000` |
 | `response.json.lineValidation` | Line validation verdict (`resolvable` or `invalid_line_target`). | `probe_get_status` | false | `"resolvable"` |
-| `response.json.capturePreview` | Lightweight runtime payload preview from Java agent. | `probe_get_status` | false | `{"available":true,"captureId":"abc123"}` |
-| `response.json.capturePreview.argsPreview` | Preview argument metadata only (`index`, `truncated`, `originalLength`, `redacted`), intentionally excludes serialized values. | `probe_get_status` | false | `[{"index":0,"truncated":false,"originalLength":12,"redacted":false}]` |
-| `response.json.capturePreview.returnPreview` | Preview return metadata only (`truncated`, `originalLength`, `redacted`), intentionally excludes serialized value body. | `probe_get_status` | false | `{"truncated":false,"originalLength":896,"redacted":false}` |
-| `response.json.capturePreview.thrownPreview` | Preview thrown-value metadata only (`truncated`, `originalLength`, `redacted`) when an exception is captured. | `probe_get_status` | false | `null` |
+| `response.json.capturePreview` | Compact runtime preview metadata from Java agent (`available`, `captureId`, timestamp, optional path list). | `probe_get_status` | false | `{"available":true,"captureId":"abc123"}` |
 | `response.json.capturePreview.capturedAtEpochMs` | Capture preview Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200456` |
-| `response.json.capturePreview.executionPaths` | Optional execution-path frames captured at runtime (`ClassName.method()#line`, oldest-to-newest). | `probe_get_status` | false | `["CatalogController.listCatalogShoes()#42"]` |
+| `response.json.capturePreview.executionPaths` | Optional execution-path frames captured at runtime when `MCP_PROBE_INCLUDE_EXECUTION_PATHS=true`. | `probe_get_status` | false | `["CatalogController.listCatalogShoes()#42"]` |
 | `response.json.runtime` | Runtime actuation/observe mode payload. | `probe_get_status` | false | `{"mode":"observe"}` |
-| `response.json.runtime.serverEpochMs` | JVM host wall-clock Unix epoch milliseconds at status response build time. | `probe_get_status` | false | `1739671200123` |
 | `response.json.runtime.appPort.value` | Runtime application port hint when inferable (`null` when unknown). | `probe_get_status` | false | `8082` |
 | `response.json.runtime.appPort.source` | Source used to infer app port hint. | `probe_get_status` | false | `"system_property:server.port"` |
 | `result` | Guidance block when runtime alignment fails. | `probe_get_status` | false | `{"reason":"invalid_line_target","actionCode":"runtime_not_aligned"}` |
@@ -143,10 +145,10 @@ Text vs structured content policy (probe tools):
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
 | `request` | Capture fetch request details. | `probe_get_capture` | true | `{"captureId":"abc123","url":"http://127.0.0.1:9191/__probe/capture?captureId=abc123"}` |
-| `response` | Raw `/__probe/capture` HTTP response payload. | `probe_get_capture` | true | `{"status":200,"json":{"capture":{"captureId":"abc123"}}}` |
+| `response` | Compact capture fetch response metadata (`status` only). | `probe_get_capture` | true | `{"status":200}` |
 | `result.found` | Whether capture payload exists and was returned. | `probe_get_capture` | true | `true` |
-| `result.capture` | Full stored capture payload when found. | `probe_get_capture` | false | `{"methodKey":"com.example.Catalog#save","args":[...]}` |
-| `result.capture.executionPaths` | Optional execution-path frames captured for the method invocation (`ClassName.method()#line`). | `probe_get_capture` | false | `["CatalogService.save()#88"]` |
+| `result.capture` | Compact capture metadata (`captureId`, `methodKey`, timestamp, args/return/thrown presence flags). | `probe_get_capture` | false | `{"captureId":"abc123","argsCount":1,"hasReturnValue":true}` |
+| `result.capture.executionPaths` | Optional execution-path frames when `MCP_PROBE_INCLUDE_EXECUTION_PATHS=true`. | `probe_get_capture` | false | `["CatalogService.save()#88"]` |
 | `result.reason` | Error reason when capture is unavailable. | `probe_get_capture` | false | `"capture_not_found"` |
 
 ## probe_reset
@@ -154,7 +156,7 @@ Text vs structured content policy (probe tools):
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
 | `request` | Reset selector request details (canonical `key`; optional `resolvedKey` only when transformed from input). | `probe_reset` | true | `{"key":"com.example.Catalog#save:88"}` |
-| `response` | Raw reset endpoint response payload. | `probe_reset` | true | `{"status":200,"json":{"ok":true}}` |
+| `response` | Compact reset response metadata (`status`, plus selector/reason metadata in batch mode). | `probe_reset` | true | `{"status":200}` |
 | `result` | Guidance block when line target is invalid. | `probe_reset` | false | `{"reason":"invalid_line_target"}` |
 | `mode` | Batch marker for multi-key/class reset. | `probe_reset` | false | `"probe_batch"` |
 | `operation` | Batch operation identifier. | `probe_reset` | false | `"reset"` |
@@ -167,9 +169,7 @@ Text vs structured content policy (probe tools):
 | --- | --- | --- | --- | --- |
 | `request` | Polling request and retry configuration (`key` canonical; optional `resolvedKey` only when transformed from input). | `probe_wait_for_hit` | true | `{"key":"com.example.Catalog#save:88","maxRetries":1}` |
 | `request.waitStartEpochMs` | Unix-epoch millisecond timestamp when current wait attempt started. | `probe_wait_for_hit` | false | `1773318672847` |
-| `request.waitStartIsoUtc` | ISO-8601 UTC timestamp for `waitStartEpochMs`. | `probe_wait_for_hit` | false | `"2026-03-11T14:57:52.847Z"` |
 | `request.triggerWindowStartEpochMs` | Reset-aware Unix-epoch start used for strict inline classification. | `probe_wait_for_hit` | false | `1773318658526` |
-| `request.triggerWindowStartIsoUtc` | ISO-8601 UTC timestamp for `triggerWindowStartEpochMs`. | `probe_wait_for_hit` | false | `"2026-03-11T14:57:38.526Z"` |
 | `request.triggerLeadMs` | Milliseconds between wait start and trigger window start (`waitStartEpochMs - triggerWindowStartEpochMs`). | `probe_wait_for_hit` | false | `14321` |
 | `baseline` | Baseline probe snapshot used for inline hit diffing. | `probe_wait_for_hit` | false | `{"hitCount":0,"lastHitEpochMs":0}` |
 | `result.hit` | Whether a hit was detected in current wait window. | `probe_wait_for_hit` | true | `true` |

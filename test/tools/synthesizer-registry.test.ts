@@ -40,7 +40,7 @@ test("registry selects the first plugin that can handle the input", async () => 
     searchRootsAbs: ["C:\\repo\\service"],
     classHint: "HealthController",
     methodHint: "health",
-    intentMode: "regression_api_only",
+    intentMode: "regression_http_only",
   });
 
   assert.equal(result.status, "recipe");
@@ -55,7 +55,7 @@ test("registry fails closed when no plugin can handle input", async () => {
     searchRootsAbs: ["C:\\repo\\service"],
     classHint: "HealthController",
     methodHint: "health",
-    intentMode: "regression_api_only",
+    intentMode: "regression_http_only",
   });
 
   assert.equal(result.status, "report");
