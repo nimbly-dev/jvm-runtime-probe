@@ -7,6 +7,7 @@ const { loadConfigFromEnvAndArgs } = require("@/config/server-config");
 
 const MANAGED_ENV_NAMES = [
   MCP_ENV.PROBE_BASE_URL,
+  MCP_ENV.PROBE_LINE_SELECTION_MAX_SCAN_LINES,
   MCP_ENV.PROBE_WAIT_UNREACHABLE_RETRY_ENABLED,
   MCP_ENV.PROBE_WAIT_UNREACHABLE_MAX_RETRIES,
 ] as const;
@@ -51,6 +52,10 @@ test("loads with only base URL and applies fixed probe path defaults", () => {
       assert.equal(cfg.probeStatusPath, CONFIG_DEFAULTS.PROBE_STATUS_PATH);
       assert.equal(cfg.probeResetPath, CONFIG_DEFAULTS.PROBE_RESET_PATH);
       assert.equal(cfg.probeCapturePath, CONFIG_DEFAULTS.PROBE_CAPTURE_PATH);
+      assert.equal(
+        cfg.probeLineSelectionMaxScanLines,
+        CONFIG_DEFAULTS.PROBE_LINE_SELECTION_MAX_SCAN_LINES,
+      );
       assert.equal(
         cfg.probeWaitUnreachableRetryEnabled,
         CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_RETRY_ENABLED,
@@ -137,13 +142,61 @@ test("parses probe wait unreachable retry settings from env", () => {
   withEnv(
     {
       [MCP_ENV.PROBE_BASE_URL]: "http://127.0.0.1:9193",
+      [MCP_ENV.PROBE_LINE_SELECTION_MAX_SCAN_LINES]: "240",
       [MCP_ENV.PROBE_WAIT_UNREACHABLE_RETRY_ENABLED]: "true",
       [MCP_ENV.PROBE_WAIT_UNREACHABLE_MAX_RETRIES]: "7",
     },
     () => {
       const cfg = loadConfigFromEnvAndArgs(["node", "server"]);
+      assert.equal(cfg.probeLineSelectionMaxScanLines, 240);
       assert.equal(cfg.probeWaitUnreachableRetryEnabled, true);
       assert.equal(cfg.probeWaitUnreachableMaxRetries, 7);
+    },
+  );
+});
+
+test("uses default line selection scan cap when env is invalid or missing", () => {
+  withEnv(
+    {
+      [MCP_ENV.PROBE_BASE_URL]: "http://127.0.0.1:9193",
+      [MCP_ENV.PROBE_LINE_SELECTION_MAX_SCAN_LINES]: "not-a-number",
+    },
+    () => {
+      const cfg = loadConfigFromEnvAndArgs(["node", "server"]);
+      assert.equal(
+        cfg.probeLineSelectionMaxScanLines,
+        CONFIG_DEFAULTS.PROBE_LINE_SELECTION_MAX_SCAN_LINES,
+      );
+    },
+  );
+});
+
+test("clamps line selection scan cap to configured bounds", () => {
+  withEnv(
+    {
+      [MCP_ENV.PROBE_BASE_URL]: "http://127.0.0.1:9193",
+      [MCP_ENV.PROBE_LINE_SELECTION_MAX_SCAN_LINES]: "99999",
+    },
+    () => {
+      const cfg = loadConfigFromEnvAndArgs(["node", "server"]);
+      assert.equal(
+        cfg.probeLineSelectionMaxScanLines,
+        CONFIG_DEFAULTS.PROBE_LINE_SELECTION_MAX_SCAN_LINES_MAX,
+      );
+    },
+  );
+
+  withEnv(
+    {
+      [MCP_ENV.PROBE_BASE_URL]: "http://127.0.0.1:9193",
+      [MCP_ENV.PROBE_LINE_SELECTION_MAX_SCAN_LINES]: "1",
+    },
+    () => {
+      const cfg = loadConfigFromEnvAndArgs(["node", "server"]);
+      assert.equal(
+        cfg.probeLineSelectionMaxScanLines,
+        CONFIG_DEFAULTS.PROBE_LINE_SELECTION_MAX_SCAN_LINES_MIN,
+      );
     },
   );
 });

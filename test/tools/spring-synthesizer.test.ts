@@ -11,7 +11,7 @@ test("spring synthesizer maps AST resolver success into a request recipe", async
       searchRootsAbs: ["C:\\repo\\service"],
       classHint: "HealthController",
       methodHint: "health",
-      intentMode: "regression_api_only",
+      intentMode: "regression_http_only",
       inferredTargetFileAbs: "C:\\repo\\service\\src\\main\\java\\HealthController.java",
     },
     {
@@ -57,7 +57,7 @@ test("spring synthesizer consumes optional resolver extensions without changing 
       searchRootsAbs: ["C:\\repo\\service"],
       classHint: "HealthController",
       methodHint: "health",
-      intentMode: "regression_api_only",
+      intentMode: "regression_http_only",
     },
     {
       resolveRequestMappingFn: async () => ({
@@ -98,7 +98,7 @@ test("spring synthesizer surfaces AST resolver bootstrap failures distinctly", a
       searchRootsAbs: ["C:\\repo\\service"],
       classHint: "HealthController",
       methodHint: "health",
-      intentMode: "regression_api_only",
+      intentMode: "regression_http_only",
     },
     {
       resolveRequestMappingFn: async () => ({

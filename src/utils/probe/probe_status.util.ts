@@ -89,7 +89,7 @@ async function probeStatusSingle(args: {
       url: url.toString(),
       timeoutMs,
     }),
-    response: { status: res.status, json: normalizedJson, text: normalizedJson ? undefined : res.text },
+    response: { status: res.status, json: normalizedJson },
   };
 
   const json = normalizedJson;
@@ -155,7 +155,6 @@ async function probeStatusBatch(args: {
         reproStatus: "line_key_required",
         probeHit: "line probe key required (Class#method:<line>); method-only checks disabled",
         httpCode: 400,
-        httpResponse: { hit: false, reason: "line_key_required" },
       });
       continue;
     }
@@ -195,15 +194,28 @@ async function probeStatusBatch(args: {
         reproStatus: "status_failed",
         probeHit: "missing batch status row for key",
         httpCode: remoteResponse?.status ?? 500,
-        httpResponse: remoteResponse?.json ?? remoteResponse?.text ?? null,
       });
       continue;
     }
     const hitCount = typeof row.hitCount === "number" ? row.hitCount : 0;
+    const lastHitEpochMs =
+      typeof row.lastHitEpochMs === "number"
+        ? row.lastHitEpochMs
+        : typeof row.lastHitMs === "number"
+          ? row.lastHitMs
+          : undefined;
     const lineValidation = readLineValidation(row);
     const guidance = lineValidation.invalidLineTarget ? GUIDANCE_RUNTIME_NOT_ALIGNED : undefined;
     localByKey.set(key, {
       key,
+      hitCount,
+      ...(typeof lastHitEpochMs === "number" ? { lastHitEpochMs } : {}),
+      ...(typeof lineValidation.lineResolvable === "boolean"
+        ? { lineResolvable: lineValidation.lineResolvable }
+        : {}),
+      ...(typeof lineValidation.lineValidation === "string"
+        ? { lineValidation: lineValidation.lineValidation }
+        : {}),
       executionHit: lineValidation.invalidLineTarget ? "not_hit" : classifyExecutionHitStrictLine(key, hitCount > 0),
       apiOutcome:
         typeof row.ok === "boolean"
@@ -219,7 +231,6 @@ async function probeStatusBatch(args: {
           : `hitCount=${hitCount}, lastHitEpochMs=${typeof row.lastHitEpochMs === "number" ? row.lastHitEpochMs : typeof row.lastHitMs === "number" ? row.lastHitMs : 0}`,
       ...(guidance ? { actionCode: guidance.actionCode, nextAction: guidance.nextAction } : {}),
       httpCode: remoteResponse?.status ?? 200,
-      httpResponse: row,
       runtimeMode: typeof row.mode === "string" ? row.mode : undefined,
       ...(typeof row.capturePreview === "object" && row.capturePreview !== null
         ? { capturePreview: row.capturePreview }
@@ -237,9 +248,7 @@ async function probeStatusBatch(args: {
     operation: "status",
     request: { keys, url, timeoutMs },
     results: orderedResults,
-    response: remoteResponse
-      ? { status: remoteResponse.status, json: remoteResponse.json, text: remoteResponse.text }
-      : undefined,
+    response: remoteResponse ? { status: remoteResponse.status } : undefined,
   });
 }
 

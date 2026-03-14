@@ -41,7 +41,7 @@ export function resolveSelectedMode(ctx: RoutingContext): RoutingDecision {
     lineTargetProvided,
     probeIntentRequested,
     routingReason:
-      ctx.requestedIntentMode === "regression_api_only"
+      ctx.requestedIntentMode === "regression_http_only"
         ? "Regression API checks requested without probe verification."
         : ctx.requestedIntentMode === "single_line_probe"
           ? "Line probe verification requested with explicit line target."

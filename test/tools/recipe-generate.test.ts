@@ -11,14 +11,14 @@ const okAuth = {
   notes: [],
 };
 
-test("fails closed when target is not inferred in regression_api_only mode", async () => {
+test("fails closed when target is not inferred in regression_http_only mode", async () => {
   const result = await generateRecipe(
     {
       rootAbs: "C:\\repo\\service",
       workspaceRootAbs: "C:\\repo",
       classHint: "SynonymRuleController",
       methodHint: "addSynonymRuleStages",
-      intentMode: "regression_api_only",
+      intentMode: "regression_http_only",
     },
     {
       inferTargetsFn: async () => ({
@@ -124,7 +124,7 @@ test("reports request_inference failure when target is inferred but request cand
       workspaceRootAbs: "C:\\repo",
       classHint: "SynonymRuleController",
       methodHint: "addSynonymRuleStages",
-      intentMode: "regression_api_only",
+      intentMode: "regression_http_only",
     },
     {
       inferTargetsFn: async () => ({
@@ -169,7 +169,7 @@ test("reports auth_resolution when request exists but auth input is still requir
       workspaceRootAbs: "C:\\repo",
       classHint: "SynonymRuleController",
       methodHint: "addSynonymRuleStages",
-      intentMode: "regression_api_only",
+      intentMode: "regression_http_only",
     },
     {
       inferTargetsFn: async () => ({
@@ -234,7 +234,7 @@ test("reports request_confirmation_required when unresolved confirmation blocks 
       workspaceRootAbs: "C:\\repo",
       classHint: "CatalogController",
       methodHint: "listCatalogShoes",
-      intentMode: "regression_api_only",
+      intentMode: "regression_http_only",
     },
     {
       inferTargetsFn: async () => ({
@@ -294,7 +294,7 @@ test("keeps deterministic spring request ready even when informational confirmat
       workspaceRootAbs: "C:\\repo",
       classHint: "CatalogController",
       methodHint: "listCatalogShoes",
-      intentMode: "regression_api_only",
+      intentMode: "regression_http_only",
     },
     {
       inferTargetsFn: async () => ({
@@ -341,7 +341,7 @@ test("keeps deterministic spring request ready even when informational confirmat
   );
 
   assert.equal(result.resultType, "recipe");
-  assert.equal(result.status, "regression_api_only_ready");
+  assert.equal(result.status, "regression_http_only_ready");
   assert.equal(result.executionReadiness, "ready");
 });
 
@@ -353,7 +353,7 @@ test("applies apiBasePath prefix to synthesized request candidate and trigger", 
       classHint: "CatalogController",
       methodHint: "listCatalogShoes",
       apiBasePath: "/api/v1",
-      intentMode: "regression_api_only",
+      intentMode: "regression_http_only",
     },
     {
       inferTargetsFn: async () => ({
@@ -413,7 +413,7 @@ test("does not double-prefix apiBasePath when synthesized path already includes 
       classHint: "CatalogController",
       methodHint: "listCatalogShoes",
       apiBasePath: "/api/v1",
-      intentMode: "regression_api_only",
+      intentMode: "regression_http_only",
     },
     {
       inferTargetsFn: async () => ({
@@ -470,7 +470,7 @@ test("emits non-blocking context path hint when apiBasePath is not provided", as
       workspaceRootAbs: "C:\\repo",
       classHint: "CatalogController",
       methodHint: "listCatalogShoes",
-      intentMode: "regression_api_only",
+      intentMode: "regression_http_only",
     },
     {
       inferTargetsFn: async () => ({

@@ -86,7 +86,7 @@ async function probeResetSingle(args: {
       url,
       timeoutMs,
     }),
-    response: { status: res.status, json: res.json, text: res.json ? undefined : res.text },
+    response: { status: res.status, json: res.json },
   };
   const json = res.json as Record<string, unknown> | null;
   const lineValidation = readLineValidation(json);
@@ -162,7 +162,6 @@ async function probeResetBatch(args: {
           reproStatus: "line_key_required",
           probeHit: "line probe key required (Class#method:<line>); method-only checks disabled",
           httpCode: 400,
-          httpResponse: { reset: false, reason: "line_key_required" },
         });
         continue;
       }
@@ -220,7 +219,6 @@ async function probeResetBatch(args: {
           }
         : {}),
       httpCode: res.status,
-      httpResponse: row,
     });
   }
   for (const key of requestedLineKeys) {
@@ -232,7 +230,6 @@ async function probeResetBatch(args: {
       reproStatus: "reset_failed",
       probeHit: "missing batch reset row for key",
       httpCode: res.status,
-      httpResponse: res.json ?? res.text,
     });
   }
   const orderedResults: Array<Record<string, unknown> & { apiOutcome: string }> = [];
@@ -255,7 +252,12 @@ async function probeResetBatch(args: {
     operation: "reset",
     request: { ...(keys ? { keys } : {}), ...(className ? { className } : {}), url, timeoutMs },
     results: orderedResults,
-    response: { status: res.status, json: res.json, text: res.json ? undefined : res.text },
+    response: {
+      status: res.status,
+      ...(typeof json?.reason === "string" ? { reason: json.reason } : {}),
+      ...(typeof json?.selector === "string" ? { selector: json.selector } : {}),
+      ...(typeof json?.className === "string" ? { className: json.className } : {}),
+    },
   });
 }
 
