@@ -134,11 +134,11 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
     assert.equal(out.structuredContent.response.json.runtime.serverMs, undefined);
     assert.equal(out.structuredContent.response.json.runtime.appPort.value, 8082);
     assert.equal(out.structuredContent.response.json.runtime.appPort.confidence, undefined);
-    assert.equal(out.structuredContent.request.key, undefined);
     assert.equal(
-      out.structuredContent.request.resolvedKey,
+      out.structuredContent.request.key,
       "com.example.Catalog#updateAndStageSynonymRule:122",
     );
+    assert.equal(out.structuredContent.request.resolvedKey, undefined);
   });
 });
 
@@ -162,11 +162,11 @@ test("probe_reset returns invalid_line_target semantics when runtime line is unr
     assert.match(parsed.probeHit, /counter reset requested/i);
     assert.equal(out.structuredContent.result.reason, "invalid_line_target");
     assert.equal(out.structuredContent.result.actionCode, "runtime_not_aligned");
-    assert.equal(out.structuredContent.request.key, undefined);
     assert.equal(
-      out.structuredContent.request.resolvedKey,
+      out.structuredContent.request.key,
       "com.example.Catalog#updateAndStageSynonymRule:122",
     );
+    assert.equal(out.structuredContent.request.resolvedKey, undefined);
   });
 });
 
@@ -346,6 +346,8 @@ test("probe_wait_for_hit emits minimal non-duplicative epoch fields", async () =
       });
       assert.equal(out.structuredContent.result.hit, true);
       assert.equal(out.structuredContent.result.inline, true);
+      assert.equal(out.structuredContent.request.key, key);
+      assert.equal(out.structuredContent.request.resolvedKey, undefined);
       assert.equal(out.structuredContent.request.waitStartEpochMs, 2_000);
       assert.equal(out.structuredContent.request.triggerWindowStartEpochMs, 1_000);
       assert.equal(out.structuredContent.request.inlineStartEpochMs, undefined);

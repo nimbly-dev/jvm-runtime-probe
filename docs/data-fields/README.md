@@ -116,7 +116,7 @@ Text vs structured content policy (probe tools):
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
-| `request` | Status request details (key, URL, timeout). | `probe_get_status` | true | `{"resolvedKey":"com.example.Catalog#save:88"}` |
+| `request` | Status request details (canonical `key`, URL, timeout; `resolvedKey` appears only when canonicalization differs). | `probe_get_status` | true | `{"key":"com.example.Catalog#save:88"}` |
 | `response` | Raw endpoint response after MCP normalization. | `probe_get_status` | true | `{"status":200,"json":{"hitCount":1}}` |
 | `response.json.contractVersion` | Probe contract marker. | `probe_get_status` | false | `"0.1.0"` |
 | `response.json.hitCount` | Probe hit counter for the line key. | `probe_get_status` | false | `1` |
@@ -153,7 +153,7 @@ Text vs structured content policy (probe tools):
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
-| `request` | Reset selector request details. | `probe_reset` | true | `{"resolvedKey":"com.example.Catalog#save:88"}` |
+| `request` | Reset selector request details (canonical `key`; optional `resolvedKey` only when transformed from input). | `probe_reset` | true | `{"key":"com.example.Catalog#save:88"}` |
 | `response` | Raw reset endpoint response payload. | `probe_reset` | true | `{"status":200,"json":{"ok":true}}` |
 | `result` | Guidance block when line target is invalid. | `probe_reset` | false | `{"reason":"invalid_line_target"}` |
 | `mode` | Batch marker for multi-key/class reset. | `probe_reset` | false | `"probe_batch"` |
@@ -165,7 +165,7 @@ Text vs structured content policy (probe tools):
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
-| `request` | Polling request and retry configuration. | `probe_wait_for_hit` | true | `{"resolvedKey":"com.example.Catalog#save:88","maxRetries":1}` |
+| `request` | Polling request and retry configuration (`key` canonical; optional `resolvedKey` only when transformed from input). | `probe_wait_for_hit` | true | `{"key":"com.example.Catalog#save:88","maxRetries":1}` |
 | `request.waitStartEpochMs` | Unix-epoch millisecond timestamp when current wait attempt started. | `probe_wait_for_hit` | false | `1773318672847` |
 | `request.waitStartIsoUtc` | ISO-8601 UTC timestamp for `waitStartEpochMs`. | `probe_wait_for_hit` | false | `"2026-03-11T14:57:52.847Z"` |
 | `request.triggerWindowStartEpochMs` | Reset-aware Unix-epoch start used for strict inline classification. | `probe_wait_for_hit` | false | `1773318658526` |
