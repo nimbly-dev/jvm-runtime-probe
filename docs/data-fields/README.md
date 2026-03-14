@@ -87,6 +87,8 @@ Text vs structured content policy (probe tools):
 | `status` | Recipe generation status for orchestration decisions (`*_ready` or fail-closed report status). | `probe_recipe_create` | true | `"single_line_probe_ready"` |
 | `reasonCode` | Deterministic synthesis/report reason code for fail-closed routing. | `probe_recipe_create` | false | `"spring_entrypoint_not_proven"` |
 | `failedStep` | Specific synthesis stage that failed proof. | `probe_recipe_create` | false | `"spring_entrypoint_resolution"` |
+| `reasonCode` (execution input gating) | When `status=execution_input_required`, reason maps to the first unresolved category (`auth_input_required`, `request_confirmation_required`, `actuation_input_required`, `line_target_required_for_probe_mode`, `request_candidate_missing`). | `probe_recipe_create` | false | `"request_confirmation_required"` |
+| `failedStep` (execution input gating) | Stage marker paired with execution-input reason (`auth_resolution`, `request_confirmation`, `actuation_resolution`, `intent_routing`, `request_synthesis`). | `probe_recipe_create` | false | `"request_confirmation"` |
 | `selectedMode` | Final routed intent mode. | `probe_recipe_create` | true | `"single_line_probe"` |
 | `executionReadiness` | Execution gate (`ready` or `needs_user_input`). | `probe_recipe_create` | true | `"ready"` |
 | `missingInputs` | Missing runtime/auth inputs blocking execution. | `probe_recipe_create` | true | `[]` |
@@ -125,7 +127,7 @@ Text vs structured content policy (probe tools):
 | `response.json.capturePreview.returnPreview` | Preview return metadata only (`truncated`, `originalLength`, `redacted`), intentionally excludes serialized value body. | `probe_get_status` | false | `{"truncated":false,"originalLength":896,"redacted":false}` |
 | `response.json.capturePreview.thrownPreview` | Preview thrown-value metadata only (`truncated`, `originalLength`, `redacted`) when an exception is captured. | `probe_get_status` | false | `null` |
 | `response.json.capturePreview.capturedAtEpochMs` | Capture preview Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200456` |
-| `response.json.capturePreview.executionPaths` | Optional compact execution-path frames captured at runtime (`root...Class.method()#line`). | `probe_get_status` | false | `["com.example...catalog.web.CatalogController.listCatalogShoes()#42"]` |
+| `response.json.capturePreview.executionPaths` | Optional execution-path frames captured at runtime (`ClassName.method()#line`, oldest-to-newest). | `probe_get_status` | false | `["CatalogController.listCatalogShoes()#42"]` |
 | `response.json.runtime` | Runtime actuation/observe mode payload. | `probe_get_status` | false | `{"mode":"observe"}` |
 | `response.json.runtime.serverEpochMs` | JVM host wall-clock Unix epoch milliseconds at status response build time. | `probe_get_status` | false | `1739671200123` |
 | `response.json.runtime.appPort.value` | Runtime application port hint when inferable (`null` when unknown). | `probe_get_status` | false | `8082` |
@@ -144,7 +146,7 @@ Text vs structured content policy (probe tools):
 | `response` | Raw `/__probe/capture` HTTP response payload. | `probe_get_capture` | true | `{"status":200,"json":{"capture":{"captureId":"abc123"}}}` |
 | `result.found` | Whether capture payload exists and was returned. | `probe_get_capture` | true | `true` |
 | `result.capture` | Full stored capture payload when found. | `probe_get_capture` | false | `{"methodKey":"com.example.Catalog#save","args":[...]}` |
-| `result.capture.executionPaths` | Optional compact execution-path frames captured for the method invocation. | `probe_get_capture` | false | `["com.example...catalog.service.CatalogService.save()#88"]` |
+| `result.capture.executionPaths` | Optional execution-path frames captured for the method invocation (`ClassName.method()#line`). | `probe_get_capture` | false | `["CatalogService.save()#88"]` |
 | `result.reason` | Error reason when capture is unavailable. | `probe_get_capture` | false | `"capture_not_found"` |
 
 ## probe_reset

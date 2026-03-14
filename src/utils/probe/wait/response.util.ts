@@ -28,7 +28,7 @@ type WaitStage = "baseline_status_check" | "poll_status_check";
 function buildWaitRequest(args: WaitRequestArgs, options?: { includeUnreachable?: boolean; stage?: WaitStage }) {
   const triggerLeadMs = Math.max(0, args.waitStartEpochMs - args.triggerWindowStartEpochMs);
   const request: Record<string, unknown> = {
-    key: args.key,
+    ...(args.key !== args.resolvedKey ? { key: args.key } : {}),
     resolvedKey: args.resolvedKey,
     timeoutMs: args.timeoutMs,
     pollIntervalMs: args.pollIntervalMs,
@@ -252,7 +252,7 @@ export function buildTimeoutNoInlineHitResponse(args: {
 }): ToolTextResponse {
   const structuredContent: Record<string, unknown> = {
     request: {
-      key: args.key,
+      ...(args.key !== args.resolvedKey ? { key: args.key } : {}),
       resolvedKey: args.resolvedKey,
       timeoutMs: args.timeoutMs,
       pollIntervalMs: args.pollIntervalMs,

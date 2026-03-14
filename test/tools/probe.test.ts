@@ -86,11 +86,11 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
         available: true,
         captureId: "abc123",
         capturedAtEpochMs: 5555,
-        executionPaths: [
-          "com.example...catalog.web.CatalogController.listCatalogShoes()#42",
-          "com.example...catalog.service.CatalogService.listCatalogShoes()#101",
-        ],
-      },
+            executionPaths: [
+              "CatalogController.listCatalogShoes()#42",
+              "CatalogService.listCatalogShoes()#101",
+            ],
+          },
       runtime: {
         mode: "observe",
         actuatorId: "",
@@ -125,15 +125,20 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
     assert.equal(out.structuredContent.response.json.capturePreview.captureId, "abc123");
     assert.equal(out.structuredContent.response.json.capturePreview.capturedAtEpochMs, 5555);
     assert.equal(out.structuredContent.response.json.capturePreview.capturedAtMs, undefined);
-    assert.deepEqual(out.structuredContent.response.json.capturePreview.executionPaths, [
-      "com.example...catalog.web.CatalogController.listCatalogShoes()#42",
-      "com.example...catalog.service.CatalogService.listCatalogShoes()#101",
-    ]);
+  assert.deepEqual(out.structuredContent.response.json.capturePreview.executionPaths, [
+    "CatalogController.listCatalogShoes()#42",
+    "CatalogService.listCatalogShoes()#101",
+  ]);
     assert.equal(out.structuredContent.response.json.runtime.applicationType, undefined);
     assert.equal(out.structuredContent.response.json.runtime.serverEpochMs, 7777);
     assert.equal(out.structuredContent.response.json.runtime.serverMs, undefined);
     assert.equal(out.structuredContent.response.json.runtime.appPort.value, 8082);
     assert.equal(out.structuredContent.response.json.runtime.appPort.confidence, undefined);
+    assert.equal(out.structuredContent.request.key, undefined);
+    assert.equal(
+      out.structuredContent.request.resolvedKey,
+      "com.example.Catalog#updateAndStageSynonymRule:122",
+    );
   });
 });
 
@@ -157,6 +162,11 @@ test("probe_reset returns invalid_line_target semantics when runtime line is unr
     assert.match(parsed.probeHit, /counter reset requested/i);
     assert.equal(out.structuredContent.result.reason, "invalid_line_target");
     assert.equal(out.structuredContent.result.actionCode, "runtime_not_aligned");
+    assert.equal(out.structuredContent.request.key, undefined);
+    assert.equal(
+      out.structuredContent.request.resolvedKey,
+      "com.example.Catalog#updateAndStageSynonymRule:122",
+    );
   });
 });
 
@@ -441,7 +451,7 @@ test("probe_get_status supports 0.1.0 batch rows with nested probe payload", asy
             available: true,
             captureId: "cap-1",
             capturedAtEpochMs: 4444,
-            executionPaths: ["com.example...catalog.web.CatalogController.listCatalogShoes()#42"],
+              executionPaths: ["CatalogController.listCatalogShoes()#42"],
           },
           runtime: {
             mode: "observe",
@@ -497,7 +507,7 @@ test("probe_get_capture returns capture payload when available", async () => {
         returnValue: { value: "{\"ok\":true}", truncated: false, originalLength: 11, redacted: false },
         thrownValue: null,
         truncatedAny: false,
-        executionPaths: ["com.example...catalog.core.repository.CatalogRepo.save()#88"],
+            executionPaths: ["CatalogRepo.save()#88"],
       },
     });
   }, async () => {
@@ -516,9 +526,9 @@ test("probe_get_capture returns capture payload when available", async () => {
     assert.equal(parsed.notes, "Use structuredContent.result.capture for full payload.");
     assert.equal(out.structuredContent.result.found, true);
     assert.equal(out.structuredContent.result.capture.captureId, "abc123");
-    assert.deepEqual(out.structuredContent.result.capture.executionPaths, [
-      "com.example...catalog.core.repository.CatalogRepo.save()#88",
-    ]);
+  assert.deepEqual(out.structuredContent.result.capture.executionPaths, [
+    "CatalogRepo.save()#88",
+  ]);
   });
 });
 

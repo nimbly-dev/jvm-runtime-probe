@@ -17,6 +17,22 @@ import {
   validateSelectorCount,
 } from "@/utils/probe/selector_batch.util";
 
+function buildSelectorRequest(args: {
+  key: string;
+  resolvedKey: string;
+  lineHint?: number;
+  timeoutMs: number;
+  url?: string;
+}): Record<string, unknown> {
+  return {
+    ...(args.key !== args.resolvedKey ? { key: args.key } : {}),
+    resolvedKey: args.resolvedKey,
+    ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
+    ...(typeof args.url === "string" ? { url: args.url } : {}),
+    timeoutMs: args.timeoutMs,
+  };
+}
+
 async function probeResetSingle(args: {
   key: string;
   lineHint?: number;
@@ -30,7 +46,12 @@ async function probeResetSingle(args: {
 
   if (!isLineKey(resolvedKey)) {
     return buildLineKeyRequiredResponse({
-      request: { key: args.key, resolvedKey, lineHint: args.lineHint, timeoutMs },
+      request: buildSelectorRequest({
+        key: args.key,
+        resolvedKey,
+        ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
+        timeoutMs,
+      }),
       targetPath: resolvedKey,
       httpRequest: `POST ${url}`,
       requestMethod: "POST",
@@ -55,7 +76,13 @@ async function probeResetSingle(args: {
   }
 
   const structuredContent: Record<string, unknown> = {
-    request: { key: args.key, resolvedKey, lineHint: args.lineHint, url, timeoutMs },
+    request: buildSelectorRequest({
+      key: args.key,
+      resolvedKey,
+      ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
+      url,
+      timeoutMs,
+    }),
     response: { status: res.status, json: res.json, text: res.json ? undefined : res.text },
   };
   const json = res.json as Record<string, unknown> | null;

@@ -74,6 +74,26 @@ test("execution readiness requires user confirmation when candidate is uncertain
   );
 });
 
+test("execution readiness does not block deterministic request candidates on informational confirmations", () => {
+  const readiness = buildExecutionReadiness({
+    selectedMode: "regression_api_only",
+    lineTargetProvided: false,
+    requestCandidate: {
+      ...requestCandidate,
+      needsConfirmation: ["Best-effort candidate from controller declaration; confirm mapping/auth before execution."],
+    },
+    deterministicRequestInferred: true,
+    auth: readyAuth,
+    actuationEnabled: false,
+  });
+
+  assert.equal(readiness.executionReadiness, "ready");
+  assert.equal(
+    readiness.missingInputs.some((m: any) => m.category === "confirmation"),
+    false,
+  );
+});
+
 test("execution readiness requires explicit actuation decision when enabled", () => {
   const readiness = buildExecutionReadiness({
     selectedMode: "single_line_probe",

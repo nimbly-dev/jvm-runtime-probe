@@ -227,6 +227,124 @@ test("reports auth_resolution when request exists but auth input is still requir
   assert.equal(result.failureReasonCode, "auth_input_required");
 });
 
+test("reports request_confirmation_required when unresolved confirmation blocks execution", async () => {
+  const result = await generateRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      classHint: "CatalogController",
+      methodHint: "listCatalogShoes",
+      intentMode: "regression_api_only",
+    },
+    {
+      inferTargetsFn: async () => ({
+        scannedJavaFiles: 20,
+        candidates: [
+          {
+            file: "C:\\repo\\service\\src\\main\\java\\CatalogController.java",
+            className: "CatalogController",
+            methodName: "listCatalogShoes",
+            line: 42,
+            key: "com.example.CatalogController#listCatalogShoes",
+            reasons: ["method exact match"],
+          },
+        ],
+      }),
+      synthesizerRegistry: {
+        synthesize: async () => ({
+          status: "recipe",
+          synthesizerUsed: "spring",
+          framework: "spring",
+          requestCandidate: {
+            method: "GET",
+            path: "/catalog/shoes",
+            queryTemplate: "",
+            fullUrlHint: "/catalog/shoes",
+            needsConfirmation: ["Confirm endpoint path in current environment."],
+            rationale: ["controller mapping"],
+          },
+          trigger: {
+            kind: "http",
+            method: "GET",
+            path: "/catalog/shoes",
+            queryTemplate: "",
+            fullUrlHint: "/catalog/shoes",
+            headers: {},
+          },
+          evidence: ["resolver=stub"],
+          attemptedStrategies: ["stub_strategy"],
+        }),
+      },
+      resolveAuthForRecipeFn: async () => okAuth,
+    },
+  );
+
+  assert.equal(result.status, "execution_input_required");
+  assert.equal(result.resultType, "report");
+  assert.equal(result.failurePhase, "request_inference");
+  assert.equal(result.failureReasonCode, "request_confirmation_required");
+  assert.equal(result.reasonCode, "request_confirmation_required");
+  assert.equal(result.failedStep, "request_confirmation");
+});
+
+test("keeps deterministic spring request ready even when informational confirmation note is present", async () => {
+  const result = await generateRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      classHint: "CatalogController",
+      methodHint: "listCatalogShoes",
+      intentMode: "regression_api_only",
+    },
+    {
+      inferTargetsFn: async () => ({
+        scannedJavaFiles: 20,
+        candidates: [
+          {
+            file: "C:\\repo\\service\\src\\main\\java\\CatalogController.java",
+            className: "CatalogController",
+            methodName: "listCatalogShoes",
+            line: 42,
+            key: "com.example.CatalogController#listCatalogShoes",
+            reasons: ["method exact match"],
+          },
+        ],
+      }),
+      synthesizerRegistry: {
+        synthesize: async () => ({
+          status: "recipe",
+          synthesizerUsed: "spring",
+          framework: "spring",
+          requestCandidate: {
+            method: "GET",
+            path: "/catalog/shoes",
+            queryTemplate: "",
+            fullUrlHint: "/catalog/shoes",
+            needsConfirmation: ["Best-effort candidate from controller declaration; confirm mapping/auth before execution."],
+            rationale: ["controller mapping"],
+          },
+          trigger: {
+            kind: "http",
+            method: "GET",
+            path: "/catalog/shoes",
+            queryTemplate: "",
+            fullUrlHint: "/catalog/shoes",
+            headers: {},
+          },
+          requestSource: "spring_mvc",
+          evidence: ["resolver=stub"],
+          attemptedStrategies: ["stub_strategy"],
+        }),
+      },
+      resolveAuthForRecipeFn: async () => okAuth,
+    },
+  );
+
+  assert.equal(result.resultType, "recipe");
+  assert.equal(result.status, "regression_api_only_ready");
+  assert.equal(result.executionReadiness, "ready");
+});
+
 test("applies apiBasePath prefix to synthesized request candidate and trigger", async () => {
   const result = await generateRecipe(
     {

@@ -49,14 +49,19 @@ public final class ProbeRuntime {
   private static volatile String CAPTURE_REDACTION_MODE = "basic";
   private static final int CAPTURE_EXECUTION_PATH_MAX_FRAMES = 12;
   private static final int EXECUTION_PATH_ROOT_PACKAGE_SEGMENTS = 2;
+  private static final int EXECUTION_PATH_TAIL_SEGMENTS = 2;
   private static final String[] EXECUTION_PATH_EXCLUDED_PREFIXES = new String[] {
       "com.nimbly.mcpjvmdebugger.agent.",
       "java.",
       "javax.",
       "jdk.",
       "sun.",
-      "net.bytebuddy."
+      "net.bytebuddy.",
+      "org.apache.",
+      "org.springframework."
   };
+  private static volatile List<Pattern> EXECUTION_PATH_INCLUDE_REGEX = Collections.emptyList();
+  private static volatile List<Pattern> EXECUTION_PATH_EXCLUDE_REGEX = Collections.emptyList();
   private static volatile RuntimeStringSignal APPLICATION_TYPE_SIGNAL =
       new RuntimeStringSignal("unknown", "runtime_introspection", 0.1);
 
@@ -102,6 +107,11 @@ public final class ProbeRuntime {
       CAPTURE_STORED_MAX_CHARS = CAPTURE_PREVIEW_MAX_CHARS;
     }
     CAPTURE_REDACTION_MODE = "off".equalsIgnoreCase(captureRedactionMode) ? "off" : "basic";
+  }
+
+  static void configureExecutionPathScope(List<String> includePatterns, List<String> excludePatterns) {
+    EXECUTION_PATH_INCLUDE_REGEX = compileGlobPatterns(includePatterns);
+    EXECUTION_PATH_EXCLUDE_REGEX = compileGlobPatterns(excludePatterns);
   }
 
   public static void hit(String key) {
@@ -750,10 +760,18 @@ public final class ProbeRuntime {
     List<String> out = new ArrayList<>();
     String previous = null;
     for (StackTraceElement frame : frames) {
+      String normalizedClassName = normalizeExecutionClassName(frame.getClassName(), dottedClassName);
+      int renderedLine = frame.getLineNumber();
+      if (renderedLine <= 0
+          && dottedClassName.equals(normalizedClassName)
+          && methodName.equals(frame.getMethodName())
+          && fallbackLine > 0) {
+        renderedLine = fallbackLine;
+      }
       String rendered = formatExecutionFrame(
-          frame.getClassName(),
+          normalizedClassName,
           frame.getMethodName(),
-          frame.getLineNumber(),
+          renderedLine,
           rootPackage
       );
       if (rendered.equals(previous)) continue;
@@ -776,7 +794,69 @@ public final class ProbeRuntime {
         return true;
       }
     }
+    List<Pattern> includeRegex = EXECUTION_PATH_INCLUDE_REGEX;
+    if (!includeRegex.isEmpty() && !matchesAny(includeRegex, className)) {
+      return true;
+    }
+    List<Pattern> excludeRegex = EXECUTION_PATH_EXCLUDE_REGEX;
+    if (!excludeRegex.isEmpty() && matchesAny(excludeRegex, className)) {
+      return true;
+    }
     return false;
+  }
+
+  private static boolean matchesAny(List<Pattern> patterns, String value) {
+    for (Pattern pattern : patterns) {
+      if (pattern.matcher(value).matches()) return true;
+    }
+    return false;
+  }
+
+  private static List<Pattern> compileGlobPatterns(List<String> patterns) {
+    if (patterns == null || patterns.isEmpty()) return Collections.emptyList();
+    List<Pattern> out = new ArrayList<>();
+    for (String raw : patterns) {
+      String pattern = raw == null ? "" : raw.trim();
+      if (pattern.isEmpty()) continue;
+      out.add(Pattern.compile(globToRegex(pattern)));
+    }
+    return out;
+  }
+
+  private static String globToRegex(String globOrPrefix) {
+    boolean hasWildcard = globOrPrefix.indexOf('*') >= 0;
+    String normalized = hasWildcard
+        ? globOrPrefix
+        : (globOrPrefix.endsWith(".") ? globOrPrefix + "**" : globOrPrefix + ".**");
+
+    StringBuilder out = new StringBuilder("^");
+    int idx = 0;
+    while (idx < normalized.length()) {
+      char ch = normalized.charAt(idx);
+      if (ch == '*') {
+        if (idx + 1 < normalized.length() && normalized.charAt(idx + 1) == '*') {
+          out.append(".*");
+          idx += 2;
+        } else {
+          out.append("[^.]*");
+          idx++;
+        }
+      } else {
+        out.append(Pattern.quote(String.valueOf(ch)));
+        idx++;
+      }
+    }
+    out.append("$");
+    return out.toString();
+  }
+
+  private static String normalizeExecutionClassName(String className, String targetClassName) {
+    if (className == null || className.isBlank()) return "UnknownClass";
+    if (targetClassName == null || targetClassName.isBlank()) return className;
+    if (className.startsWith(targetClassName + "$$")) {
+      return targetClassName;
+    }
+    return className;
   }
 
   private static String deriveExecutionPathRootPackage(String className) {
@@ -804,14 +884,9 @@ public final class ProbeRuntime {
     String cls = (className == null || className.isBlank()) ? "UnknownClass" : className;
     String method = (methodName == null || methodName.isBlank()) ? "<unknown>" : methodName;
     String line = lineNumber > 0 ? String.valueOf(lineNumber) : "?";
-    String prefix = cls;
-    if (rootPackage != null && !rootPackage.isBlank()) {
-      String compactClass = cls.startsWith(rootPackage + ".")
-          ? cls.substring(rootPackage.length() + 1)
-          : cls;
-      prefix = rootPackage + "..." + compactClass;
-    }
-    return prefix + "." + method + "()#" + line;
+    int lastDot = cls.lastIndexOf('.');
+    String simpleClass = lastDot >= 0 ? cls.substring(lastDot + 1) : cls;
+    return simpleClass + "." + method + "()#" + line;
   }
 
   private static int clamp(int value, int min, int max, int defaultValue) {

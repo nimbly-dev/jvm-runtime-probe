@@ -28,6 +28,7 @@ public final class ProbeAgent {
         cfg.captureStoredMaxChars,
         cfg.captureRedactionMode
     );
+    ProbeRuntime.configureExecutionPathScope(cfg.includePatterns, cfg.excludePatterns);
 
     try {
       ProbeHttpServer http = ProbeHttpServer.start(cfg.host, cfg.port);

@@ -27,6 +27,26 @@ import {
 } from "@/utils/probe/wait/response.util";
 import { hasBaselineInlineHit, isInlineByTime, resolveProbeWaitWindow } from "@/utils/probe/wait/window.util";
 
+function buildSelectorRequest(args: {
+  key: string;
+  resolvedKey: string;
+  timeoutMs: number;
+  pollIntervalMs: number;
+  maxRetries: number;
+  unreachableRetryEnabled: boolean;
+  unreachableMaxRetries: number;
+}): Record<string, unknown> {
+  return {
+    key: args.key,
+    resolvedKey: args.resolvedKey,
+    timeoutMs: args.timeoutMs,
+    pollIntervalMs: args.pollIntervalMs,
+    maxRetries: args.maxRetries,
+    unreachableRetryEnabled: args.unreachableRetryEnabled,
+    unreachableMaxRetries: args.unreachableMaxRetries,
+  };
+}
+
 export async function probeWaitHit(args: {
   key: string;
   lineHint?: number;
@@ -60,7 +80,7 @@ export async function probeWaitHit(args: {
 
   if (!isLineKey(resolvedKey)) {
     return buildLineKeyRequiredResponse({
-      request: {
+      request: buildSelectorRequest({
         key: args.key,
         resolvedKey,
         timeoutMs,
@@ -68,7 +88,7 @@ export async function probeWaitHit(args: {
         maxRetries,
         unreachableRetryEnabled,
         unreachableMaxRetries,
-      },
+      }),
       targetPath: resolvedKey,
       httpRequest: `POLL ${pollUrl} (maxRetries=${maxRetries}, pollMs=${pollIntervalMs})`,
       requestMethod: "POLL",

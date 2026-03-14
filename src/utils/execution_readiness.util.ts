@@ -10,6 +10,7 @@ type ReadinessArgs = {
   selectedMode: IntentMode;
   lineTargetProvided: boolean;
   requestCandidate?: RecipeCandidate;
+  deterministicRequestInferred?: boolean;
   auth: AuthResolution;
   actuationEnabled: boolean;
   actuationReturnBoolean?: boolean;
@@ -64,11 +65,14 @@ export function collectMissingExecutionInputs(args: ReadinessArgs): MissingExecu
     }
   }
 
-  if (args.requestCandidate?.needsConfirmation?.length) {
+  const confirmationNotes = args.requestCandidate?.needsConfirmation ?? [];
+  const hasBlockingConfirmation =
+    confirmationNotes.length > 0 && !args.deterministicRequestInferred;
+  if (hasBlockingConfirmation) {
     missingInputs.push({
       category: "confirmation",
       field: "requestCandidate.needsConfirmation",
-      reason: `Request candidate has unresolved confirmations: ${args.requestCandidate.needsConfirmation.join(" ")}`,
+      reason: `Request candidate has unresolved confirmations: ${confirmationNotes.join(" ")}`,
       suggestedAction:
         "Confirm the inferred endpoint/method assumptions before executing the trigger request.",
     });

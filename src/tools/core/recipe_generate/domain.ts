@@ -139,6 +139,48 @@ function applyApiBasePathToTrigger(
   };
 }
 
+function mapExecutionInputFailure(missingInputs: MissingExecutionInput[]): {
+  failurePhase: InferenceFailurePhase;
+  failureReasonCode: string;
+  failedStep: string;
+} | undefined {
+  const first = missingInputs[0];
+  if (!first) return undefined;
+  switch (first.category) {
+    case "probe":
+      return {
+        failurePhase: "target_inference",
+        failureReasonCode: "line_target_required_for_probe_mode",
+        failedStep: "intent_routing",
+      };
+    case "request":
+      return {
+        failurePhase: "request_inference",
+        failureReasonCode: "request_candidate_missing",
+        failedStep: "request_synthesis",
+      };
+    case "confirmation":
+      return {
+        failurePhase: "request_inference",
+        failureReasonCode: "request_confirmation_required",
+        failedStep: "request_confirmation",
+      };
+    case "actuation":
+      return {
+        failurePhase: "auth_resolution",
+        failureReasonCode: "actuation_input_required",
+        failedStep: "actuation_resolution",
+      };
+    case "auth":
+    default:
+      return {
+        failurePhase: "auth_resolution",
+        failureReasonCode: "auth_input_required",
+        failedStep: "auth_resolution",
+      };
+  }
+}
+
 export async function generateRecipe(
   args: {
     rootAbs: string;
@@ -440,13 +482,17 @@ export async function generateRecipe(
       ? { actuationReturnBoolean: normalized.actuationReturnBoolean }
       : {}),
     ...(bestRequest ? { requestCandidate: bestRequest } : {}),
+    deterministicRequestInferred: Boolean(inferenceDiagnostics.request.matched && inferenceDiagnostics.request.source),
   });
   if (readiness.executionReadiness === "needs_user_input") {
     resultType = "report";
     if (status !== "api_request_not_inferred" && status !== "target_not_inferred") {
+      const readinessFailure = mapExecutionInputFailure(readiness.missingInputs);
       status = "execution_input_required";
-      failurePhase = "auth_resolution";
-      failureReasonCode = "auth_input_required";
+      failurePhase = readinessFailure?.failurePhase ?? "auth_resolution";
+      failureReasonCode = readinessFailure?.failureReasonCode ?? "auth_input_required";
+      failedStep = failedStep ?? readinessFailure?.failedStep;
+      reasonCode = reasonCode ?? readinessFailure?.failureReasonCode;
     }
     if (!nextAction && readiness.nextAction) nextAction = readiness.nextAction;
   }
