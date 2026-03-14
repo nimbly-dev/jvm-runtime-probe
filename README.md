@@ -137,9 +137,11 @@ Optional:
 - `MCP_JAVA_REQUEST_MAPPING_RESOLVER_JAR`
 - `MCP_JAVA_REQUEST_MAPPING_RESOLVER_CLASSPATH`
 - `MCP_JAVA_BIN`
+- `MCP_PROBE_LINE_SELECTION_MAX_SCAN_LINES` (default `120`, min `10`, max `2000`)
 - `MCP_PROBE_WAIT_MAX_RETRIES` (default `1`, max `10`)
 - `MCP_PROBE_WAIT_UNREACHABLE_RETRY_ENABLED` (default `false`)
 - `MCP_PROBE_WAIT_UNREACHABLE_MAX_RETRIES` (default `3`, max `10`)
+- `MCP_PROBE_INCLUDE_EXECUTION_PATHS` (default `false`; set `true` to include executionPaths arrays in probe payloads)
 
 Probe endpoint paths are fixed and non-overridable:
 

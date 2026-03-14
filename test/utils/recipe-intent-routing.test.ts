@@ -6,9 +6,9 @@ const {
   resolveSelectedMode,
 } = require("@/utils/recipe_intent_routing.util");
 
-test("regression_api_only keeps regression mode and disables probe tools", () => {
-  const decision = resolveSelectedMode(buildRoutingContext({ intentMode: "regression_api_only" }));
-  assert.equal(decision.selectedMode, "regression_api_only");
+test("regression_http_only keeps regression mode and disables probe tools", () => {
+  const decision = resolveSelectedMode(buildRoutingContext({ intentMode: "regression_http_only" }));
+  assert.equal(decision.selectedMode, "regression_http_only");
   assert.equal(decision.probeIntentRequested, false);
   assert.equal(decision.lineTargetProvided, false);
 });

@@ -18,7 +18,7 @@ test("recipe domain emits fail-closed synthesis diagnostics", async () => {
       workspaceRootAbs: "C:\\repo",
       classHint: "CatalogService",
       methodHint: "finalPriceLte",
-      intentMode: "regression_api_only",
+      intentMode: "regression_http_only",
     },
     {
       inferTargetsFn: async () => ({

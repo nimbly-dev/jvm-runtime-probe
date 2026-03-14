@@ -40,7 +40,7 @@ function toActionCode(step: { title: string }): string {
 }
 
 function compactRoutingReason(selectedMode: string): string {
-  if (selectedMode === "regression_api_only") return "regression_api_only_no_probe";
+  if (selectedMode === "regression_http_only") return "regression_http_only_no_probe";
   if (selectedMode === "single_line_probe") return "single_line_probe";
   if (selectedMode === "regression_plus_line_probe") return "regression_plus_line_probe";
   return "mode_selected";
@@ -64,6 +64,23 @@ function compactExecutionPlanForOutput(args: {
       actionCode: toActionCode(step),
     })),
     probeCallPlan: args.executionPlan.probeCallPlan,
+  };
+}
+
+function compactExecutionPlanForText(executionPlan: {
+  selectedMode: string;
+  routingReason: string;
+  steps: Array<{ phase: string; title: string; instruction: string }>;
+  probeCallPlan: unknown;
+}) {
+  return {
+    selectedMode: executionPlan.selectedMode,
+    routingReason: compactRoutingReason(executionPlan.selectedMode),
+    steps: executionPlan.steps.map((step) => ({
+      phase: step.phase,
+      actionCode: toActionCode(step),
+    })),
+    probeCallPlan: executionPlan.probeCallPlan,
   };
 }
 
@@ -281,20 +298,41 @@ export function registerRecipeCreateTool(
         ...(generated.failedStep ? { failedStep: generated.failedStep } : {}),
         ...(generated.synthesizerUsed ? { synthesizerUsed: generated.synthesizerUsed } : {}),
         ...(generated.applicationType ? { applicationType: generated.applicationType } : {}),
-        ...(generated.trigger ? { trigger: generated.trigger } : {}),
-        attemptedStrategies: generated.attemptedStrategies,
-        evidence: generated.evidence,
+        ...(generated.trigger
+          ? {
+              trigger: {
+                kind: generated.trigger.kind,
+                method: generated.trigger.method,
+                path: generated.trigger.path,
+                queryTemplate: generated.trigger.queryTemplate,
+              },
+            }
+          : {}),
+        attemptedStrategies: generated.attemptedStrategies.slice(0, 6),
         inferenceDiagnostics: generated.inferenceDiagnostics,
         routingReason: generated.executionPlan.routingReason,
         inferredTarget: structuredContent.inferredTarget,
-        requestCandidates: generated.requestCandidates,
-        executionPlan: compactExecutionPlanForOutput({
-          resultType: generated.resultType,
-          executionPlan: generated.executionPlan,
-        }),
+        requestCandidates: generated.requestCandidates.map((candidate) => ({
+          method: candidate.method,
+          path: candidate.path,
+          queryTemplate: candidate.queryTemplate,
+        })),
+        executionPlan: compactExecutionPlanForText(generated.executionPlan),
         auth: generated.auth,
-        notes: generated.notes,
-        runtimeCapture,
+        runtimeCapture:
+          runtimeCapture.status === "available"
+            ? {
+                status: "available",
+                capturePreview: {
+                  available: true,
+                  captureId: runtimeCapture.capturePreview?.captureId,
+                  capturedAtEpochMs: runtimeCapture.capturePreview?.capturedAtEpochMs,
+                },
+                lineValidation: runtimeCapture.lineValidation,
+                lineResolvable: runtimeCapture.lineResolvable,
+              }
+            : runtimeCapture,
+        notes: generated.notes.slice(0, 6),
       };
       return {
         content: [

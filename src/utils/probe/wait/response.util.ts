@@ -2,6 +2,7 @@ import type { ToolTextResponse } from "@/models/tool_response.model";
 import { classifyExecutionHitStrictLine, classifyReproStatusStrictLine } from "@/utils/probe/key.util";
 import { formatProbeOutput } from "@/utils/probe/output.util";
 import { buildTextResponse } from "@/utils/probe/response_builders.util";
+import { compactStatusPayload } from "@/utils/probe/compact_payload.util";
 import {
   GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW,
   GUIDANCE_PROBE_CONNECTIVITY_ISSUE,
@@ -25,6 +26,19 @@ type WaitRequestArgs = {
 
 type WaitStage = "baseline_status_check" | "poll_status_check";
 
+function compactWaitStatus(status: Record<string, unknown> | null): Record<string, unknown> | null {
+  if (!status) return null;
+  const response =
+    typeof status.response === "object" && status.response !== null
+      ? (status.response as Record<string, unknown>)
+      : null;
+  const fromResponse =
+    response && typeof response.json === "object" && response.json !== null
+      ? (response.json as Record<string, unknown>)
+      : null;
+  return compactStatusPayload(fromResponse ?? status);
+}
+
 function buildWaitRequest(args: WaitRequestArgs, options?: { includeUnreachable?: boolean; stage?: WaitStage }) {
   const triggerLeadMs = Math.max(0, args.waitStartEpochMs - args.triggerWindowStartEpochMs);
   const keyFields =
@@ -38,9 +52,7 @@ function buildWaitRequest(args: WaitRequestArgs, options?: { includeUnreachable?
     maxRetries: args.maxRetries,
     attempt: args.attempt,
     waitStartEpochMs: args.waitStartEpochMs,
-    waitStartIsoUtc: new Date(args.waitStartEpochMs).toISOString(),
     triggerWindowStartEpochMs: args.triggerWindowStartEpochMs,
-    triggerWindowStartIsoUtc: new Date(args.triggerWindowStartEpochMs).toISOString(),
     triggerLeadMs,
   };
   if (options?.includeUnreachable) {
@@ -125,7 +137,7 @@ export function buildInvalidLineTargetResponse(args: {
       actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
       nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
       lineValidation: args.lineValidation,
-      lastStatus: args.lastStatus,
+      lastStatus: compactWaitStatus(args.lastStatus),
     },
   };
   if (args.baseline) {
@@ -176,7 +188,7 @@ export function buildBaselineInlineHitResponse(args: {
       source: "already_hit_since_inline_start",
       hitCount: args.baselineHitCount,
       hitDelta: 0,
-      lastStatus: args.lastStatus,
+      lastStatus: compactWaitStatus(args.lastStatus),
     },
   };
   const text = formatProbeOutput({
@@ -215,7 +227,13 @@ export function buildPolledInlineHitResponse(args: {
   const structuredContent: Record<string, unknown> = {
     request: buildWaitRequest(args.request, { includeUnreachable: true }),
     baseline: { hitCount: args.baselineHitCount, lastHitEpochMs: args.baselineLastHitEpochMs },
-    result: { hit: true, inline: true, hitCount: args.hitCount, hitDelta: args.hitDelta, lastStatus: args.lastStatus },
+    result: {
+      hit: true,
+      inline: true,
+      hitCount: args.hitCount,
+      hitDelta: args.hitDelta,
+      lastStatus: compactWaitStatus(args.lastStatus),
+    },
   };
   const text = formatProbeOutput({
     probeKey: args.request.resolvedKey,
@@ -272,7 +290,7 @@ export function buildTimeoutNoInlineHitResponse(args: {
       reason: "timeout_no_inline_hit",
       actionCode: GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW.actionCode,
       nextAction: GUIDANCE_LINE_NOT_EXECUTED_IN_WINDOW.nextAction,
-      last: args.last,
+      lastStatus: compactWaitStatus(args.last),
       staleCandidate: args.staleCandidate,
     },
   };
@@ -291,7 +309,9 @@ export function buildTimeoutNoInlineHitResponse(args: {
     httpCode: 408,
     httpResponse: structuredContent.result,
     runtimeMode:
-      typeof (args.last as any)?.response?.json?.mode === "string" ? (args.last as any).response.json.mode : undefined,
+      typeof compactWaitStatus(args.last)?.mode === "string"
+        ? (compactWaitStatus(args.last)?.mode as string)
+        : undefined,
     runDuration: `${args.timeoutMs}ms x ${args.maxRetries}`,
     runNotes: "probe_wait_for_hit timeout",
   });

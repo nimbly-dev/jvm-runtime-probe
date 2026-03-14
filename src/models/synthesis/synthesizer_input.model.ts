@@ -1,5 +1,5 @@
 export type SynthesizerIntentMode =
-  | "regression_api_only"
+  | "regression_http_only"
   | "single_line_probe"
   | "regression_plus_line_probe";
 

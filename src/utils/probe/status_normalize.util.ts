@@ -1,3 +1,9 @@
+import {
+  compactCapturePreview,
+  compactRuntimeHints,
+  compactStatusPayload,
+} from "@/utils/probe/compact_payload.util";
+
 export function readLineValidation(json: Record<string, unknown> | null): {
   lineValidation?: string;
   lineResolvable?: boolean;
@@ -9,37 +15,6 @@ export function readLineValidation(json: Record<string, unknown> | null): {
   if (typeof json?.lineValidation === "string") out.lineValidation = json.lineValidation;
   if (typeof json?.lineResolvable === "boolean") out.lineResolvable = json.lineResolvable;
   out.invalidLineTarget = out.lineValidation === "invalid_line_target" || out.lineResolvable === false;
-  return out;
-}
-
-function sanitizeRuntimeHints(runtime: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...runtime };
-  if (typeof out.serverMs === "number" && typeof out.serverEpochMs !== "number") {
-    out.serverEpochMs = out.serverMs;
-    delete out.serverMs;
-  }
-  // Runtime applicationType is intentionally omitted from MCP status payloads.
-  delete out.applicationType;
-  const appPort =
-    typeof out.appPort === "object" && out.appPort !== null
-      ? { ...(out.appPort as Record<string, unknown>) }
-      : undefined;
-  if (appPort) {
-    delete appPort.confidence;
-    out.appPort = appPort;
-  }
-  return out;
-}
-
-function sanitizeCapturePreview(capturePreview: Record<string, unknown>): Record<string, unknown> {
-  const out: Record<string, unknown> = { ...capturePreview };
-  if (typeof out.capturedAtMs === "number" && typeof out.capturedAtEpochMs !== "number") {
-    out.capturedAtEpochMs = out.capturedAtMs;
-    delete out.capturedAtMs;
-  }
-  if (Array.isArray(out.executionPaths)) {
-    out.executionPaths = out.executionPaths.filter((value) => typeof value === "string");
-  }
   return out;
 }
 
@@ -62,18 +37,20 @@ export function normalizeStatusJson(
   }
   if (typeof raw.contractVersion === "string") out.contractVersion = raw.contractVersion;
   if (typeof raw.capturePreview === "object" && raw.capturePreview !== null) {
-    out.capturePreview = sanitizeCapturePreview(raw.capturePreview as Record<string, unknown>);
+    out.capturePreview = compactCapturePreview(raw.capturePreview as Record<string, unknown>);
   }
   if (runtime) {
-    const sanitizedRuntime = sanitizeRuntimeHints(runtime);
+    const sanitizedRuntime = compactRuntimeHints(runtime);
     out.runtime = sanitizedRuntime;
     if (typeof sanitizedRuntime.mode === "string") out.mode = sanitizedRuntime.mode;
   }
-  return out;
+  return compactStatusPayload(out);
 }
 
 export function normalizeStatusBatchRow(raw: Record<string, unknown>): Record<string, unknown> {
-  if (typeof raw.probe !== "object" || raw.probe === null) return raw;
+  if (typeof raw.probe !== "object" || raw.probe === null) {
+    return compactStatusPayload(raw) ?? raw;
+  }
   const out: Record<string, unknown> = {
     ...(raw.probe as Record<string, unknown>),
   };
@@ -83,15 +60,15 @@ export function normalizeStatusBatchRow(raw: Record<string, unknown>): Record<st
   }
   if (typeof raw.ok === "boolean") out.ok = raw.ok;
   if (typeof raw.capturePreview === "object" && raw.capturePreview !== null) {
-    out.capturePreview = sanitizeCapturePreview(raw.capturePreview as Record<string, unknown>);
+    out.capturePreview = compactCapturePreview(raw.capturePreview as Record<string, unknown>);
   }
   if (typeof raw.runtime === "object" && raw.runtime !== null) {
-    const sanitizedRuntime = sanitizeRuntimeHints(raw.runtime as Record<string, unknown>);
+    const sanitizedRuntime = compactRuntimeHints(raw.runtime as Record<string, unknown>);
     out.runtime = sanitizedRuntime;
     const mode = sanitizedRuntime.mode;
     if (typeof mode === "string") out.mode = mode;
   }
-  return out;
+  return compactStatusPayload(out) ?? {};
 }
 
 export function normalizeStatusBatchPayload(raw: unknown): unknown {

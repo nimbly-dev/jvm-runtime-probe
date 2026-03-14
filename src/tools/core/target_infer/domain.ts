@@ -5,9 +5,12 @@ export type InferredTarget = {
   file: string;
   className?: string;
   methodName?: string;
-  line?: number;
+  line?: number | null;
   declarationLine?: number;
-  firstExecutableLine?: number;
+  endLine?: number;
+  firstExecutableLine?: number | null;
+  lineSelectionStatus?: "validated" | "unresolved";
+  lineSelectionSource?: "runtime_probe_validation";
   signature?: string;
   returnsBoolean?: boolean;
   fqcn?: string;
@@ -20,7 +23,9 @@ export type ClassMethodSpan = {
   signature: string;
   startLine: number;
   endLine: number;
-  firstExecutableLine?: number;
+  firstExecutableLine?: number | null;
+  lineSelectionStatus?: "validated" | "unresolved";
+  lineSelectionSource?: "runtime_probe_validation";
   probeKey?: string;
 };
 
@@ -71,7 +76,7 @@ function scoreCandidate(args: {
   className?: string;
   methodName?: string;
   declarationLine?: number;
-  firstExecutableLine?: number;
+  firstExecutableLine?: number | null;
 }): { score: number; reasons: string[] } {
   const reasons: string[] = [];
   let score = 1;
@@ -167,6 +172,7 @@ export async function inferTargets(args: {
       };
       if (f.className) candidate.className = f.className;
       candidate.declarationLine = m.declarationLine;
+      candidate.endLine = m.endLine;
       candidate.firstExecutableLine = m.firstExecutableLine;
       candidate.line = m.firstExecutableLine;
       if (fqcn) {
