@@ -42,9 +42,43 @@ test("enrichRuntimeCapture returns available when capturePreview is present", as
   });
   assert.equal(out.status, "available");
   assert.equal(out.capturePreview.captureId, "abc123");
-  assert.deepEqual(out.capturePreview.executionPaths, [
-    "CatalogController.listCatalogShoes()#42",
-  ]);
+  assert.equal(out.capturePreview.executionPaths, undefined);
+});
+
+test("enrichRuntimeCapture includes executionPaths when env is enabled", async () => {
+  const previous = process.env.MCP_PROBE_INCLUDE_EXECUTION_PATHS;
+  process.env.MCP_PROBE_INCLUDE_EXECUTION_PATHS = "true";
+  try {
+    const out = await enrichRuntimeCapture({
+      inferredKey: "com.example.Catalog#save",
+      inferredLine: 88,
+      probeBaseUrl: "http://127.0.0.1:9191",
+      probeStatusPath: "/__probe/status",
+      probeStatusFn: async () => ({
+        content: [{ type: "text", text: "{}" }],
+        structuredContent: {
+          response: {
+            status: 200,
+            json: {
+              hitCount: 1,
+              capturePreview: {
+                available: true,
+                captureId: "abc123",
+                executionPaths: ["CatalogController.listCatalogShoes()#42"],
+              },
+            },
+          },
+        },
+      }),
+    });
+    assert.equal(out.status, "available");
+    assert.deepEqual(out.capturePreview.executionPaths, [
+      "CatalogController.listCatalogShoes()#42",
+    ]);
+  } finally {
+    if (typeof previous === "string") process.env.MCP_PROBE_INCLUDE_EXECUTION_PATHS = previous;
+    else delete process.env.MCP_PROBE_INCLUDE_EXECUTION_PATHS;
+  }
 });
 
 test("enrichRuntimeCapture returns not_captured_yet when preview is absent", async () => {

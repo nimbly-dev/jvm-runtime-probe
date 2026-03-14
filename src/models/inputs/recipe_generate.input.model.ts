@@ -16,7 +16,7 @@ export const RecipeGenerateInputSchema = {
       "Optional API context/base path (for example /api/v1). Applied by orchestration to request candidates and trigger paths.",
     ),
   intentMode: z
-    .enum(["regression_api_only", "single_line_probe", "regression_plus_line_probe"])
+    .enum(["regression_http_only", "single_line_probe", "regression_plus_line_probe"])
     .describe("Required execution intent routing mode."),
   authToken: z
     .string()

@@ -123,7 +123,7 @@ export function buildRecipeTemplateModel(args: {
   const planMode = generated.executionPlan.selectedMode;
   const planReason = generated.executionPlan.routingReason;
   const successCriterion =
-    generated.selectedMode === "regression_api_only"
+    generated.selectedMode === "regression_http_only"
       ? "api_regression_only"
       : typeof lineHint === "number"
         ? "line_hit (probe key Class#method:line; breakpoint optional)"

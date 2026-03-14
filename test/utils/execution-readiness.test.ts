@@ -34,7 +34,7 @@ test("execution readiness is ready when required inputs are present", () => {
 
 test("execution readiness requires user input when auth is unresolved", () => {
   const readiness = buildExecutionReadiness({
-    selectedMode: "regression_api_only",
+    selectedMode: "regression_http_only",
     lineTargetProvided: false,
     requestCandidate,
     auth: {
@@ -57,7 +57,7 @@ test("execution readiness requires user input when auth is unresolved", () => {
 
 test("execution readiness requires user confirmation when candidate is uncertain", () => {
   const readiness = buildExecutionReadiness({
-    selectedMode: "regression_api_only",
+    selectedMode: "regression_http_only",
     lineTargetProvided: false,
     requestCandidate: {
       ...requestCandidate,
@@ -76,7 +76,7 @@ test("execution readiness requires user confirmation when candidate is uncertain
 
 test("execution readiness does not block deterministic request candidates on informational confirmations", () => {
   const readiness = buildExecutionReadiness({
-    selectedMode: "regression_api_only",
+    selectedMode: "regression_http_only",
     lineTargetProvided: false,
     requestCandidate: {
       ...requestCandidate,

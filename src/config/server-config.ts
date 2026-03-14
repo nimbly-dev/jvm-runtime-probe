@@ -11,6 +11,7 @@ export type ServerConfig = {
   probeStatusPath: string;
   probeResetPath: string;
   probeCapturePath: string;
+  probeLineSelectionMaxScanLines: number;
   probeWaitMaxRetries: number;
   probeWaitUnreachableRetryEnabled: boolean;
   probeWaitUnreachableMaxRetries: number;
@@ -44,6 +45,12 @@ export class ServerConfigLoader {
     const probeStatusPath = CONFIG_DEFAULTS.PROBE_STATUS_PATH;
     const probeResetPath = CONFIG_DEFAULTS.PROBE_RESET_PATH;
     const probeCapturePath = CONFIG_DEFAULTS.PROBE_CAPTURE_PATH;
+    const probeLineSelectionMaxScanLines = this.parseIntFlag(
+      this.env(MCP_ENV.PROBE_LINE_SELECTION_MAX_SCAN_LINES),
+      CONFIG_DEFAULTS.PROBE_LINE_SELECTION_MAX_SCAN_LINES,
+      CONFIG_DEFAULTS.PROBE_LINE_SELECTION_MAX_SCAN_LINES_MIN,
+      CONFIG_DEFAULTS.PROBE_LINE_SELECTION_MAX_SCAN_LINES_MAX,
+    );
 
     const probeWaitMaxRetries = this.parseIntFlag(
       this.args.get("--probe-wait-max-retries") ?? this.env(MCP_ENV.PROBE_WAIT_MAX_RETRIES),
@@ -81,6 +88,7 @@ export class ServerConfigLoader {
       probeStatusPath,
       probeResetPath,
       probeCapturePath,
+      probeLineSelectionMaxScanLines,
       probeWaitMaxRetries,
       probeWaitUnreachableRetryEnabled,
       probeWaitUnreachableMaxRetries,

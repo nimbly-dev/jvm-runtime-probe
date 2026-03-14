@@ -59,10 +59,11 @@ Use this workflow only for strict one-line verification runs.
    - probe reachability
    - API reachability
    - strict target alignment (`Class#method:line` resolvability or class-scoped line discovery)
-15. When capture preview is available, use `capturePreview.executionPaths` as runtime evidence; do not re-derive call paths heuristically.
-16. Execute probe flow:
+15. Treat `probe_target_infer.firstExecutableLine` as runtime-validated only; when unresolved, do not guess a line and fail closed.
+16. When capture preview is available, use `capturePreview.executionPaths` as runtime evidence; do not re-derive call paths heuristically.
+17. Execute probe flow:
    - `probe_reset` -> trigger HTTP request -> `probe_wait_for_hit` / `probe_get_status`
-17. Cleanup (disable actuation when used).
+18. Cleanup (disable actuation when used).
 
 ## Prerequisites
 

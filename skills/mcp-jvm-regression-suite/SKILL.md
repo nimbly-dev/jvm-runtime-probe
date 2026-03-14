@@ -41,28 +41,29 @@ At run start, discover and persist once:
 ## Recipe Synthesis Policy
 
 1. Treat `probe_recipe_create` as deterministic and fail-closed.
-2. For `probe_recipe_create`, pass controller/service class as exact FQCN in `classHint`.
-3. Runtime synthesis scope is runtime-only (`src/main/java` + generated-main roots); test sources are excluded.
-4. Pass `apiBasePath` when runtime uses a context path (for example `/api/v1`).
-5. Prompt for context path at most once per run, then reuse the same `apiBasePath` value for all endpoints in that run.
-6. If `probe_recipe_create` returns `resultType=report`, do not hard-stop the whole run:
+2. Use `intentMode=regression_http_only` for HTTP regression runs without strict line verification.
+3. For `probe_recipe_create`, pass controller/service class as exact FQCN in `classHint`.
+4. Runtime synthesis scope is runtime-only (`src/main/java` + generated-main roots); test sources are excluded.
+5. Pass `apiBasePath` when runtime uses a context path (for example `/api/v1`).
+6. Prompt for context path at most once per run, then reuse the same `apiBasePath` value for all endpoints in that run.
+7. If `probe_recipe_create` returns `resultType=report`, do not hard-stop the whole run:
    - keep fail-closed diagnostics for that endpoint
    - gather only missing execution inputs
    - continue endpoint with manual probe-verified flow when feasible.
-7. In report mode, prefer compact execution metadata:
+8. In report mode, prefer compact execution metadata:
    - `executionPlan.routingReason` (code)
    - `executionPlan.steps[].actionCode` (code)
    - avoid depending on verbose instruction text.
-8. Route only by deterministic contract fields (`resultType`, `status`, `reasonCode`, `failedStep`).
-9. Never use confidence/heuristic scoring for routing decisions.
-10. Probe tool outputs use compact text summaries; treat `structuredContent` as canonical for full payload details.
-11. Capture and propagate synthesis diagnostics for every fail-closed report:
+9. Route only by deterministic contract fields (`resultType`, `status`, `reasonCode`, `failedStep`).
+10. Never use confidence/heuristic scoring for routing decisions.
+11. Probe tool outputs use compact text summaries; treat `structuredContent` as canonical for full payload details.
+12. Capture and propagate synthesis diagnostics for every fail-closed report:
    - `reasonCode`
    - `failedStep`
    - `evidence`
    - `attemptedStrategies`
    - `synthesizerUsed`
-12. Prefer runtime-provided `capturePreview.executionPaths` / `probe_get_capture.capture.executionPaths` as call-path evidence when present; avoid heuristic reconstruction.
+13. Prefer runtime-provided `capturePreview.executionPaths` / `probe_get_capture.capture.executionPaths` as call-path evidence when present; avoid heuristic reconstruction.
 
 ## Route Resolution (Probe-Capable Endpoints)
 
