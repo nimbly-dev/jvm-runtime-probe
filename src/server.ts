@@ -19,19 +19,19 @@ async function main() {
   const probeCapturePath = cfg.probeCapturePath;
 
   const server = new McpServer({
-    name: "mcp-jvm-debugger",
+    name: "mcp-java-dev-tools",
     version: "0.1.0",
   });
 
   // Register at least one resource so Codex doesn't spam resources/list with "method not found".
   server.registerResource(
     "status",
-    "mcp-jvm-debugger://status",
+    "mcp-java-dev-tools://status",
     { mimeType: "application/json", description: "Server status and defaults" },
     async () => {
       const payload = {
         ok: true,
-        name: "mcp-jvm-debugger",
+        name: "mcp-java-dev-tools",
         version: "0.1.0",
         workspaceRoot: cfg.workspaceRootAbs,
         workspaceRootSource: cfg.workspaceRootSource,
@@ -56,7 +56,7 @@ async function main() {
       return {
         contents: [
           {
-            uri: "mcp-jvm-debugger://status",
+            uri: "mcp-java-dev-tools://status",
             text: JSON.stringify(payload, null, 2),
           },
         ],
@@ -110,7 +110,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    `mcp-jvm-debugger 0.1.0 running (stdio). workspaceRoot=${cfg.workspaceRootAbs} probeBaseUrl=${cfg.probeBaseUrl}`,
+    `mcp-java-dev-tools 0.1.0 running (stdio). workspaceRoot=${cfg.workspaceRootAbs} probeBaseUrl=${cfg.probeBaseUrl}`,
   );
 }
 

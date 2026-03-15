@@ -1,5 +1,5 @@
 {
-  "name": "mcp-jvm-debugger",
+  "name": "mcp-java-dev-tools",
   "version": "0.1.0",
   "description": "",
   "main": "dist/server.js",
@@ -18,16 +18,16 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nimbly-dev/mcp-jvm-debugger.git"
+    "url": "git+https://github.com/nimbly-dev/mcp-java-dev-tools.git"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {
-    "url": "https://github.com/nimbly-dev/mcp-jvm-debugger/issues"
+    "url": "https://github.com/nimbly-dev/mcp-java-dev-tools/issues"
   },
-  "homepage": "https://github.com/nimbly-dev/mcp-jvm-debugger#readme",
+  "homepage": "https://github.com/nimbly-dev/mcp-java-dev-tools#readme",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
     "zod": "^4.3.6"
@@ -50,7 +50,7 @@
     "typescript": "^5.9.3"
   },
   "bin": {
-    "mcp-jvm-debugger": "dist/server.js"
+    "mcp-java-dev-tools": "dist/server.js"
   },
   "files": [
     "dist/**",

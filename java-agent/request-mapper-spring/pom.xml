@@ -6,15 +6,15 @@
 
   <parent>
     <groupId>com.nimbly</groupId>
-    <artifactId>mcp-jvm-probe-agent-parent</artifactId>
+    <artifactId>mcp-java-dev-tools-agent-parent</artifactId>
     <version>0.1.0</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
-  <artifactId>mcp-jvm-request-mapper-spring</artifactId>
+  <artifactId>mcp-java-dev-tools-request-mapper-spring</artifactId>
   <version>0.1.0</version>
   <packaging>jar</packaging>
-  <name>mcp-jvm-request-mapper-spring</name>
+  <name>mcp-java-dev-tools-request-mapper-spring</name>
 
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
@@ -24,7 +24,7 @@
   <dependencies>
     <dependency>
       <groupId>com.nimbly</groupId>
-      <artifactId>mcp-jvm-core-request-mapper</artifactId>
+      <artifactId>mcp-java-dev-tools-core-request-mapper</artifactId>
       <version>${project.version}</version>
     </dependency>
   </dependencies>

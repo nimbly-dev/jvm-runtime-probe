@@ -179,16 +179,16 @@ Text vs structured content policy (probe tools):
 | `result.nextAction` | Human-readable follow-up action. | `probe_wait_for_hit` | false | `"verify_trigger_path_or_branch_then_rerun_probe_wait_for_hit"` |
 | `result.lastStatus` | Last observed probe status payload. | `probe_wait_for_hit` | false | `{"hitCount":0}` |
 
-## Skill-Orchestrated Route Pushback (`mcp-jvm-line-probe-run`, `mcp-jvm-regression-suite`)
+## Skill-Orchestrated Route Pushback (`mcp-java-dev-tools-line-probe-run`, `mcp-java-dev-tools-regression-suite`)
 
 These fields are emitted by orchestration summaries in skill-guided runs when probe route resolution cannot be proven uniquely.
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
-| `reasonCode` | Deterministic failure code (`toolchain_unavailable`, `probe_route_not_found`, `probe_route_ambiguous`). | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `"probe_route_ambiguous"` |
-| `attemptedCandidates` | Candidate runtime routes evaluated before pushback. | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `[{"apiBase":"http://localhost:8082","probeBase":"http://localhost:9192"}]` |
-| `validationResults` | Per-candidate validation outcomes (probe/API/line alignment checks). | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `[{"probeReachable":true,"apiReachable":false}]` |
-| `nextAction` | Action required from the user to proceed after pushback. | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `"Provide a unique runtime/service selector or stop conflicting services."` |
-| `reproSteps` | Ordered executable reproduction steps emitted for both success and pushback outputs. | `mcp-jvm-line-probe-run (summary), mcp-jvm-regression-suite (summary)` | true | `["1. Validate projectRootAbs", "2. Call probe_recipe_create", "3. Resolve runtime route"]` |
+| `reasonCode` | Deterministic failure code (`toolchain_unavailable`, `probe_route_not_found`, `probe_route_ambiguous`). | `mcp-java-dev-tools-line-probe-run (summary), mcp-java-dev-tools-regression-suite (summary)` | true | `"probe_route_ambiguous"` |
+| `attemptedCandidates` | Candidate runtime routes evaluated before pushback. | `mcp-java-dev-tools-line-probe-run (summary), mcp-java-dev-tools-regression-suite (summary)` | true | `[{"apiBase":"http://localhost:8082","probeBase":"http://localhost:9192"}]` |
+| `validationResults` | Per-candidate validation outcomes (probe/API/line alignment checks). | `mcp-java-dev-tools-line-probe-run (summary), mcp-java-dev-tools-regression-suite (summary)` | true | `[{"probeReachable":true,"apiReachable":false}]` |
+| `nextAction` | Action required from the user to proceed after pushback. | `mcp-java-dev-tools-line-probe-run (summary), mcp-java-dev-tools-regression-suite (summary)` | true | `"Provide a unique runtime/service selector or stop conflicting services."` |
+| `reproSteps` | Ordered executable reproduction steps emitted for both success and pushback outputs. | `mcp-java-dev-tools-line-probe-run (summary), mcp-java-dev-tools-regression-suite (summary)` | true | `["1. Validate projectRootAbs", "2. Call probe_recipe_create", "3. Resolve runtime route"]` |
 
 
