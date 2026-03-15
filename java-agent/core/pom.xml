@@ -105,7 +105,7 @@
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
                   <manifestEntries>
-                    <Premain-Class>com.nimbly.mcpjvmdebugger.agent.ProbeAgent</Premain-Class>
+                    <Premain-Class>com.nimbly.mcpjavadevtools.agent.bootstrap.ProbeAgent</Premain-Class>
                     <Can-Redefine-Classes>true</Can-Redefine-Classes>
                     <Can-Retransform-Classes>true</Can-Retransform-Classes>
                   </manifestEntries>
@@ -118,4 +118,5 @@
     </plugins>
   </build>
 </project>
+
 

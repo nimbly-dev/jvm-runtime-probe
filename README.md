@@ -41,7 +41,7 @@ mvn -f java-agent\pom.xml package
 ## Java Agent
 
 ```text
--javaagent:C:\Users\{desktopName}\repository\mcp-java-dev-tools\java-agent\core\target\mcp-java-dev-tools-agent-0.1.0.jar=host=0.0.0.0;port=9191;include=com.{your_workspace_root_package}.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
+-javaagent:C:\Users\{desktopName}\repository\mcp-java-dev-tools\java-agent\core\target\mcp-java-dev-tools-agent-0.1.0.jar=host=0.0.0.0;port=9191;include=com.{your_workspace_root_package}.**;exclude=com.nimbly.mcpjavadevtools.agent.**,**.config.**,**Test
 ```
 
 Optional Java agent capture history tuning:
@@ -184,4 +184,5 @@ Shipped skills:
 - When `resultType=report`, `executionPlan.steps` are compact action codes (for example `resolve_auth`, `request_candidate_missing`) instead of verbose instruction text.
 - Orchestration decisions must use deterministic fields (`resultType`, `status`, `reasonCode`, `failedStep`); confidence/heuristic scoring is not part of the public contract.
 - Preferred operator inputs for fewer ambiguities: explicit API/probe base URL, context path, and app port.
+
 

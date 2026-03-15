@@ -5,7 +5,7 @@ Framework-agnostic Java AST request-mapping resolver used by `probe_recipe_creat
 ## File Tree Packaging
 
 ```text
-java-agent/core-request-mapper/src/main/java/com/nimbly/mcpjvmdebugger/requestmapping
+java-agent/core-request-mapper/src/main/java/com/nimbly/mcpjavadevtools/requestmapping
 |- api/
 |- ast/
 |- core/
@@ -27,8 +27,9 @@ java-agent/core-request-mapper/src/main/java/com/nimbly/mcpjvmdebugger/requestma
 
 ## SPI Rules
 
-- Mapper implementations must implement `com.nimbly.mcpjvmdebugger.requestmapping.extractor.MappingExtractor`.
+- Mapper implementations must implement `com.nimbly.mcpjavadevtools.requestmapping.extractor.MappingExtractor`.
 - Provider modules must register implementations in:
-  - `META-INF/services/com.nimbly.mcpjvmdebugger.requestmapping.extractor.MappingExtractor`
+  - `META-INF/services/com.nimbly.mcpjavadevtools.requestmapping.extractor.MappingExtractor`
 - Discovery is runtime via `ServiceLoader`; if no plugin is loaded, resolver returns deterministic fail-closed report:
   - `reasonCode=mapper_plugin_unavailable`
+

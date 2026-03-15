@@ -13,7 +13,7 @@ const AST_RESOLVER_JAR_ENV = "MCP_JAVA_REQUEST_MAPPING_RESOLVER_JAR";
 const AST_RESOLVER_CLASSPATH_ENV = "MCP_JAVA_REQUEST_MAPPING_RESOLVER_CLASSPATH";
 const JAVA_BIN_ENV = "MCP_JAVA_BIN";
 const CORE_REQUEST_MAPPER_MAIN_CLASS =
-  "com.nimbly.mcpjvmdebugger.requestmapping.RequestMappingResolverMain";
+  "com.nimbly.mcpjavadevtools.requestmapping.RequestMappingResolverMain";
 
 type ResolverLaunch = {
   args: string[];
@@ -245,3 +245,4 @@ export async function resolveRequestMappingAst(
     child.stdin.end(JSON.stringify(input));
   });
 }
+

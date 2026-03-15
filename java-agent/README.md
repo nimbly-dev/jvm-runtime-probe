@@ -39,7 +39,7 @@ The request-mapping resolver is a generic JVM AST helper consumed by synthesizer
 Use JVM args (example):
 
 ```text
--javaagent:C:\Users\Altheo\repository\mcp-java-dev-tools\java-agent\core\target\mcp-java-dev-tools-agent-0.1.0.jar=host=127.0.0.1;port=9191;mode=observe;actuatorId=none;captureMethodBufferSize=3;include=com.nimbly.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
+-javaagent:C:\Users\Altheo\repository\mcp-java-dev-tools\java-agent\core\target\mcp-java-dev-tools-agent-0.1.0.jar=host=127.0.0.1;port=9191;mode=observe;actuatorId=none;captureMethodBufferSize=3;include=com.nimbly.**;exclude=com.nimbly.mcpjavadevtools.agent.**,**.config.**,**Test
 ```
 
 `include` and `exclude` are comma-separated glob patterns over dotted class names.
@@ -91,4 +91,5 @@ Use JVM args (example):
 - `POST /__probe/reset`
   - Body: `{ "key":"com.nimbly.phshoesbackend.catalog.core.repository.jpa.CatalogShoeSpecifications#finalPriceGte" }`
   - Line-key reset works the same way using `Class#method:<line>`.
+
 
