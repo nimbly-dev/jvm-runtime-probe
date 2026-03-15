@@ -3,14 +3,14 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-mcp-jvm-debugger installer (bash)
+mcp-java-dev-tools installer (bash)
 
 Usage:
   ./scripts/install-integrations.sh [options]
 
 Options:
   --client <codex|kiro|both>      Target client(s). Default: both
-  --server-name <name>            MCP server name. Default: mcp-jvm-debugger
+  --server-name <name>            MCP server name. Default: mcp-java-dev-tools
   --skill-name <name>             Install only selected skill(s). Repeatable. Default: install all shipped skills
   --probe-base-url <url>          Default: http://127.0.0.1:9193
   --workspace-root <absPath>      Optional MCP_WORKSPACE_ROOT value
@@ -28,17 +28,17 @@ Options:
 Behavior:
 - Idempotent by default: skips if Skill/MCP already installed.
 - Use --update-skill-if-exists to replace existing installed skill folders.
-- Retired skill mcp-jvm-repro-orchestration is removed during skill install/update.
+- Retired skill mcp-java-dev-tools-repro-orchestration is removed during skill install/update.
 - If no args are provided, interactive mode is enabled automatically.
 EOF
 }
 
 CLIENT="both"
-SERVER_NAME="mcp-jvm-debugger"
-SKILL_NAMES_DEFAULT=("mcp-jvm-line-probe-run" "mcp-jvm-regression-suite")
+SERVER_NAME="mcp-java-dev-tools"
+SKILL_NAMES_DEFAULT=("mcp-java-dev-tools-line-probe-run" "mcp-java-dev-tools-regression-suite")
 SKILL_NAMES=("${SKILL_NAMES_DEFAULT[@]}")
 SKILL_NAME_OVERRIDE=0
-RETIRED_SKILL_NAME="mcp-jvm-repro-orchestration"
+RETIRED_SKILL_NAME="mcp-java-dev-tools-repro-orchestration"
 PROBE_BASE_URL="http://127.0.0.1:9193"
 WORKSPACE_ROOT=""
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"

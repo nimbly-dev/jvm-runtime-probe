@@ -1,16 +1,19 @@
-# mcp-jvm-debugger
+# mcp-java-dev-tools
 
 [![node](https://img.shields.io/badge/node-v24.13.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![npm](https://img.shields.io/badge/npm-11.6.2-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/)
 [![JDK](https://img.shields.io/badge/JDK-21%2B-007396?logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Java Agent Target](https://img.shields.io/badge/Java%20Agent%20Target-17-ED8B00?logo=openjdk&logoColor=white)](https://maven.apache.org/)
-[![package](https://img.shields.io/badge/package-mcp--jvm--debugger%400.1.0-0A66C2)](https://github.com/nimbly-dev/mcp-jvm-debugger)
+[![package](https://img.shields.io/badge/package-mcp--jvm--debugger%400.1.0-0A66C2)](https://github.com/nimbly-dev/mcp-java-dev-tools)
 
-**Java MCP Dev Tool** connects agentic coding tools to live Java runtime data through a lightweight sidecar agent.  
-It attaches to a running service and exposes bytecode/runtime signals that static analysis alone cannot see,
-with that, it enables targeted regression checks, line-level/runtime-path inspection, and more reliable debugging decisions.  
+**MCP Java Dev Tools** connects agentic coding tools to live Java runtime behavior through a lightweight sidecar agent.
 
-The Java Agent is built with **ByteBuddy**, it complements `JDWP` rather than replacing it.
+It attaches to a running JVM and exposes bytecode-level runtime signals that static analysis alone cannot see,
+allowing probe-verified inspection, targeted regression checks, runtime-path validation, and deterministic debugging workflows.
+
+The runtime agent is built with ByteBuddy and complements JDWP rather than replacing it.
+On top of the probe layer, the system provides framework-aware data synthesis and strict, fail-closed tool contracts,
+so agent orchestrators can make reliable decisions based on runtime proof.
 
 Operator workflows and end-to-end execution flows are documented in [docs/how-it-works/README.md](./docs/how-it-works/README.md).
 
@@ -38,7 +41,7 @@ mvn -f java-agent\pom.xml package
 ## Java Agent
 
 ```text
--javaagent:C:\Users\{desktopName}\repository\mcp-jvm-debugger\java-agent\core\target\mcp-jvm-probe-agent-0.1.0.jar=host=0.0.0.0;port=9191;include=com.{your_workspace_root_package}.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
+-javaagent:C:\Users\{desktopName}\repository\mcp-java-dev-tools\java-agent\core\target\mcp-java-dev-tools-agent-0.1.0.jar=host=0.0.0.0;port=9191;include=com.{your_workspace_root_package}.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
 ```
 
 Optional Java agent capture history tuning:
@@ -55,7 +58,7 @@ Optional Java agent capture history tuning:
 <summary><strong>Codex</strong></summary>
 
 ```powershell
-codex.cmd mcp add mcp-jvm-debugger --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 -- node C:\Users\{desktopName}\repository\mcp-jvm-debugger\dist\server.js
+codex.cmd mcp add mcp-java-dev-tools --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 -- node C:\Users\{desktopName}\repository\mcp-java-dev-tools\dist\server.js
 ```
 
 Optional env:
@@ -65,8 +68,8 @@ Optional env:
 Reinstall:
 
 ```powershell
-codex.cmd mcp remove mcp-jvm-debugger
-codex.cmd mcp add mcp-jvm-debugger --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 -- node C:\Users\{desktopName}\repository\mcp-jvm-debugger\dist\server.js
+codex.cmd mcp remove mcp-java-dev-tools
+codex.cmd mcp add mcp-java-dev-tools --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 -- node C:\Users\{desktopName}\repository\mcp-java-dev-tools\dist\server.js
 ```
 
 </details>
@@ -79,9 +82,9 @@ Example (`~/.kiro/mcp.json`):
 ```json
 {
   "mcpServers": {
-    "mcp-jvm-debugger": {
+    "mcp-java-dev-tools": {
       "command": "node",
-      "args": ["C:\\Users\\{desktopName}\\repository\\mcp-jvm-debugger\\dist\\server.js"],
+      "args": ["C:\\Users\\{desktopName}\\repository\\mcp-java-dev-tools\\dist\\server.js"],
       "env": {
         "MCP_PROBE_BASE_URL": "http://127.0.0.1:9193"
       }
@@ -106,8 +109,8 @@ Optional env:
 
 Default skill install set:
 
-- `mcp-jvm-line-probe-run`
-- `mcp-jvm-regression-suite`
+- `mcp-java-dev-tools-line-probe-run`
+- `mcp-java-dev-tools-regression-suite`
 
 Non-interactive:
 
@@ -115,13 +118,13 @@ Non-interactive:
 ./scripts/install-integrations.sh --client codex --probe-base-url http://127.0.0.1:9193
 ./scripts/install-integrations.sh --client kiro --dry-run
 ./scripts/install-integrations.sh --client both --update-skill-if-exists
-./scripts/install-integrations.sh --client codex --skill-name mcp-jvm-line-probe-run
-./scripts/install-integrations.sh --client codex --skill-name mcp-jvm-line-probe-run --skill-name mcp-jvm-regression-suite
+./scripts/install-integrations.sh --client codex --skill-name mcp-java-dev-tools-line-probe-run
+./scripts/install-integrations.sh --client codex --skill-name mcp-java-dev-tools-line-probe-run --skill-name mcp-java-dev-tools-regression-suite
 ```
 
 Installer migration behavior:
 
-- Retired skill `mcp-jvm-repro-orchestration` is removed from installed skill roots during skill install/update.
+- Retired skill `mcp-java-dev-tools-repro-orchestration` is removed from installed skill roots during skill install/update.
 
 ---
 
@@ -153,8 +156,8 @@ Probe endpoint paths are fixed and non-overridable:
 
 Shipped skills:
 
-- `mcp-jvm-line-probe-run`
-- `mcp-jvm-regression-suite`
+- `mcp-java-dev-tools-line-probe-run`
+- `mcp-java-dev-tools-regression-suite`
 
 ---
 

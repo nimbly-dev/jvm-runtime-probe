@@ -74,7 +74,7 @@ export class ServerConfigLoader {
     if (missing.length > 0) {
       throw new Error(
         `Missing required MCP config: ${missing.join(", ")}. ` +
-          "Set required probe env vars when adding mcp-jvm-debugger.",
+          "Set required probe env vars when adding mcp-java-dev-tools.",
       );
     }
 

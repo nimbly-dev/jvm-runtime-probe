@@ -61,14 +61,14 @@ async function resolveLaunch(): Promise<ResolverLaunch | undefined> {
         "java-agent",
         "core-request-mapper",
         "target",
-        `mcp-jvm-core-request-mapper-${version}-all.jar`,
+        `mcp-java-dev-tools-core-request-mapper-${version}-all.jar`,
       ),
       path.join(
         repoRoot,
         "java-agent",
         "core-request-mapper",
         "target",
-        `mcp-jvm-core-request-mapper-${version}.jar`,
+        `mcp-java-dev-tools-core-request-mapper-${version}.jar`,
       ),
     );
     springPluginCandidates.push(
@@ -77,7 +77,7 @@ async function resolveLaunch(): Promise<ResolverLaunch | undefined> {
         "java-agent",
         "request-mapper-spring",
         "target",
-        `mcp-jvm-request-mapper-spring-${version}.jar`,
+        `mcp-java-dev-tools-request-mapper-spring-${version}.jar`,
       ),
     );
     legacyCandidates.push(
@@ -86,14 +86,14 @@ async function resolveLaunch(): Promise<ResolverLaunch | undefined> {
         "java-agent",
         "request-mapping-resolver",
         "target",
-        `mcp-jvm-request-mapping-resolver-${version}-all.jar`,
+        `mcp-java-dev-tools-request-mapping-resolver-${version}-all.jar`,
       ),
       path.join(
         repoRoot,
         "java-agent",
         "request-mapping-resolver",
         "target",
-        `mcp-jvm-request-mapping-resolver-${version}.jar`,
+        `mcp-java-dev-tools-request-mapping-resolver-${version}.jar`,
       ),
     );
   }

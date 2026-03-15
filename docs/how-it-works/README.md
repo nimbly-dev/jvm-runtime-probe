@@ -1,6 +1,6 @@
 # How It Works
 
-This document provides an overview and guide on how to use the mcp-jvm-probe tool
+This document provides an overview and guide on how to use the mcp-java-dev-tools tool
 
 ## Run Preconditions
 

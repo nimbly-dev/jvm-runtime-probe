@@ -1,5 +1,5 @@
 ---
-name: mcp-jvm-regression-suite
+name: mcp-java-dev-tools-regression-suite
 description: "Run MCP-first HTTP regression suites across controller, service, or whole API scope with optional strict probe verification per endpoint."
 ---
 

@@ -5,10 +5,10 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>com.nimbly</groupId>
-  <artifactId>mcp-jvm-probe-agent-parent</artifactId>
+  <artifactId>mcp-java-dev-tools-agent-parent</artifactId>
   <version>0.1.0</version>
   <packaging>pom</packaging>
-  <name>mcp-jvm-probe-agent-parent</name>
+  <name>mcp-java-dev-tools-agent-parent</name>
 
   <properties>
     <mcp.contract.version>${project.version}</mcp.contract.version>

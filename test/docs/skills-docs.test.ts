@@ -5,9 +5,9 @@ const test = require("node:test");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const SKILLS_ROOT = path.join(REPO_ROOT, "skills");
-const LINE_PROBE_SKILL = path.join(SKILLS_ROOT, "mcp-jvm-line-probe-run", "SKILL.md");
-const REGRESSION_SKILL = path.join(SKILLS_ROOT, "mcp-jvm-regression-suite", "SKILL.md");
-const RETIRED_SKILL = path.join(SKILLS_ROOT, "mcp-jvm-repro-orchestration", "SKILL.md");
+const LINE_PROBE_SKILL = path.join(SKILLS_ROOT, "mcp-java-dev-tools-line-probe-run", "SKILL.md");
+const REGRESSION_SKILL = path.join(SKILLS_ROOT, "mcp-java-dev-tools-regression-suite", "SKILL.md");
+const RETIRED_SKILL = path.join(SKILLS_ROOT, "mcp-java-dev-tools-repro-orchestration", "SKILL.md");
 
 test("retired repro skill is removed from repo skills", () => {
   assert.equal(fs.existsSync(RETIRED_SKILL), false);

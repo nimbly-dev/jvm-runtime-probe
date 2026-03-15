@@ -17,11 +17,11 @@ mvn -f java-agent\pom.xml package
 Built artifacts:
 
 ```text
-java-agent\core\target\mcp-jvm-probe-agent-0.1.0-minimal.jar
-java-agent\core\target\mcp-jvm-probe-agent-0.1.0-spring.jar
-java-agent\core\target\mcp-jvm-probe-agent-0.1.0-all.jar
-java-agent\core-request-mapper\target\mcp-jvm-core-request-mapper-0.1.0-all.jar
-java-agent\request-mapper-spring\target\mcp-jvm-request-mapper-spring-0.1.0.jar
+java-agent\core\target\mcp-java-dev-tools-agent-0.1.0-minimal.jar
+java-agent\core\target\mcp-java-dev-tools-agent-0.1.0-spring.jar
+java-agent\core\target\mcp-java-dev-tools-agent-0.1.0-all.jar
+java-agent\core-request-mapper\target\mcp-java-dev-tools-core-request-mapper-0.1.0-all.jar
+java-agent\request-mapper-spring\target\mcp-java-dev-tools-request-mapper-spring-0.1.0.jar
 ```
 
 Profile-specific build examples:
@@ -39,7 +39,7 @@ The request-mapping resolver is a generic JVM AST helper consumed by synthesizer
 Use JVM args (example):
 
 ```text
--javaagent:C:\Users\Altheo\repository\mcp-jvm-debugger\java-agent\core\target\mcp-jvm-probe-agent-0.1.0.jar=host=127.0.0.1;port=9191;mode=observe;actuatorId=none;captureMethodBufferSize=3;include=com.nimbly.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
+-javaagent:C:\Users\Altheo\repository\mcp-java-dev-tools\java-agent\core\target\mcp-java-dev-tools-agent-0.1.0.jar=host=127.0.0.1;port=9191;mode=observe;actuatorId=none;captureMethodBufferSize=3;include=com.nimbly.**;exclude=com.nimbly.mcpjvmdebugger.agent.**,**.config.**,**Test
 ```
 
 `include` and `exclude` are comma-separated glob patterns over dotted class names.
@@ -55,7 +55,7 @@ Use JVM args (example):
 - Runtime probe keys are dynamic: `fully.qualified.ClassName#methodName`.
 - Line-level probe keys are also emitted: `fully.qualified.ClassName#methodName:<lineNumber>`.
   - Example: `com.nimbly.phshoesbackend.useraccount.core.service.impl.SuppressionServiceImpl#shouldBlock:32`
-- In `mcp-jvm-debugger`, `project_context_validate` can validate scoped project roots before probe runs.
+- In `mcp-java-dev-tools`, `project_context_validate` can validate scoped project roots before probe runs.
 - If `include` is omitted, the agent auto-infers base package at startup:
   - from executable jar manifest `Start-Class` (or `Main-Class`)
   - or from class-launch command (`java com.example.Main`)
