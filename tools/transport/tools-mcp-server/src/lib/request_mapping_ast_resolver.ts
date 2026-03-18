@@ -20,6 +20,15 @@ type ResolverLaunch = {
   evidence: string[];
 };
 
+async function dirExists(dirAbs: string): Promise<boolean> {
+  try {
+    const stat = await fs.stat(dirAbs);
+    return stat.isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 async function fileExists(fileAbs: string): Promise<boolean> {
   try {
     await fs.access(fileAbs);
@@ -27,6 +36,38 @@ async function fileExists(fileAbs: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function looksLikeRepoRoot(dirAbs: string): Promise<boolean> {
+  const packageJsonAbs = path.join(dirAbs, "package.json");
+  const javaAgentPomAbs = path.join(dirAbs, "java-agent", "pom.xml");
+  return (await fileExists(packageJsonAbs)) && (await fileExists(javaAgentPomAbs));
+}
+
+async function findRepoRoots(): Promise<string[]> {
+  const out: string[] = [];
+  const seen = new Set<string>();
+
+  const add = async (candidateAbs: string) => {
+    const normalized = path.resolve(candidateAbs);
+    if (seen.has(normalized)) return;
+    seen.add(normalized);
+    if (await looksLikeRepoRoot(normalized)) {
+      out.push(normalized);
+    }
+  };
+
+  await add(process.cwd());
+
+  let cursor = path.resolve(__dirname);
+  for (let i = 0; i < 10; i += 1) {
+    await add(cursor);
+    const parent = path.dirname(cursor);
+    if (parent === cursor) break;
+    cursor = parent;
+  }
+
+  return out;
 }
 
 async function resolveLaunch(): Promise<ResolverLaunch | undefined> {
@@ -46,92 +87,115 @@ async function resolveLaunch(): Promise<ResolverLaunch | undefined> {
     };
   }
 
-  const repoRoot = path.resolve(__dirname, "..", "..");
+  const repoRoots = await findRepoRoots();
+  if (repoRoots.length === 0) {
+    return undefined;
+  }
+
   const versionCandidates = Array.from(
     new Set([getContractVersion(), "0.1.0"].filter((v) => v && v !== "unknown")),
   );
-  const mapperCoreCandidates: string[] = [];
-  const springPluginCandidates: string[] = [];
-  const legacyCandidates: string[] = [];
+  const mapperCoreCandidates: Array<{ repoRoot: string; jarAbs: string }> = [];
+  const springPluginCandidates: Array<{ repoRoot: string; jarAbs: string }> = [];
+  const legacyCandidates: Array<{ repoRoot: string; jarAbs: string }> = [];
 
-  for (const version of versionCandidates) {
-    mapperCoreCandidates.push(
-      path.join(
+  for (const repoRoot of repoRoots) {
+    for (const version of versionCandidates) {
+      mapperCoreCandidates.push(
+        {
+          repoRoot,
+          jarAbs: path.join(
+            repoRoot,
+            "java-agent",
+            "core",
+            "core-request-mapper",
+            "target",
+            `mcp-java-dev-tools-core-request-mapper-${version}-all.jar`,
+          ),
+        },
+        {
+          repoRoot,
+          jarAbs: path.join(
+            repoRoot,
+            "java-agent",
+            "core",
+            "core-request-mapper",
+            "target",
+            `mcp-java-dev-tools-core-request-mapper-${version}.jar`,
+          ),
+        },
+      );
+      springPluginCandidates.push({
         repoRoot,
-        "java-agent",
-        "core",
-        "core-request-mapper",
-        "target",
-        `mcp-java-dev-tools-core-request-mapper-${version}-all.jar`,
-      ),
-      path.join(
-        repoRoot,
-        "java-agent",
-        "core",
-        "core-request-mapper",
-        "target",
-        `mcp-java-dev-tools-core-request-mapper-${version}.jar`,
-      ),
-    );
-    springPluginCandidates.push(
-      path.join(
-        repoRoot,
-        "java-agent",
-        "mappers-adapters",
-        "adapter-request-mapper-spring",
-        "target",
-        `mcp-java-dev-tools-adapter-request-mapper-spring-${version}.jar`,
-      ),
-    );
-    legacyCandidates.push(
-      path.join(
-        repoRoot,
-        "java-agent",
-        "request-mapping-resolver",
-        "target",
-        `mcp-java-dev-tools-request-mapping-resolver-${version}-all.jar`,
-      ),
-      path.join(
-        repoRoot,
-        "java-agent",
-        "request-mapping-resolver",
-        "target",
-        `mcp-java-dev-tools-request-mapping-resolver-${version}.jar`,
-      ),
-    );
+        jarAbs: path.join(
+          repoRoot,
+          "java-agent",
+          "mappers-adapters",
+          "adapter-request-mapper-spring",
+          "target",
+          `mcp-java-dev-tools-adapter-request-mapper-spring-${version}.jar`,
+        ),
+      });
+      legacyCandidates.push(
+        {
+          repoRoot,
+          jarAbs: path.join(
+            repoRoot,
+            "java-agent",
+            "request-mapping-resolver",
+            "target",
+            `mcp-java-dev-tools-request-mapping-resolver-${version}-all.jar`,
+          ),
+        },
+        {
+          repoRoot,
+          jarAbs: path.join(
+            repoRoot,
+            "java-agent",
+            "request-mapping-resolver",
+            "target",
+            `mcp-java-dev-tools-request-mapping-resolver-${version}.jar`,
+          ),
+        },
+      );
+    }
   }
 
-  let selectedCoreMapperJar: string | undefined;
+  let selectedCoreMapperJar: { repoRoot: string; jarAbs: string } | undefined;
   for (const candidate of mapperCoreCandidates) {
-    if (await fileExists(candidate)) {
+    if (await fileExists(candidate.jarAbs)) {
       selectedCoreMapperJar = candidate;
       break;
     }
   }
   if (selectedCoreMapperJar) {
-    const classpathEntries = [selectedCoreMapperJar];
+    const classpathEntries = [selectedCoreMapperJar.jarAbs];
     let springPluginJar: string | undefined;
     for (const pluginCandidate of springPluginCandidates) {
-      if (await fileExists(pluginCandidate)) {
-        springPluginJar = pluginCandidate;
-        classpathEntries.push(pluginCandidate);
+      if (pluginCandidate.repoRoot !== selectedCoreMapperJar.repoRoot) {
+        continue;
+      }
+      if (await fileExists(pluginCandidate.jarAbs)) {
+        springPluginJar = pluginCandidate.jarAbs;
+        classpathEntries.push(pluginCandidate.jarAbs);
         break;
       }
     }
     return {
       args: ["-cp", classpathEntries.join(path.delimiter), CORE_REQUEST_MAPPER_MAIN_CLASS],
       evidence: [
-        `coreMapperJar=${selectedCoreMapperJar}`,
+        `repoRoot=${selectedCoreMapperJar.repoRoot}`,
+        `coreMapperJar=${selectedCoreMapperJar.jarAbs}`,
         `springPluginJar=${springPluginJar ?? "(missing)"}`,
       ],
     };
   }
 
   for (const candidate of legacyCandidates) {
-    if (await fileExists(candidate)) {
+    if (await fileExists(candidate.jarAbs)) {
       return {
-        args: ["-jar", candidate],
-        evidence: [`legacyJarPath=${candidate}`],
+        args: ["-jar", candidate.jarAbs],
+        evidence: [`repoRoot=${candidate.repoRoot}`, `legacyJarPath=${candidate.jarAbs}`],
       };
     }
   }
@@ -159,9 +223,13 @@ export async function resolveRequestMappingAst(
 ): Promise<JvmAstRequestMappingResult> {
   const launch = await resolveLaunch();
   if (!launch) {
+    const repoRoots = await findRepoRoots();
     return buildUnavailableFailure("resolver_jar_missing=true", [
       `envJarPath=${process.env[AST_RESOLVER_JAR_ENV] ?? "(unset)"}`,
       `envClasspath=${process.env[AST_RESOLVER_CLASSPATH_ENV] ?? "(unset)"}`,
+      `cwd=${process.cwd()}`,
+      `resolverDir=${__dirname}`,
+      `detectedRepoRoots=${repoRoots.length > 0 ? repoRoots.join("|") : "(none)"}`,
     ]);
   }
 

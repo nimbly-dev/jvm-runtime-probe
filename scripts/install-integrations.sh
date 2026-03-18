@@ -21,6 +21,10 @@ Options:
   --skip-skill                    Install MCP only
   --skip-mcp                      Install skill only
   --no-build                      Do not run build when dist/server.js is missing
+  --no-build-java                 Do not run Maven build for Java agent when jar is missing
+  --jdk21-compat                  Enable Java 21 compatibility flag in generated -javaagent args
+  --agent-include <glob>          Probe include glob for generated -javaagent args (default: com.**)
+  --agent-exclude <glob>          Probe exclude glob for generated -javaagent args
   --dev-mode                      Enable installer development mode
   --interactive                   Prompt for values in terminal
   --dry-run                       Dev-only: print actions without changing files/config (requires --dev-mode)
@@ -49,6 +53,10 @@ SKIP_SKILL=0
 SKIP_MCP=0
 UPDATE_SKILL_IF_EXISTS=0
 BUILD_IF_MISSING=1
+BUILD_JAVA_IF_MISSING=1
+JDK21_COMPAT=0
+AGENT_INCLUDE="com.**"
+AGENT_EXCLUDE="com.nimbly.mcpjavadevtools.agent.**,**.config.**,**Test"
 INTERACTIVE=0
 DRY_RUN=0
 DEV_MODE=0
@@ -78,6 +86,10 @@ while [[ $# -gt 0 ]]; do
     --skip-skill) SKIP_SKILL=1; shift ;;
     --skip-mcp) SKIP_MCP=1; shift ;;
     --no-build) BUILD_IF_MISSING=0; shift ;;
+    --no-build-java) BUILD_JAVA_IF_MISSING=0; shift ;;
+    --jdk21-compat) JDK21_COMPAT=1; shift ;;
+    --agent-include) AGENT_INCLUDE="${2:-}"; shift 2 ;;
+    --agent-exclude) AGENT_EXCLUDE="${2:-}"; shift 2 ;;
     --dev-mode) DEV_MODE=1; shift ;;
     --interactive) INTERACTIVE=1; shift ;;
     --dry-run) DRY_RUN=1; shift ;;
@@ -158,12 +170,39 @@ prompt_yes_no() {
   return 1
 }
 
+derive_probe_host_port() {
+  local url="$1"
+  local fallback_host="127.0.0.1"
+  local fallback_port="9193"
+  local rest host_port host port
+
+  rest="${url#*://}"
+  if [[ "$rest" == "$url" ]]; then
+    rest="$url"
+  fi
+  host_port="${rest%%/*}"
+  host="${host_port%%:*}"
+  if [[ "$host_port" == *:* ]]; then
+    port="${host_port##*:}"
+  else
+    port=""
+  fi
+
+  if [[ -z "$host" ]]; then host="$fallback_host"; fi
+  if [[ -z "$port" || ! "$port" =~ ^[0-9]+$ ]]; then port="$fallback_port"; fi
+
+  printf '%s;%s\n' "$host" "$port"
+}
+
 if [[ "$INTERACTIVE" -eq 1 ]]; then
   echo "Interactive install configuration:"
   CLIENT="$(prompt_default "Client (codex|kiro|both)" "$CLIENT")"
   SERVER_NAME="$(prompt_default "MCP server name" "$SERVER_NAME")"
   PROBE_BASE_URL="$(prompt_default "MCP_PROBE_BASE_URL" "$PROBE_BASE_URL")"
   read -r -p "MCP_WORKSPACE_ROOT (optional, empty to skip): " WORKSPACE_ROOT
+  AGENT_INCLUDE="$(prompt_default "Java agent include glob" "$AGENT_INCLUDE")"
+  AGENT_EXCLUDE="$(prompt_default "Java agent exclude glob" "$AGENT_EXCLUDE")"
+  if prompt_yes_no "Enable Java 21 compatibility flag in javaagent args?" "n"; then JDK21_COMPAT=1; fi
   if prompt_yes_no "Install Skill?" "y"; then SKIP_SKILL=0; else SKIP_SKILL=1; fi
   if prompt_yes_no "Install MCP?" "y"; then SKIP_MCP=0; else SKIP_MCP=1; fi
   if prompt_yes_no "Update existing skill installs?" "n"; then UPDATE_SKILL_IF_EXISTS=1; fi
@@ -212,17 +251,64 @@ if [[ "$DEV_MODE" -eq 1 ]]; then
 fi
 
 ensure_build() {
-  if [[ -f "$SERVER_JS_PATH" ]]; then
+  if [[ "$BUILD_IF_MISSING" -eq 0 ]]; then
+    if [[ ! -f "$SERVER_JS_PATH" ]]; then
+      echo "Missing $SERVER_JS_PATH. Run npm run build first or remove --no-build." >&2
+      exit 1
+    fi
     return
   fi
-  if [[ "$BUILD_IF_MISSING" -eq 0 ]]; then
-    echo "Missing $SERVER_JS_PATH. Run npm run build first or remove --no-build." >&2
-    exit 1
-  fi
-  echo "- dist/server.js not found. Running npm run build"
+  echo "- Running npm run build"
   if [[ "$DRY_RUN" -eq 0 ]]; then
     (cd "$REPO_ROOT" && npm run build)
   fi
+}
+
+ensure_java_build() {
+  local agent_target_dir="$REPO_ROOT/java-agent/core/core-probe/target"
+  local existing
+  existing="$(ls -1 "$agent_target_dir"/mcp-java-dev-tools-agent-*-all.jar 2>/dev/null | head -n1 || true)"
+  if [[ -n "$existing" ]]; then
+    return
+  fi
+  if [[ "$BUILD_JAVA_IF_MISSING" -eq 0 ]]; then
+    echo "Missing Java agent jar under $agent_target_dir. Run mvn -f java-agent/pom.xml package first or remove --no-build-java." >&2
+    exit 1
+  fi
+  echo "- Java agent jar not found. Running Maven build"
+  if [[ "$DRY_RUN" -eq 0 ]]; then
+    (cd "$REPO_ROOT" && mvn -f java-agent/pom.xml -pl core/core-probe -am package -DskipTests)
+  fi
+}
+
+emit_javaagent_args() {
+  local agent_target_dir="$REPO_ROOT/java-agent/core/core-probe/target"
+  local jar
+  jar="$(ls -1 "$agent_target_dir"/mcp-java-dev-tools-agent-*-all.jar 2>/dev/null | head -n1 || true)"
+  if [[ -z "$jar" ]]; then
+    jar="$agent_target_dir/mcp-java-dev-tools-agent-0.1.0-all.jar"
+  fi
+  local jar_abs jar_dir
+  jar_dir="$(dirname "$jar")"
+  if [[ -d "$jar_dir" ]]; then
+    jar_abs="$(cd "$jar_dir" && pwd)/$(basename "$jar")"
+  else
+    jar_abs="$jar"
+  fi
+
+  local host_port host port
+  host_port="$(derive_probe_host_port "$PROBE_BASE_URL")"
+  host="${host_port%%;*}"
+  port="${host_port##*;}"
+
+  local compat_suffix=""
+  if [[ "$JDK21_COMPAT" -eq 1 ]]; then
+    compat_suffix=";allowJava21=true"
+  fi
+
+  echo
+  echo "Java agent JVM arg (copy/paste):"
+  echo "-javaagent:$jar_abs=host=$host;port=$port;include=$AGENT_INCLUDE;exclude=$AGENT_EXCLUDE$compat_suffix"
 }
 
 replace_skill_dir() {
@@ -414,6 +500,7 @@ NODE
 
 if [[ "$SKIP_MCP" -eq 0 ]]; then
   ensure_build
+  ensure_java_build
 fi
 
 if [[ "$CLIENT" == "codex" || "$CLIENT" == "both" ]]; then
@@ -455,3 +542,4 @@ if [[ "$CLIENT" == "kiro" || "$CLIENT" == "both" ]]; then
 fi
 
 echo "Done."
+emit_javaagent_args

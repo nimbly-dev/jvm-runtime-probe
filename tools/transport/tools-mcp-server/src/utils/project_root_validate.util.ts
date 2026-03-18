@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { MCP_ENV } from "@/config/env-vars";
 
 export type ProjectRootValidation =
   | {
@@ -22,31 +23,31 @@ export async function validateProjectRootAbs(
       ok: false,
       status: "project_selector_required",
       reason: "projectRootAbs is required",
-      nextAction: "Provide projectRootAbs as an absolute existing project directory path.",
+      nextAction:
+        "Provide projectRootAbs as an existing project directory path (absolute or relative to workspace).",
     };
   }
 
   const trimmed = projectRootAbs.trim();
-  if (!path.isAbsolute(trimmed)) {
-    return {
-      ok: false,
-      status: "project_selector_invalid",
-      reason: "projectRootAbs must be absolute",
-      value: trimmed,
-      nextAction: "Provide an absolute projectRootAbs path from orchestrator context.",
-    };
-  }
+  const workspaceRoot = process.env[MCP_ENV.WORKSPACE_ROOT]?.trim();
+  const resolved =
+    path.isAbsolute(trimmed)
+      ? trimmed
+      : workspaceRoot && workspaceRoot.length > 0
+        ? path.resolve(workspaceRoot, trimmed)
+        : path.resolve(trimmed);
 
   let stat;
   try {
-    stat = await fs.stat(trimmed);
+    stat = await fs.stat(resolved);
   } catch {
     return {
       ok: false,
       status: "project_selector_invalid",
       reason: "projectRootAbs does not exist",
-      value: trimmed,
-      nextAction: "Provide an existing projectRootAbs path from orchestrator context.",
+      value: resolved,
+      nextAction:
+        "Provide an existing projectRootAbs path (absolute or relative to current workspace context).",
     };
   }
 
@@ -55,13 +56,13 @@ export async function validateProjectRootAbs(
       ok: false,
       status: "project_selector_invalid",
       reason: "projectRootAbs must be a directory",
-      value: trimmed,
+      value: resolved,
       nextAction: "Provide an existing project directory path for projectRootAbs.",
     };
   }
 
   return {
     ok: true,
-    projectRootAbs: path.resolve(trimmed),
+    projectRootAbs: path.resolve(resolved),
   };
 }

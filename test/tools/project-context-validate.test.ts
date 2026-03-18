@@ -30,10 +30,10 @@ test("project_context_validate succeeds for absolute existing project directory"
   });
 });
 
-test("project_context_validate fails for non-absolute selector", async () => {
-  const out = await projectContextValidateDomain({ projectRootAbs: "relative/path" });
-  assert.equal(out.structuredContent.status, "project_selector_invalid");
-  assert.equal(out.structuredContent.reason, "projectRootAbs must be absolute");
+test("project_context_validate resolves relative selector against workspace/cwd", async () => {
+  const out = await projectContextValidateDomain({ projectRootAbs: "." });
+  assert.equal(out.structuredContent.status, "ok");
+  assert.equal(out.structuredContent.projectRootAbs, path.resolve("."));
 });
 
 test("project_context_validate fails for non-existent selector", async () => {

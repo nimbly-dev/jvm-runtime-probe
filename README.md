@@ -57,6 +57,16 @@ This produces two artifacts:
 
 Default is `3`.
 
+**Java 21 compatibility mode**:
+
+| Method | Value |
+|---|---|
+| Agent arg | `allowJava21=true` (aliases: `java21Compat=true`, `byteBuddyExperimental=true`) |
+| JVM property | `-Dmcp.probe.bytebuddy.experimental=true` (legacy alias: `-Dmcp.probe.allow.java21=true`) |
+| Environment variable | `MCP_PROBE_BYTEBUDDY_EXPERIMENTAL=true` (legacy alias: `MCP_PROBE_ALLOW_JAVA21=true`) |
+
+Default is `false`.
+
 ---
 
 ## Installing the MCP Server

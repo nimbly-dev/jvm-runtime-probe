@@ -3,7 +3,9 @@ import * as z from "zod/v4";
 export const TargetInferInputSchema = {
   projectRootAbs: z
     .string()
-    .describe("Absolute project root selected by orchestrator; all inference stays scoped here."),
+    .describe(
+      "Project root selected by orchestrator (absolute or relative to workspace); all inference stays scoped here.",
+    ),
   discoveryMode: z
     .enum(["ranked_candidates", "class_methods"])
     .optional()

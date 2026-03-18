@@ -9,7 +9,13 @@ export const springSynthesizerPlugin: SynthesizerPlugin = {
   framework: "spring",
   pluginApiVersion: SYNTHESIZER_PLUGIN_API_VERSION,
   async canHandle(input: SynthesizerInput): Promise<boolean> {
-    return isSpringProject(input.rootAbs);
+    const options = {
+      searchRootsAbs: input.searchRootsAbs,
+      ...(input.inferredTargetFileAbs
+        ? { inferredTargetFileAbs: input.inferredTargetFileAbs }
+        : {}),
+    };
+    return isSpringProject(input.rootAbs, options);
   },
   async synthesize(input: SynthesizerInput) {
     return synthesizeSpringRecipe(input);

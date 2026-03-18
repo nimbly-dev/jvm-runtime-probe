@@ -19,10 +19,13 @@ import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
 
 public final class ProbeAgent {
+  private static final String BYTE_BUDDY_EXPERIMENTAL_PROPERTY = "net.bytebuddy.experimental";
+
   private ProbeAgent() {}
 
   public static void premain(String agentArgs, Instrumentation inst) {
     AgentConfig cfg = AgentConfig.fromAgentArgs(agentArgs);
+    configureByteBuddyCompatibility(cfg);
     ProbeRuntime.configure(cfg.mode, cfg.actuatorId, cfg.actuateTargetKey, cfg.actuateReturnBoolean);
     ProbeRuntime.configureCapture(
         cfg.captureEnabled,
@@ -53,6 +56,8 @@ public final class ProbeAgent {
       System.err.println("[probe-agent] capturePreviewMaxChars: " + cfg.capturePreviewMaxChars);
       System.err.println("[probe-agent] captureStoredMaxChars: " + cfg.captureStoredMaxChars);
       System.err.println("[probe-agent] captureRedactionMode: " + cfg.captureRedactionMode);
+      System.err.println("[probe-agent] byteBuddyExperimentalCompatibility: " + cfg.byteBuddyExperimentalCompatibility);
+      System.err.println("[probe-agent] net.bytebuddy.experimental: " + System.getProperty(BYTE_BUDDY_EXPERIMENTAL_PROPERTY, "false"));
       System.err.println("[probe-agent] include: " + String.join(",", cfg.includePatterns));
       System.err.println("[probe-agent] exclude: " + String.join(",", cfg.excludePatterns));
       // keep reference so GC doesn't collect server
@@ -64,6 +69,13 @@ public final class ProbeAgent {
     }
 
     installInstrumentation(inst, cfg);
+  }
+
+  private static void configureByteBuddyCompatibility(AgentConfig cfg) {
+    if (!cfg.byteBuddyExperimentalCompatibility) {
+      return;
+    }
+    System.setProperty(BYTE_BUDDY_EXPERIMENTAL_PROPERTY, "true");
   }
 
   private static void installInstrumentation(Instrumentation inst, AgentConfig cfg) {
