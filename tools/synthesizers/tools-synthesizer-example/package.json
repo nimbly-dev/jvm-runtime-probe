@@ -3,5 +3,5 @@
   "version": "0.1.0",
   "private": true,
   "description": "Opt-in example synthesizer plugin scaffold",
-  "main": "src/plugin.ts"
+  "main": "src/adapter.ts"
 }

@@ -1,12 +1,18 @@
 # Example Synthesizer Plugin (Opt-In)
 
-This package is a practical starter for framework adoptors building synthesis plugins.
+This package is a practical starter for framework adopters building synthesis plugins.
 
 ## Important
 
 - This package is example-only.
 - It is **not** registered in default runtime plugin wiring.
 - It is **not** part of default `tsconfig` include paths.
+
+## Structure
+
+- `src/adapter.ts`: package-facing entrypoint.
+- `src/plugin.ts`: plugin implementation.
+- `src/models/*`: framework-local model/constants used by the adapter/plugin.
 
 ## What It Demonstrates
 
@@ -15,6 +21,7 @@ This package is a practical starter for framework adoptors building synthesis pl
 - deterministic `report` response when not enabled
 - deterministic starter `recipe` response when enabled
 - usage of project-standard alias imports (`@...`)
+- adapter + models organization for synthesizer packages
 
 ## Current Example Behavior
 
@@ -30,13 +37,15 @@ If marker does not exist:
 
 This makes it safe to copy while showing the full success/failure contract shape.
 
-## How Adoptors Use This
+## How Adopters Use This
 
 1. Copy into `tools/synthesizers/tools-<framework>`.
-2. Rename plugin `id` and `framework`.
-3. Replace marker logic with real framework detection.
-4. Replace starter recipe generation with framework-aware synthesis.
-5. Add tests for both success and fail-closed paths.
+2. Keep `adapter.ts` as public entrypoint.
+3. Rename plugin `id` and `framework`.
+4. Replace marker logic with real framework detection.
+5. Replace starter recipe generation with framework-aware synthesis.
+6. Keep framework-specific models under `src/models`.
+7. Add tests for both success and fail-closed paths.
 
 ## When To Register In Default Registry
 

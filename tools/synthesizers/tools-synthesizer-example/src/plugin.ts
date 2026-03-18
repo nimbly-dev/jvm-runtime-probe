@@ -6,7 +6,7 @@ import type { SynthesizerOutput } from "@/models/synthesis/synthesizer_output.mo
 import { SYNTHESIZER_PLUGIN_API_VERSION } from "@tools-registry/plugin.compat";
 import type { SynthesizerPlugin } from "@tools-registry/plugin.contract";
 
-const EXAMPLE_MARKER_FILE = ".mcp-java-dev-tools-example-framework";
+import { EXAMPLE_MARKER_FILE } from "./models/example_synthesizer.model";
 
 async function hasExampleMarker(rootAbs: string): Promise<boolean> {
   try {

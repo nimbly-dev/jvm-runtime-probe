@@ -1,5 +1,6 @@
 {
   "name": "@mcp-java-dev-tools/tools-spring",
   "private": true,
-  "version": "0.1.0"
+  "version": "0.1.0",
+  "main": "src/adapter.ts"
 }
