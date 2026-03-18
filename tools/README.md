@@ -12,12 +12,12 @@ This folder is the workspace-style scaffold for TS tool packages.
 - `synthesizers/tools-grpc-rpc`
 - `transport/tools-mcp-server`
 
-## Test groups
-- `tests/contract`
-- `tests/e2e`
+## Integrated test location
+- Top-level fixture and integration scaffolding lives under:
+  - `test/fixtures/spring-apps`
+  - `test/integration/mcp`
 
-Each package already has its own placeholder `package.json` so adapter teams can add local dependencies independently.
-This scaffold is intentionally lightweight and non-breaking.
+Cross-module MCP integration coverage belongs in the centralized top-level `test` tree, not under `tools/tests`.
 
 ## Opt-in examples
 - `synthesizers/tools-synthesizer-example`

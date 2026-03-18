@@ -17,12 +17,12 @@ Grouped module layout with non-breaking artifact names.
   - `java-agent/core/pom.xml`
   - `java-agent/mappers-adapters/pom.xml`
 
-## Test placeholders
-- `tests/core-contract-tests`
-- `tests/mapper-contract-tests`
-- `tests/e2e-agent-tests`
+## Integrated test location
+- Top-level fixture and integration scaffolding lives under:
+  - `test/fixtures/spring-apps`
+  - `test/integration/mcp`
 
-These test modules are placeholders only for now; no generated test code was added.
+Java-agent behavior that must be validated with the MCP server and a real Spring runtime belongs in the centralized top-level `test` tree, not under `java-agent/tests`.
 
 ## Opt-in examples
 - `mappers-adapters/adapter-request-mapper-example`
