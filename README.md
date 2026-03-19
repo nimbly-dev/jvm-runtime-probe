@@ -2,9 +2,9 @@
 
 [![node](https://img.shields.io/badge/node-v24.13.0-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 [![npm](https://img.shields.io/badge/npm-11.6.2-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/)
-[![JDK](https://img.shields.io/badge/JDK-21%2B-007396?logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![JDK](https://img.shields.io/badge/JDK-17%2B-007396?logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Java Agent Target](https://img.shields.io/badge/Java%20Agent%20Target-17-ED8B00?logo=openjdk&logoColor=white)](https://maven.apache.org/)
-[![package](https://img.shields.io/badge/package-mcp--jvm--debugger%400.1.0-0A66C2)](https://github.com/nimbly-dev/mcp-java-dev-tools)
+[![package](https://img.shields.io/badge/package-mcp--java--dev--tools%400.1.0-0A66C2)](https://github.com/nimbly-dev/mcp-java-dev-tools)
 
 **MCP Java Dev Tools** bridges agentic coding tools and live Java runtime behavior through a lightweight sidecar agent.
 
@@ -22,7 +22,7 @@ For operator workflows and end-to-end execution flows, see [docs/how-it-works/RE
 |---|---|
 | Node.js | `v24.13.0` (tested) |
 | npm | `11.6.2` (tested) |
-| JDK | `21+` |
+| JDK | `17+` |
 | Maven | any recent |
 
 ---
@@ -41,82 +41,11 @@ This produces two artifacts:
 
 ---
 
-## Attaching the Java Agent
+## Installation
 
-```text
--javaagent:C:\Users\{desktopName}\repository\mcp-java-dev-tools\java-agent\core\core-probe\target\mcp-java-dev-tools-agent-0.1.0.jar=host=0.0.0.0;port=9191;include=com.{your_workspace_root_package}.**;exclude=com.nimbly.mcpjavadevtools.agent.**,**.config.**,**Test
-```
+### Installer
 
-**Tuning capture history buffer size** (all three are equivalent):
-
-| Method | Value |
-|---|---|
-| Agent arg | `captureMethodBufferSize=<1..32>` |
-| JVM property | `-Dmcp.probe.capture.method.buffer.size=<1..32>` |
-| Environment variable | `MCP_PROBE_CAPTURE_METHOD_BUFFER_SIZE=<1..32>` |
-
-Default is `3`.
-
-**Java 21 compatibility mode**:
-
-| Method | Value |
-|---|---|
-| Agent arg | `allowJava21=true` (aliases: `java21Compat=true`, `byteBuddyExperimental=true`) |
-| JVM property | `-Dmcp.probe.bytebuddy.experimental=true` (legacy alias: `-Dmcp.probe.allow.java21=true`) |
-| Environment variable | `MCP_PROBE_BYTEBUDDY_EXPERIMENTAL=true` (legacy alias: `MCP_PROBE_ALLOW_JAVA21=true`) |
-
-Default is `false`.
-
----
-
-## Installing the MCP Server
-
-<details>
-<summary><strong>Codex</strong></summary>
-
-```powershell
-codex.cmd mcp add mcp-java-dev-tools --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 -- node C:\Users\{desktopName}\repository\mcp-java-dev-tools\dist\server.js
-```
-
-Optional: set `MCP_WORKSPACE_ROOT` if needed for your project layout.
-
-To reinstall:
-
-```powershell
-codex.cmd mcp remove mcp-java-dev-tools
-codex.cmd mcp add mcp-java-dev-tools --env MCP_PROBE_BASE_URL=http://127.0.0.1:9193 -- node C:\Users\{desktopName}\repository\mcp-java-dev-tools\dist\server.js
-```
-
-</details>
-
-<details>
-<summary><strong>Kiro / mcpServers JSON</strong></summary>
-
-Add this to `~/.kiro/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "mcp-java-dev-tools": {
-      "command": "node",
-      "args": ["C:\\Users\\{desktopName}\\repository\\mcp-java-dev-tools\\dist\\server.js"],
-      "env": {
-        "MCP_PROBE_BASE_URL": "http://127.0.0.1:9193"
-      }
-    }
-  }
-}
-```
-
-Optional: set `MCP_WORKSPACE_ROOT` if needed.
-
-</details>
-
----
-
-## Installer Script
-
-The quickest way to get set up is the installer script:
+The installer currently supports Codex and Kiro.
 
 ```bash
 ./scripts/install-integrations.sh
@@ -126,29 +55,105 @@ This installs the default skill set:
 - `mcp-java-dev-tools-line-probe-run`
 - `mcp-java-dev-tools-regression-suite`
 
-For non-interactive or CI use, the script accepts flags:
+For non-interactive or CI use, use the `./scripts/install-integrations.sh` flags shown above.
 
-```bash
-./scripts/install-integrations.sh --client codex --probe-base-url http://127.0.0.1:9193
-./scripts/install-integrations.sh --client kiro --dev-mode --dry-run
-./scripts/install-integrations.sh --client both --update-skill-if-exists
-./scripts/install-integrations.sh --client codex --skill-name mcp-java-dev-tools-line-probe-run
-./scripts/install-integrations.sh --client codex --skill-name mcp-java-dev-tools-line-probe-run --skill-name mcp-java-dev-tools-regression-suite
+### Manual Setup
+
+#### Java Agent Setup
+
+The target JVM must run on **Java 17 or newer**. If you're on Java 21, see [Java 21 compatibility mode](#java-21-compatibility-mode) before continuing.
+
+Add the following as a JVM argument when launching your application, replacing `{desktopName}` and the `include` package with your own:
+
+```text
+-javaagent:C:\Users\{desktopName}\repository\mcp-java-dev-tools\java-agent\core\core-probe\target\mcp-java-dev-tools-agent-0.1.0.jar=host=0.0.0.0;port=9191;include=com.{package_to_capture}.**;exclude=com.nimbly.mcpjavadevtools.agent.**,**.config.**,**Test
 ```
+
+> **Tip:** The `include` filter is optional. By default, the agent instruments all classes within the module it was run from. Setting `include` to your root package (e.g. `com.acme.**`) keeps instrumentation focused and avoids capturing classes you don't care about.
+
+To confirm the agent is instrumenting your classes, check the startup logs for lines like:
+
+```txt
+[mcp-probe]: com.yourpackagename.yourclassname
+```
+
+If you don't see your classes listed, check your `include` filter.
+
+---
+
+<details>
+<summary><strong>IntelliJ IDEA — Step by Step</strong></summary>
+
+1. Open **Run > Edit Configurations...** from the top menu
+2. Select the run configuration for your target application (or create one if it doesn't exist)
+3. Expand the **Modify options** dropdown and enable **Add VM options** if it isn't already visible
+4. In the **VM options** field, paste the full `-javaagent:...` argument from above
+5. Click **Apply**, then **OK**
+6. Run your application normally — the agent attaches on startup
+
+**Finding the JAR path:** If you're unsure of the absolute path, right-click the agent JAR in the Project panel and choose **Copy Path > Absolute Path**.
+
+> On Windows, use backslashes in the path (`C:\Users\...`). On macOS/Linux, use forward slashes (`/home/...` or `/Users/...`).
+
+</details>
+
+---
+
+<details>
+<summary><strong>Eclipse — Step by Step</strong></summary>
+
+1. Go to **Run > Run Configurations...** (or **Debug Configurations...** if you're debugging)
+2. Select your application under **Java Application**, or create a new one
+3. Open the **Arguments** tab
+4. In the **VM arguments** field, paste the full `-javaagent:...` argument from above
+5. Click **Apply**, then **Run** (or **Debug**)
+
+**Finding the JAR path:** Navigate to the JAR in your file system, right-click it, and copy the full path. Paste it into the agent argument, replacing the placeholder path.
+
+> On Windows, Eclipse accepts both forward and backslashes in paths, but backslashes are safer. Wrap the path in quotes if it contains spaces: `-javaagent:"C:\path with spaces\agent.jar"=...`
+
+</details>
 
 ---
 
 ## Runtime Configuration
 
-One environment variable is required; the rest are optional tuning knobs.
+### Java Agent Options
 
-**Required:**
+#### Capture History Buffer Size
+
+Controls how many method captures the agent retains per probe point.
+
+| Method | Value |
+|---|---|
+| Agent arg | `captureMethodBufferSize=<1..32>` |
+| JVM property | `-Dmcp.probe.capture.method.buffer.size=<1..32>` |
+| Environment variable | `MCP_PROBE_CAPTURE_METHOD_BUFFER_SIZE=<1..32>` |
+
+Default is `3`. Increase this if you need deeper capture history for a single probe point.
+
+#### Java 21 Compatibility Mode
+
+Required if your target JVM runs on Java 21. Enables ByteBuddy's experimental support for newer JVM internals.
+
+| Method | Value |
+|---|---|
+| Agent arg | `allowJava21=true` (aliases: `java21Compat=true`, `byteBuddyExperimental=true`) |
+| JVM property | `-Dmcp.probe.bytebuddy.experimental=true` (legacy alias: `-Dmcp.probe.allow.java21=true`) |
+| Environment variable | `MCP_PROBE_BYTEBUDDY_EXPERIMENTAL=true` (legacy alias: `MCP_PROBE_ALLOW_JAVA21=true`) |
+
+Default is `false`.
+
+
+### MCP Server Environment Variables
+
+#### Required
 
 | Variable | Purpose |
 |---|---|
 | `MCP_PROBE_BASE_URL` | URL of the running probe agent |
 
-**Optional:**
+#### Optional
 
 | Variable | Default | Notes |
 |---|---|---|
@@ -162,7 +167,9 @@ One environment variable is required; the rest are optional tuning knobs.
 | `MCP_PROBE_WAIT_UNREACHABLE_MAX_RETRIES` | `3` | Max: 10 |
 | `MCP_PROBE_INCLUDE_EXECUTION_PATHS` | `false` | Set `true` to include `executionPaths` arrays in probe payloads |
 
-Probe endpoint paths are fixed:
+#### Probe Endpoints
+
+These paths are fixed and cannot be overridden.
 
 | Endpoint | Path |
 |---|---|
