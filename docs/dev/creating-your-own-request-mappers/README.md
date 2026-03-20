@@ -1,6 +1,8 @@
 # Creating a Request Mapper Adapter
 
-This guide walks you through teaching the Java agent how a framework expresses HTTP routes. You'll build an adapter that extracts route information from source code evidence (usually annotations).
+This guide covers the current Java adapter surface for HTTP route extraction. The core resolver contract today materializes HTTP request candidates, so a new adapter must be able to prove an HTTP method and path from source evidence.
+
+You'll build an adapter that extracts route information from source code evidence, usually annotations.
 
 ---
 
@@ -37,7 +39,9 @@ Place your implementation in:
 java-agent/mappers-adapters/adapter-request-mapper-<framework>
 ```
 
-For example: `adapter-request-mapper-jaxrs-http`, `adapter-request-mapper-grpc-rpc`
+For example: `adapter-request-mapper-jaxrs-http`, `adapter-request-mapper-quarkus-http`
+
+If you need a non-HTTP transport such as gRPC, an adapter alone is not enough. The current `ResolvedMapping` contract, resolver success payload, and downstream synthesis flow are all HTTP-shaped and would need to be extended first.
 
 ---
 

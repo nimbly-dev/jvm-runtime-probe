@@ -15,7 +15,7 @@ This section is for developers adding framework support — whether you're exten
 
 ## How the Architecture Fits Together
 
-There are two extension surfaces — one on the Java side, one on the TypeScript side. Together they form a pipeline:
+There are two extension surfaces — one on the Java side, one on the TypeScript side. Together they form the HTTP recipe pipeline:
 
 | Surface | Language | What it does |
 |---|---|---|
@@ -49,7 +49,9 @@ The **probe** is always the runtime truth source. Your adapters and synthesizers
 - Route extraction already works, but recipe generation needs framework-specific logic
 - Auth, header, or body assumptions vary by framework convention
 
-**Starting a brand-new framework?** You'll likely need both.
+**Starting a brand-new HTTP framework?** You'll likely need both.
+
+> **Note:** The current adapter and synthesizer extension points are HTTP-specific. If your target transport isn't HTTP, the shared request-mapping contract and recipe model aren't sufficient on their own — non-HTTP support would require widening those contracts first.
 
 ---
 
@@ -57,9 +59,9 @@ The **probe** is always the runtime truth source. Your adapters and synthesizers
 
 A few principles that hold across all extension work:
 
-- **Keep the core framework-agnostic.** Framework-specific logic belongs in adapters and plugins, not in shared internals.
+- **Keep the core framework-agnostic.** Framework-specific logic belongs in adapters and plugins. Don't imply non-HTTP transport support unless the shared contracts are widened first.
 - **Fail closed, always.** When proof is insufficient, return a structured failure — never fake success from weak heuristics.
-- **Honor the contract.** Outputs should always include `status`. For `report` outputs, include: `reasonCode`, `failedStep`, `nextAction`, `evidence`, `attemptedStrategies`.
+- **Honor the contract.** Outputs should always include `status`. For `report` outputs, also include: `reasonCode`, `failedStep`, `nextAction`, `evidence`, `attemptedStrategies`.
 
 ---
 
@@ -88,6 +90,6 @@ Resist the urge to skip to step 6 — the isolated validation steps catch most i
 
 ## A Note on "Machine-First" Code
 
-If some of the contracts here feel unusually strict or mechanical — that's intentional. This system is consumed by agents as much as humans, so deterministic outputs aren't just good practice, they're load-bearing.
+If the contracts here feel unusually strict or mechanical — that's intentional. This system is consumed by agents as much as humans, so deterministic outputs aren't just good practice, they're load-bearing.
 
 That said, clarity for human readers still matters. The best extension work does both: code that's easy to follow, with outputs that agents can act on without ambiguity. You're not writing for one audience or the other — you're writing for both.

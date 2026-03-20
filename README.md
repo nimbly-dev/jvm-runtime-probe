@@ -12,6 +12,8 @@ Static analysis only gets you so far. By attaching directly to a running JVM, th
 
 The runtime agent is built with ByteBuddy and works alongside JDWP rather than replacing it. On top of the probe layer, the system adds framework-aware data synthesis and strict, fail-closed tool contracts — so agent orchestrators can make decisions grounded in actual runtime proof, not inference.
 
+The current focus is HTTP entrypoints. Non-HTTP protocol support is on the horizon but not yet implemented — it will need concrete models and validation targets before the core contracts can be generalized.
+
 For operator workflows and end-to-end execution flows, see [docs/how-it-works/README.md](./docs/how-it-works/README.md).
 
 ---
@@ -187,6 +189,18 @@ These paths are fixed and cannot be overridden.
 | `mcp-java-dev-tools-line-probe-run` | Line-level probe execution |
 | `mcp-java-dev-tools-regression-suite` | Regression check orchestration |
 | `mcp-java-dev-tools-issue-report` | Sanitized issue reporting from session, runtime, and probe evidence |
+
+---
+
+## Contributing
+
+Contribution guidance lives in [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+The guide distinguishes between:
+- synthesizer and adapter contributions
+- probe tools and recipe generation contributions
+
+Start there before opening a large pull request or changing public tool contracts.
 
 ---
 

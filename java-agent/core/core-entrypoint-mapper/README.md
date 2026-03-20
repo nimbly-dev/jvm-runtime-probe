@@ -1,6 +1,6 @@
 # Core Entrypoint Mapper
 
-Framework-agnostic Java AST entrypoint resolver used by `probe_recipe_create` synthesis.
+Shared Java AST HTTP entrypoint resolver used by `probe_recipe_create` synthesis.
 
 ## File Tree Packaging
 
@@ -21,9 +21,11 @@ java-agent/core/core-entrypoint-mapper/src/main/java/com/nimbly/mcpjavadevtools/
 - `ast` contains internal AST descriptors and method context types.
 - `core` contains source scanning, indexing, type resolution, and method selection.
 - `extractor` defines mapper SPI (`MappingExtractor`) and plugin registry/discovery.
-- `resolution` contains normalized resolved mapping data before transport materialization.
+- `resolution` contains normalized resolved mapping data before HTTP materialization.
 - `transport.http` materializes HTTP request candidates from resolved mappings.
 - Flow: `core -> extractor (SPI) -> transport.http -> api`.
+
+The AST indexing and selection pieces are reusable across frameworks, but the public resolved-mapping contract in this module is HTTP-shaped today. `ResolvedMapping`, resolver success responses, and downstream recipe generation all assume an HTTP method/path-oriented result.
 
 ## SPI Rules
 
