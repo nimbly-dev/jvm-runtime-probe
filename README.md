@@ -58,8 +58,6 @@ This installs the default skill set:
 - `mcp-java-dev-tools-regression-suite`
 - `mcp-java-dev-tools-issue-report`
 
-For non-interactive or CI use, use the `./scripts/install-integrations.sh` flags shown above.
-
 ### Manual Setup
 
 #### Java Agent Setup
