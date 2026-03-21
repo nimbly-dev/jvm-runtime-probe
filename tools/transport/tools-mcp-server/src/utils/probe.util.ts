@@ -28,7 +28,7 @@ export function parseProbeSnapshot(structuredContent: Record<string, unknown>): 
   const out: { key?: string; hitCount?: number; lastHitMs?: number } = {};
   const key = probe?.key;
   const hitCount = probe?.hitCount;
-  const lastHitMs = typeof probe?.lastHitMs === "number" ? probe.lastHitMs : probe?.lastHitEpochMs;
+  const lastHitMs = typeof probe?.lastHitMs === "number" ? probe.lastHitMs : probe?.lastHitEpoch;
   if (typeof key === "string") out.key = key;
   if (typeof hitCount === "number") out.hitCount = hitCount;
   if (typeof lastHitMs === "number") out.lastHitMs = lastHitMs;

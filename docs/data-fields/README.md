@@ -129,7 +129,7 @@ Capture timestamp naming:
 | `response` | Compact normalized status payload (`status` + essential `json` fields). | `probe_get_status` | true | `{"status":200,"json":{"hitCount":1}}` |
 | `response.json.contractVersion` | Probe contract marker. | `probe_get_status` | false | `"0.1.0"` |
 | `response.json.hitCount` | Probe hit counter for the line key. | `probe_get_status` | false | `1` |
-| `response.json.lastHitEpochMs` | Last hit Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200000` |
+| `response.json.lastHitEpoch` | Last hit Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200000` |
 | `response.json.lineValidation` | Line validation verdict (`resolvable` or `invalid_line_target`). | `probe_get_status` | false | `"resolvable"` |
 | `response.json.capturePreview` | Compact runtime preview metadata from Java agent (`available`, `captureId`, timestamp, optional path list). | `probe_get_status` | false | `{"available":true,"captureId":"abc123"}` |
 | `response.json.capturePreview.capturedAtEpoch` | Capture preview Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200456` |
@@ -172,10 +172,10 @@ Capture timestamp naming:
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
 | `request` | Polling request and retry configuration (`key` canonical; optional `resolvedKey` only when transformed from input). | `probe_wait_for_hit` | true | `{"key":"com.example.Catalog#save:88","maxRetries":1}` |
-| `request.waitStartEpochMs` | Unix-epoch millisecond timestamp when current wait attempt started. | `probe_wait_for_hit` | false | `1773318672847` |
-| `request.triggerWindowStartEpochMs` | Reset-aware Unix-epoch start used for strict inline classification. | `probe_wait_for_hit` | false | `1773318658526` |
-| `request.triggerLeadMs` | Milliseconds between wait start and trigger window start (`waitStartEpochMs - triggerWindowStartEpochMs`). | `probe_wait_for_hit` | false | `14321` |
-| `baseline` | Baseline probe snapshot used for inline hit diffing. | `probe_wait_for_hit` | false | `{"hitCount":0,"lastHitEpochMs":0}` |
+| `request.waitStartEpoch` | Unix-epoch millisecond timestamp when current wait attempt started. | `probe_wait_for_hit` | false | `1773318672847` |
+| `request.triggerWindowStartEpoch` | Reset-aware Unix-epoch start used for strict inline classification. | `probe_wait_for_hit` | false | `1773318658526` |
+| `request.triggerLeadMs` | Milliseconds between wait start and trigger window start (`waitStartEpoch - triggerWindowStartEpoch`). | `probe_wait_for_hit` | false | `14321` |
+| `baseline` | Baseline probe snapshot used for inline hit diffing. | `probe_wait_for_hit` | false | `{"hitCount":0,"lastHitEpoch":0}` |
 | `result.hit` | Whether a hit was detected in current wait window. | `probe_wait_for_hit` | true | `true` |
 | `result.inline` | Whether detected hit is inline to current execution window. | `probe_wait_for_hit` | true | `true` |
 | `result.reason` | Failure reason when no inline hit is confirmed. | `probe_wait_for_hit` | false | `"timeout_no_inline_hit"` |

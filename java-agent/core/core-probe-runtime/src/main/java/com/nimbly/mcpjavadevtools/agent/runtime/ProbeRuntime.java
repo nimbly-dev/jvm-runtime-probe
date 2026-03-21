@@ -122,7 +122,7 @@ public final class ProbeRuntime {
     return new KeyStatus(
         key,
         countForKey(key),
-        lastHitEpochMsForKey(key),
+        lastHitEpochForKey(key),
         includeLineValidation ? lineResolvable : null,
         includeLineValidation ? (lineResolvable ? "resolvable" : "invalid_line_target") : null
     );
@@ -146,7 +146,7 @@ public final class ProbeRuntime {
     return v == null ? 0L : v.get();
   }
 
-  public static long lastHitEpochMsForKey(String key) {
+  public static long lastHitEpochForKey(String key) {
     AtomicLong v = LAST_HIT_EPOCH_MS.get(key);
     return v == null ? 0L : v.get();
   }

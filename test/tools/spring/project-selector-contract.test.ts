@@ -287,7 +287,7 @@ test("probe_target_infer ranked success emits explicit resultType and status", a
         JSON.stringify({
           key: "com.example.CatalogService#save:3",
           hitCount: 0,
-          lastHitEpochMs: 0,
+          lastHitEpoch: 0,
           lineResolvable: calls === 1 ? false : true,
           lineValidation: calls === 1 ? "invalid_line_target" : "resolvable",
         }),
@@ -388,7 +388,7 @@ test("probe_target_infer class_methods returns unresolved line selection when no
         JSON.stringify({
           key: "com.example.CatalogService#save:3",
           hitCount: 0,
-          lastHitEpochMs: 0,
+          lastHitEpoch: 0,
           lineResolvable: false,
           lineValidation: "invalid_line_target",
         }),

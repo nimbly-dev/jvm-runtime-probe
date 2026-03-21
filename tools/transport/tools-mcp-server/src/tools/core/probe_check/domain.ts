@@ -8,8 +8,8 @@ function sanitizeRuntime(runtime: unknown): Record<string, unknown> | undefined 
   const input = runtime as Record<string, unknown>;
   const out: Record<string, unknown> = { ...input };
 
-  // serverEpochMs is a remote host clock and can be misleading in mixed-host setups.
-  delete out.serverEpochMs;
+  // serverEpoch is a remote host clock and can be misleading in mixed-host setups.
+  delete out.serverEpoch;
   // Runtime applicationType is intentionally omitted from MCP diagnostics.
   delete out.applicationType;
 

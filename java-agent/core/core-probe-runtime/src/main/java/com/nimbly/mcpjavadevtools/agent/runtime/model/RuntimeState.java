@@ -5,7 +5,7 @@ import com.nimbly.mcpjavadevtools.agent.runtime.RuntimeStringSignal;
 
 public record RuntimeState(
     ActuationState actuation,
-    long serverEpochMs,
+    long serverEpoch,
     RuntimeStringSignal applicationType,
     RuntimePortSignal appPort
 ) {}

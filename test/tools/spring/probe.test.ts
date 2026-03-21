@@ -45,7 +45,7 @@ test("probe_get_status returns invalid_line_target for unresolved runtime line",
     return jsonResponse(200, {
       key: "com.example.social.post.app.controller.PostController#updatePost:122",
       hitCount: 0,
-      lastHitEpochMs: 0,
+      lastHitEpoch: 0,
       mode: "observe",
       lineResolvable: false,
       lineValidation: "invalid_line_target",
@@ -78,7 +78,7 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
       probe: {
         key: "com.example.social.post.app.controller.PostController#updatePost:122",
         hitCount: 1,
-        lastHitEpochMs: 1234,
+        lastHitEpoch: 1234,
         lineResolvable: true,
         lineValidation: "resolvable",
       },
@@ -96,7 +96,7 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
         actuatorId: "",
         actuateTargetKey: "",
         actuateReturnBoolean: false,
-        serverEpochMs: 7777,
+        serverEpoch: 7777,
         applicationType: {
           value: "spring-boot",
           source: "classpath:org.springframework.boot.SpringApplication",
@@ -126,7 +126,7 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
     assert.equal(out.structuredContent.response.json.capturePreview.capturedAtEpoch, 5555);
     assert.equal(out.structuredContent.response.json.capturePreview.executionPaths, undefined);
     assert.equal(out.structuredContent.response.json.runtime.applicationType, undefined);
-    assert.equal(out.structuredContent.response.json.runtime.serverEpochMs, undefined);
+    assert.equal(out.structuredContent.response.json.runtime.serverEpoch, undefined);
     assert.equal(out.structuredContent.response.json.runtime.serverMs, undefined);
     assert.equal(out.structuredContent.response.json.runtime.appPort.value, 8082);
     assert.equal(out.structuredContent.response.json.runtime.appPort.confidence, undefined);
@@ -173,7 +173,7 @@ test("probe_wait_for_hit exits immediately for invalid_line_target", async () =>
     return jsonResponse(200, {
       key: "com.example.social.post.app.controller.PostController#updatePost:122",
       hitCount: 0,
-      lastHitEpochMs: 0,
+      lastHitEpoch: 0,
       mode: "observe",
       lineResolvable: false,
       lineValidation: "invalid_line_target",
@@ -233,7 +233,7 @@ test("probe_wait_for_hit retries unreachable status checks when enabled and can 
     return jsonResponse(200, {
       key: "com.example.social.post.app.controller.PostController#updatePost:122",
       hitCount: 1,
-      lastHitEpochMs: Date.now(),
+      lastHitEpoch: Date.now(),
       mode: "observe",
       lineResolvable: true,
       lineValidation: "resolvable",
@@ -290,7 +290,7 @@ test("probe_wait_for_hit timeout_no_inline_hit returns line-not-executed guidanc
     return jsonResponse(200, {
       key: "com.example.social.post.app.controller.PostController#updatePost:122",
       hitCount: 0,
-      lastHitEpochMs: 0,
+      lastHitEpoch: 0,
       mode: "observe",
       lineResolvable: true,
       lineValidation: "resolvable",
@@ -326,7 +326,7 @@ test("probe_wait_for_hit emits minimal non-duplicative epoch fields", async () =
       return jsonResponse(200, {
         key,
         hitCount: 1,
-        lastHitEpochMs: 1_500,
+        lastHitEpoch: 1_500,
         mode: "observe",
         lineResolvable: true,
         lineValidation: "resolvable",
@@ -344,10 +344,10 @@ test("probe_wait_for_hit emits minimal non-duplicative epoch fields", async () =
       assert.equal(out.structuredContent.result.inline, true);
       assert.equal(out.structuredContent.request.key, key);
       assert.equal(out.structuredContent.request.resolvedKey, undefined);
-      assert.equal(out.structuredContent.request.waitStartEpochMs, 2_000);
-      assert.equal(out.structuredContent.request.triggerWindowStartEpochMs, 1_000);
-      assert.equal(out.structuredContent.request.inlineStartEpochMs, undefined);
-      assert.equal(out.structuredContent.request.lastResetEpochMs, undefined);
+      assert.equal(out.structuredContent.request.waitStartEpoch, 2_000);
+      assert.equal(out.structuredContent.request.triggerWindowStartEpoch, 1_000);
+      assert.equal(out.structuredContent.request.inlineStartEpoch, undefined);
+      assert.equal(out.structuredContent.request.lastResetEpoch, undefined);
     });
     assert.equal(calls, 1);
     assert.equal(LAST_RESET_EPOCH_BY_KEY.has(key), false);
@@ -362,7 +362,7 @@ test("probe_get_status remains backward-compatible when line validation fields a
     return jsonResponse(200, {
       key: "com.example.social.post.app.controller.PostController#updatePost:122",
       hitCount: 0,
-      lastHitEpochMs: 0,
+      lastHitEpoch: 0,
       mode: "observe",
     });
   }, async () => {
@@ -395,7 +395,7 @@ test("probe_get_status supports keys[] batch with partial success semantics", as
           ok: true,
           key: lineKey,
           hitCount: 2,
-          lastHitEpochMs: 1234567,
+          lastHitEpoch: 1234567,
           mode: "observe",
           lineResolvable: true,
           lineValidation: "resolvable",
@@ -441,7 +441,7 @@ test("probe_get_status supports 0.1.0 batch rows with nested probe payload", asy
           probe: {
             key: lineKey,
             hitCount: 3,
-            lastHitEpochMs: 2222,
+            lastHitEpoch: 2222,
             lineResolvable: true,
             lineValidation: "resolvable",
           },
@@ -456,7 +456,7 @@ test("probe_get_status supports 0.1.0 batch rows with nested probe payload", asy
             actuatorId: "",
             actuateTargetKey: "",
             actuateReturnBoolean: false,
-            serverEpochMs: 3333,
+            serverEpoch: 3333,
             applicationType: {
               value: "spring-boot",
               source: "classpath:org.springframework.boot.SpringApplication",
@@ -488,7 +488,7 @@ test("probe_get_status supports 0.1.0 batch rows with nested probe payload", asy
     if (!firstRow) throw new Error("expected first batch row");
     assert.equal(firstRow.key, lineKey);
     assert.equal(firstRow.hitCount, 3);
-    assert.equal(firstRow.lastHitEpochMs, 2222);
+    assert.equal(firstRow.lastHitEpoch, 2222);
     assert.equal(firstRow.runtimeMode, "observe");
     assert.equal(firstRow.capturePreview.captureId, "cap-1");
     assert.equal(firstRow.capturePreview.executionPaths, undefined);

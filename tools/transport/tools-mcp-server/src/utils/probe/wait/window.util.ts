@@ -7,14 +7,14 @@ export type ProbeWaitWindow = {
 
 export function resolveProbeWaitWindow(resolvedKey: string): ProbeWaitWindow {
   const waitStartMs = Date.now();
-  const lastResetEpochMs = LAST_RESET_EPOCH_BY_KEY.get(resolvedKey);
-  if (typeof lastResetEpochMs === "number") {
+  const lastResetEpoch = LAST_RESET_EPOCH_BY_KEY.get(resolvedKey);
+  if (typeof lastResetEpoch === "number") {
     // Consume reset epoch once per wait call to avoid stale cross-run windows.
     LAST_RESET_EPOCH_BY_KEY.delete(resolvedKey);
   }
   // Use reset->wait trigger window for hit classification to avoid reset/request/wait races.
   const triggerWindowStartMs =
-    typeof lastResetEpochMs === "number" ? Math.min(lastResetEpochMs, waitStartMs) : waitStartMs;
+    typeof lastResetEpoch === "number" ? Math.min(lastResetEpoch, waitStartMs) : waitStartMs;
   return {
     waitStartMs,
     triggerWindowStartMs,

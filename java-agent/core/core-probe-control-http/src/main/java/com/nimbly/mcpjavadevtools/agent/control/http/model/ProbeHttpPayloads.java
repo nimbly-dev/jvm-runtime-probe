@@ -86,7 +86,7 @@ public final class ProbeHttpPayloads {
   public record ProbePayload(
       String key,
       long hitCount,
-      long lastHitEpochMs,
+      long lastHitEpoch,
       Boolean lineResolvable,
       String lineValidation
   ) {}
@@ -123,7 +123,7 @@ public final class ProbeHttpPayloads {
       String actuatorId,
       String actuateTargetKey,
       boolean actuateReturnBoolean,
-      long serverEpochMs,
+      long serverEpoch,
       RuntimeStringSignalPayload applicationType,
       RuntimePortSignalPayload appPort
   ) {}

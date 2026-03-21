@@ -69,7 +69,7 @@ final class ProbeHttpMapper {
     return new ProbeHttpPayloads.ProbePayload(
         status.key(),
         status.hitCount(),
-        status.lastHitEpochMs(),
+        status.lastHitEpoch(),
         status.lineResolvable(),
         status.lineValidation()
     );
@@ -138,7 +138,7 @@ final class ProbeHttpMapper {
         actuation.actuatorId(),
         actuation.targetKey(),
         actuation.returnBoolean(),
-        runtime.serverEpochMs(),
+        runtime.serverEpoch(),
         buildRuntimeStringSignal(runtime.applicationType()),
         buildRuntimePortSignal(runtime.appPort())
     );

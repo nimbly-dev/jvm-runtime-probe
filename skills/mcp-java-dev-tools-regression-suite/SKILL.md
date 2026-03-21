@@ -110,9 +110,9 @@ Always include:
 4. `Probe Coverage` (which endpoints were probe-verified vs HTTP-only)
 5. `Probe Verification`
 6. `Run Timing`:
-   - `runStartEpochMs` (Unix epoch in milliseconds)
-   - `runEndEpochMs` (Unix epoch in milliseconds)
-   - `runDurationMs` (`runEndEpochMs - runStartEpochMs`)
+   - `runStartEpoch` (Unix epoch in milliseconds)
+   - `runEndEpoch` (Unix epoch in milliseconds)
+   - `runDurationMs` (`runEndEpoch - runStartEpoch`)
    - optional human-readable UTC timestamps for operator readability
 7. `Synthesis Diagnostics` (aggregate reason/failure fields for blocked endpoints)
 8. `Runtime Evidence` (`capturePreview.executionPaths` and `probe_get_capture.capture.executionPaths` when available)

@@ -101,7 +101,7 @@ async function probeStatusSingle(args: {
   const probeHit = lineValidation.invalidLineTarget
     ? invalidLineTargetProbeHitMessage(hitCount)
     : json !== null
-    ? `hitCount=${typeof json.hitCount === "number" ? json.hitCount : 0}, lastHitEpochMs=${typeof json.lastHitEpochMs === "number" ? json.lastHitEpochMs : typeof json.lastHitMs === "number" ? json.lastHitMs : 0}`
+    ? `hitCount=${typeof json.hitCount === "number" ? json.hitCount : 0}, lastHitEpoch=${typeof json.lastHitEpoch === "number" ? json.lastHitEpoch : typeof json.lastHitMs === "number" ? json.lastHitMs : 0}`
       : "No JSON probe payload";
   const guidance = lineValidation.invalidLineTarget ? GUIDANCE_RUNTIME_NOT_ALIGNED : undefined;
   if (guidance) {
@@ -198,9 +198,9 @@ async function probeStatusBatch(args: {
       continue;
     }
     const hitCount = typeof row.hitCount === "number" ? row.hitCount : 0;
-    const lastHitEpochMs =
-      typeof row.lastHitEpochMs === "number"
-        ? row.lastHitEpochMs
+    const lastHitEpoch =
+      typeof row.lastHitEpoch === "number"
+        ? row.lastHitEpoch
         : typeof row.lastHitMs === "number"
           ? row.lastHitMs
           : undefined;
@@ -209,7 +209,7 @@ async function probeStatusBatch(args: {
     localByKey.set(key, {
       key,
       hitCount,
-      ...(typeof lastHitEpochMs === "number" ? { lastHitEpochMs } : {}),
+      ...(typeof lastHitEpoch === "number" ? { lastHitEpoch } : {}),
       ...(typeof lineValidation.lineResolvable === "boolean"
         ? { lineResolvable: lineValidation.lineResolvable }
         : {}),
@@ -228,7 +228,7 @@ async function probeStatusBatch(args: {
       reproStatus: lineValidation.invalidLineTarget ? "invalid_line_target" : "status_checked",
       probeHit: lineValidation.invalidLineTarget
         ? invalidLineTargetProbeHitMessage(hitCount)
-          : `hitCount=${hitCount}, lastHitEpochMs=${typeof row.lastHitEpochMs === "number" ? row.lastHitEpochMs : typeof row.lastHitMs === "number" ? row.lastHitMs : 0}`,
+          : `hitCount=${hitCount}, lastHitEpoch=${typeof row.lastHitEpoch === "number" ? row.lastHitEpoch : typeof row.lastHitMs === "number" ? row.lastHitMs : 0}`,
       ...(guidance ? { actionCode: guidance.actionCode, nextAction: guidance.nextAction } : {}),
       httpCode: remoteResponse?.status ?? 200,
       runtimeMode: typeof row.mode === "string" ? row.mode : undefined,
