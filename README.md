@@ -5,6 +5,7 @@
 [![JDK](https://img.shields.io/badge/JDK-17%2B-007396?logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Java Agent Target](https://img.shields.io/badge/Java%20Agent%20Target-17-ED8B00?logo=openjdk&logoColor=white)](https://maven.apache.org/)
 [![package](https://img.shields.io/badge/package-mcp--java--dev--tools%400.1.0-0A66C2)](https://github.com/nimbly-dev/mcp-java-dev-tools)
+[![MCP Badge](https://lobehub.com/badge/mcp/nimbly-dev-mcp-java-dev-tools?style=flat)](https://lobehub.com/mcp/nimbly-dev-mcp-java-dev-tools)
 
 **MCP Java Dev Tools** bridges agentic coding tools and live Java runtime behavior through a lightweight sidecar agent.
 
