@@ -327,7 +327,7 @@ export function registerRecipeCreateTool(
                 capturePreview: {
                   available: true,
                   captureId: runtimeCapture.capturePreview?.captureId,
-                  capturedAtEpochMs: runtimeCapture.capturePreview?.capturedAtEpochMs,
+                  capturedAtEpoch: runtimeCapture.capturePreview?.capturedAtEpoch,
                 },
                 lineValidation: runtimeCapture.lineValidation,
                 lineResolvable: runtimeCapture.lineResolvable,

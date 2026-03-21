@@ -97,7 +97,7 @@ public final class ProbeHttpPayloads {
       String redactionMode,
       String captureId,
       String methodKey,
-      Long capturedAtEpochMs,
+      Long capturedAtEpoch,
       List<CapturePreviewArgPayload> argsPreview,
       CapturePreviewValuePayload returnPreview,
       CapturePreviewValuePayload thrownPreview,
@@ -143,7 +143,7 @@ public final class ProbeHttpPayloads {
   public record CaptureRecordPayload(
       String captureId,
       String methodKey,
-      long capturedAtEpochMs,
+      long capturedAtEpoch,
       String redactionMode,
       List<CaptureArgPayload> args,
       CaptureValuePayload returnValue,

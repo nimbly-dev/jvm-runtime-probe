@@ -70,7 +70,7 @@ public final class ProbeCaptureStore {
 
     String methodKey = dottedClassName + "#" + methodName;
     String captureId = Long.toHexString(CAPTURE_SEQ.incrementAndGet());
-    long capturedAtEpochMs = System.currentTimeMillis();
+    long capturedAtEpoch = System.currentTimeMillis();
 
     List<CaptureValue> capturedArgs = CaptureValueSerializer.serializeArguments(
         allArguments,
@@ -97,7 +97,7 @@ public final class ProbeCaptureStore {
     CaptureEntry entry = new CaptureEntry(
         captureId,
         methodKey,
-        capturedAtEpochMs,
+        capturedAtEpoch,
         capturedArgs,
         capturedReturn,
         capturedThrown,

@@ -7,7 +7,7 @@ public final class CapturePreviewView {
   public final boolean available;
   public final String captureId;
   public final String methodKey;
-  public final long capturedAtEpochMs;
+  public final long capturedAtEpoch;
   public final String redactionMode;
   public final List<CaptureValueView> argsPreview;
   public final CaptureValueView returnPreview;
@@ -19,7 +19,7 @@ public final class CapturePreviewView {
       boolean available,
       String captureId,
       String methodKey,
-      long capturedAtEpochMs,
+      long capturedAtEpoch,
       String redactionMode,
       List<CaptureValueView> argsPreview,
       CaptureValueView returnPreview,
@@ -30,7 +30,7 @@ public final class CapturePreviewView {
     this.available = available;
     this.captureId = captureId;
     this.methodKey = methodKey;
-    this.capturedAtEpochMs = capturedAtEpochMs;
+    this.capturedAtEpoch = capturedAtEpoch;
     this.redactionMode = redactionMode;
     this.argsPreview = argsPreview;
     this.returnPreview = returnPreview;
@@ -57,7 +57,7 @@ public final class CapturePreviewView {
   static CapturePreviewView available(
       String captureId,
       String methodKey,
-      long capturedAtEpochMs,
+      long capturedAtEpoch,
       String redactionMode,
       List<CaptureValueView> argsPreview,
       CaptureValueView returnPreview,
@@ -69,7 +69,7 @@ public final class CapturePreviewView {
         true,
         captureId,
         methodKey,
-        capturedAtEpochMs,
+        capturedAtEpoch,
         redactionMode,
         argsPreview,
         returnPreview,

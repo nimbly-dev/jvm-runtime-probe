@@ -85,7 +85,7 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
       capturePreview: {
         available: true,
         captureId: "abc123",
-        capturedAtEpochMs: 5555,
+        capturedAtEpoch: 5555,
             executionPaths: [
               "CatalogController.listCatalogShoes()#42",
               "CatalogService.listCatalogShoes()#101",
@@ -123,8 +123,7 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
     assert.equal((parsed as any).requestDetails?.body, undefined);
     assert.equal(out.structuredContent.response.json.contractVersion, "0.1.0");
     assert.equal(out.structuredContent.response.json.capturePreview.captureId, "abc123");
-    assert.equal(out.structuredContent.response.json.capturePreview.capturedAtEpochMs, 5555);
-    assert.equal(out.structuredContent.response.json.capturePreview.capturedAtMs, undefined);
+    assert.equal(out.structuredContent.response.json.capturePreview.capturedAtEpoch, 5555);
     assert.equal(out.structuredContent.response.json.capturePreview.executionPaths, undefined);
     assert.equal(out.structuredContent.response.json.runtime.applicationType, undefined);
     assert.equal(out.structuredContent.response.json.runtime.serverEpochMs, undefined);
@@ -449,7 +448,7 @@ test("probe_get_status supports 0.1.0 batch rows with nested probe payload", asy
           capturePreview: {
             available: true,
             captureId: "cap-1",
-            capturedAtEpochMs: 4444,
+            capturedAtEpoch: 4444,
               executionPaths: ["CatalogController.listCatalogShoes()#42"],
           },
           runtime: {
@@ -503,7 +502,7 @@ test("probe_get_capture returns capture payload when available", async () => {
       capture: {
         captureId: "abc123",
         methodKey: "com.example.social.post.app.controller.PostController#updatePost",
-        capturedAtEpochMs: 1000,
+        capturedAtEpoch: 1000,
         redactionMode: "basic",
         args: [{ index: 0, value: "{\"sku\":\"A1\"}", truncated: false, originalLength: 12, redacted: false }],
         returnValue: { value: "{\"ok\":true}", truncated: false, originalLength: 11, redacted: false },

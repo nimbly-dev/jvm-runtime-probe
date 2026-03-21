@@ -8,7 +8,7 @@ final class CaptureEntry {
   final String captureId;
   final String methodKey;
 
-  private final long capturedAtEpochMs;
+  private final long capturedAtEpoch;
   private final List<CaptureValue> args;
   private final CaptureValue returnValue;
   private final CaptureValue thrownValue;
@@ -18,7 +18,7 @@ final class CaptureEntry {
   CaptureEntry(
       String captureId,
       String methodKey,
-      long capturedAtEpochMs,
+      long capturedAtEpoch,
       List<CaptureValue> args,
       CaptureValue returnValue,
       CaptureValue thrownValue,
@@ -27,7 +27,7 @@ final class CaptureEntry {
   ) {
     this.captureId = captureId;
     this.methodKey = methodKey;
-    this.capturedAtEpochMs = capturedAtEpochMs;
+    this.capturedAtEpoch = capturedAtEpoch;
     this.args = args;
     this.returnValue = returnValue;
     this.thrownValue = thrownValue;
@@ -52,7 +52,7 @@ final class CaptureEntry {
     return CapturePreviewView.available(
         captureId,
         methodKey,
-        capturedAtEpochMs,
+        capturedAtEpoch,
         redactionMode,
         previewArgs,
         returnPreview,
@@ -77,7 +77,7 @@ final class CaptureEntry {
     return new CaptureRecordView(
         captureId,
         methodKey,
-        capturedAtEpochMs,
+        capturedAtEpoch,
         redactionMode,
         outArgs,
         outReturn,

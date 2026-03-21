@@ -68,7 +68,7 @@ export async function probeCaptureGet(args: {
           found: true,
           captureId: compactCapture?.captureId,
           methodKey: compactCapture?.methodKey,
-          capturedAtEpochMs: compactCapture?.capturedAtEpochMs,
+          capturedAtEpoch: compactCapture?.capturedAtEpoch,
           argsCount: compactCapture?.argsCount,
           hasReturnValue: compactCapture?.hasReturnValue,
           hasThrownValue: compactCapture?.hasThrownValue,

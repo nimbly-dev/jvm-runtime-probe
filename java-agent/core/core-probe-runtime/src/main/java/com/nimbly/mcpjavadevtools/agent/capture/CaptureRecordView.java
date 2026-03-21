@@ -5,7 +5,7 @@ import java.util.List;
 public final class CaptureRecordView {
   public final String captureId;
   public final String methodKey;
-  public final long capturedAtEpochMs;
+  public final long capturedAtEpoch;
   public final String redactionMode;
   public final List<CaptureValueView> args;
   public final CaptureValueView returnValue;
@@ -16,7 +16,7 @@ public final class CaptureRecordView {
   CaptureRecordView(
       String captureId,
       String methodKey,
-      long capturedAtEpochMs,
+      long capturedAtEpoch,
       String redactionMode,
       List<CaptureValueView> args,
       CaptureValueView returnValue,
@@ -26,7 +26,7 @@ public final class CaptureRecordView {
   ) {
     this.captureId = captureId;
     this.methodKey = methodKey;
-    this.capturedAtEpochMs = capturedAtEpochMs;
+    this.capturedAtEpoch = capturedAtEpoch;
     this.redactionMode = redactionMode;
     this.args = args;
     this.returnValue = returnValue;

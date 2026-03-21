@@ -4,7 +4,7 @@ export type ProbeCapturePreviewPayload =
   | {
       available: true;
       captureId?: string;
-      capturedAtEpochMs?: number;
+      capturedAtEpoch?: number;
       executionPaths?: ProbeExecutionPaths;
       [key: string]: unknown;
     }
@@ -16,7 +16,7 @@ export type ProbeCapturePreviewPayload =
 export interface ProbeCaptureRecordPayload {
   captureId?: string;
   methodKey?: string;
-  capturedAtEpochMs?: number;
+  capturedAtEpoch?: number;
   executionPaths?: ProbeExecutionPaths;
   [key: string]: unknown;
 }
