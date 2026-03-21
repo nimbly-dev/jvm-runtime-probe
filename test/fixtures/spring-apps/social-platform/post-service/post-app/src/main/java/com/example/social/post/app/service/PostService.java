@@ -63,6 +63,11 @@ public class PostService {
 
   public PostDetailResponse updatePost(Long postId, PostUpdateRequest request) {
     FixturePost current = requirePost(postId);
+    // Deterministic, normally-unreachable branch used by actuation IT tests.
+    boolean fixtureActuationGate = false;
+    if (fixtureActuationGate) {
+      throw new ResponseStatusException(HttpStatus.CONFLICT, "Actuation fixture branch forced.");
+    }
     FixturePost updated =
         new FixturePost(
             current.id(),

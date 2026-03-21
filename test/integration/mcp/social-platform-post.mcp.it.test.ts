@@ -47,6 +47,51 @@ async function executeUpdatePost(): Promise<any> {
   return await response.json();
 }
 
+async function executeUpdatePostAs(args: { token: string; runAsUser: string; content: string }) {
+  if (!runtime) throw new Error("post-app runtime was not started");
+  return await fetch(`${runtime.apiBaseUrl}/api/v1/posts/101`, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${args.token}`,
+      "x-run-as-tenant": "fixture-tenant",
+      "x-run-as-user": args.runAsUser,
+    },
+    body: JSON.stringify({
+      content: args.content,
+      visibility: "PUBLIC",
+      tags: ["fixture", "mcp", "actuate"],
+    }),
+  });
+}
+
+const postServiceFqcn = "com.example.social.post.app.service.PostService";
+const postServiceSourceAbs = path.join(
+  postAppProjectRootAbs,
+  "src",
+  "main",
+  "java",
+  "com",
+  "example",
+  "social",
+  "post",
+  "app",
+  "service",
+  "PostService.java",
+);
+
+async function resolveFixtureActuationKey(): Promise<string> {
+  const fixtureGateLine = await findLineNumberBySnippet(
+    postServiceSourceAbs,
+    "if (fixtureActuationGate) {",
+  );
+  return buildLineKey({
+    fqcn: postServiceFqcn,
+    methodName: "updatePost",
+    line: fixtureGateLine,
+  });
+}
+
 test.before(async () => {
   runtime = await startPostAppWithAgent();
   mcp = await startMcpClient({
@@ -219,6 +264,178 @@ test("mcp IT: happy-path covers regression, probe status, capture, class invento
   assert.equal(resetClass.structuredContent.mode, "probe_batch");
   assert.equal(resetClass.structuredContent.operation, "reset");
   assert.equal(resetClass.structuredContent.summary.total >= 1, true);
+});
+
+test("mcp IT: actuate forces deterministic fixture branch outcomes for the same update request", async () => {
+  if (!runtime) throw new Error("post-app runtime was not started");
+
+  const key = await resolveFixtureActuationKey();
+
+  await callTool("probe_enable", {
+    baseUrl: runtime.probeBaseUrl,
+    mode: "observe",
+    actuatorId: "social-platform-it",
+  });
+
+  try {
+    await callTool("probe_enable", {
+      baseUrl: runtime.probeBaseUrl,
+      mode: "actuate",
+      targetKey: key,
+      returnBoolean: false,
+      actuatorId: "social-platform-it",
+    });
+    await callTool("probe_reset", {
+      key,
+      baseUrl: runtime.probeBaseUrl,
+    });
+
+    const deniedResponse = await executeUpdatePostAs({
+      token: "alice-token",
+      runAsUser: "alice",
+      content: "Fixture actuation gate forced fallthrough.",
+    });
+    assert.equal(deniedResponse.status, 409);
+    const deniedText = await deniedResponse.text();
+    assert.match(deniedText, /"status"\s*:\s*409/i);
+
+    const deniedWait = await callTool("probe_wait_for_hit", {
+      key,
+      baseUrl: runtime.probeBaseUrl,
+      timeoutMs: 10_000,
+      pollIntervalMs: 250,
+      maxRetries: 2,
+    });
+    assert.equal(deniedWait.structuredContent.result.hit, true);
+
+    await callTool("probe_enable", {
+      baseUrl: runtime.probeBaseUrl,
+      mode: "actuate",
+      targetKey: key,
+      returnBoolean: true,
+      actuatorId: "social-platform-it",
+    });
+    await callTool("probe_reset", {
+      key,
+      baseUrl: runtime.probeBaseUrl,
+    });
+
+    const allowedResponse = await executeUpdatePostAs({
+      token: "alice-token",
+      runAsUser: "alice",
+      content: "Fixture actuation gate forced taken-jump.",
+    });
+    if (allowedResponse.status !== 200) {
+      assert.fail(await allowedResponse.text());
+    }
+    const allowedPayload = await allowedResponse.json();
+    assert.equal(allowedPayload.id, 101);
+    assert.equal(allowedPayload.authorUsername, "alice");
+
+    const allowedWait = await callTool("probe_wait_for_hit", {
+      key,
+      baseUrl: runtime.probeBaseUrl,
+      timeoutMs: 10_000,
+      pollIntervalMs: 250,
+      maxRetries: 2,
+    });
+    assert.equal(allowedWait.structuredContent.result.hit, true);
+    assert.equal(allowedWait.structuredContent.result.inline, true);
+  } finally {
+    await callTool("probe_enable", {
+      baseUrl: runtime.probeBaseUrl,
+      mode: "observe",
+      actuatorId: "social-platform-it",
+    });
+  }
+});
+
+test("mcp IT: actuate with unresolved strict line target fails closed during reset/wait and returns to observe", async () => {
+  if (!runtime) throw new Error("post-app runtime was not started");
+
+  const declarationLine = await findLineNumberBySnippet(
+    postControllerSourceFileAbs,
+    "public PostDetailResponse updatePost(",
+  );
+  const invalidLineKey = buildLineKey({
+    fqcn: postControllerFqcn,
+    methodName: "updatePost",
+    line: declarationLine,
+  });
+
+  await callTool("probe_enable", {
+    baseUrl: runtime.probeBaseUrl,
+    mode: "actuate",
+    targetKey: invalidLineKey,
+    returnBoolean: true,
+    actuatorId: "social-platform-it",
+  });
+
+  const invalidReset = await callTool("probe_reset", {
+    key: invalidLineKey,
+    baseUrl: runtime.probeBaseUrl,
+  });
+  assert.equal(invalidReset.structuredContent.result.reason, "invalid_line_target");
+
+  const invalidWait = await callTool("probe_wait_for_hit", {
+    key: invalidLineKey,
+    baseUrl: runtime.probeBaseUrl,
+    timeoutMs: 2_000,
+    pollIntervalMs: 200,
+    maxRetries: 1,
+  });
+  assert.equal(invalidWait.structuredContent.result.reason, "invalid_line_target");
+  assert.equal(invalidWait.structuredContent.result.actionCode, "runtime_not_aligned");
+
+  await callTool("probe_enable", {
+    baseUrl: runtime.probeBaseUrl,
+    mode: "observe",
+    actuatorId: "social-platform-it",
+  });
+
+  const check = await callTool("probe_check", {
+    baseUrl: runtime.probeBaseUrl,
+    timeoutMs: 5_000,
+  });
+  assert.equal(check.structuredContent.checks.status.json.runtime.mode, "observe");
+});
+
+test("mcp IT: actuate without returnBoolean keeps default false branch decision", async () => {
+  if (!runtime) throw new Error("post-app runtime was not started");
+
+  const key = await resolveFixtureActuationKey();
+
+  await callTool("probe_enable", {
+    baseUrl: runtime.probeBaseUrl,
+    mode: "observe",
+    actuatorId: "social-platform-it",
+  });
+
+  const armed = await callTool("probe_enable", {
+    baseUrl: runtime.probeBaseUrl,
+    mode: "actuate",
+    targetKey: key,
+    actuatorId: "social-platform-it",
+  });
+  assert.equal(armed.structuredContent.response.status, 200);
+  assert.equal(armed.structuredContent.response.json.returnBoolean, false);
+
+  await callTool("probe_reset", {
+    key,
+    baseUrl: runtime.probeBaseUrl,
+  });
+  const response = await executeUpdatePostAs({
+    token: "alice-token",
+    runAsUser: "alice",
+    content: "Actuate without explicit returnBoolean.",
+  });
+  assert.equal(response.status, 409);
+
+  await callTool("probe_enable", {
+    baseUrl: runtime.probeBaseUrl,
+    mode: "observe",
+    actuatorId: "social-platform-it",
+  });
 });
 
 test("mcp IT: fail-closed paths cover invalid project roots, bad recipe hints, invalid strict lines, and invalid actuation keys", async () => {

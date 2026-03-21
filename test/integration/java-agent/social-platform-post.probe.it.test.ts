@@ -132,3 +132,35 @@ test("java-agent IT: declaration-line strict key fails closed as invalid_line_ta
   assert.equal(waitedStructured.result.reason, "invalid_line_target");
   assert.equal(waitedStructured.result.actionCode, "runtime_not_aligned");
 });
+
+test("java-agent IT: actuate endpoint rejects unauthorized requests when token is configured", async () => {
+  const securedRuntime = await startPostAppWithAgent({ actuateAuthToken: "fixture-actuate-secret" });
+  try {
+    const unauthorized = await fetch(`${securedRuntime.probeBaseUrl}/__probe/actuate`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        mode: "actuate",
+        targetKey: "com.example.social.post.app.service.PostService#updatePost:1",
+        returnBoolean: true,
+      }),
+    });
+    assert.equal(unauthorized.status, 401);
+
+    const authorized = await fetch(`${securedRuntime.probeBaseUrl}/__probe/actuate`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer fixture-actuate-secret",
+      },
+      body: JSON.stringify({
+        mode: "observe",
+      }),
+    });
+    assert.equal(authorized.status, 200);
+  } finally {
+    await securedRuntime.stop();
+  }
+});

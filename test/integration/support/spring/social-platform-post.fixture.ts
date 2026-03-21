@@ -230,6 +230,7 @@ export function buildLineKey(args: { fqcn: string; methodName: string; line: num
 export async function startPostAppWithAgent(args?: {
   appPort?: number;
   probePort?: number;
+  actuateAuthToken?: string;
 }): Promise<RunningApp> {
   const agentJarAbs = await resolveJarByPattern({
     dirAbs: agentTargetDirAbs,
@@ -255,16 +256,18 @@ export async function startPostAppWithAgent(args?: {
     `-javaagent:${agentJarAbs}=` +
     `host=127.0.0.1;port=${probePort};include=com.example.social.**;exclude=**.config.**;allowJava21=true`;
 
-  const child = spawn(
-    "java",
-    [javaAgentArg, "-jar", postAppJarAbs, `--server.port=${appPort}`],
-    {
+  const javaArgs = [javaAgentArg];
+  if (typeof args?.actuateAuthToken === "string" && args.actuateAuthToken.trim().length > 0) {
+    javaArgs.push(`-Dmcp.probe.auth.actuate.token=${args.actuateAuthToken.trim()}`);
+  }
+  javaArgs.push("-jar", postAppJarAbs, `--server.port=${appPort}`);
+
+  const child = spawn("java", javaArgs, {
       cwd: postAppProjectRootAbs,
       env: { ...process.env },
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
-    },
-  );
+    });
 
   child.stdout?.on("data", (chunk) => appendLog(logBuffer, chunk));
   child.stderr?.on("data", (chunk) => appendLog(logBuffer, chunk));
