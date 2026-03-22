@@ -39,3 +39,13 @@ These are folder-level placeholders only. Spring HTTP is the only active synthes
   - `core/tools-registry/src`
 - Spring HTTP synthesizer runtime implementation:
   - `synthesizers/tools-spring-http/src`
+
+## Runtime External Synthesizer Loading
+- Configure external plugin module specifiers with:
+  - `MCP_SYNTHESIZER_PLUGIN_MODULES`
+- Supports path-delimited or comma-separated module specifiers.
+- Load behavior is strict fail-closed:
+  - every configured module must load
+  - module exports must provide valid synthesizer plugin contract objects
+  - plugin API version must be compatible
+  - any bootstrap failure returns deterministic synthesis `report` (`failedStep=plugin_bootstrap`)

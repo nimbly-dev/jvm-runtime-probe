@@ -40,6 +40,59 @@ For example:
 - `tools-grpc-rpc`
 - `tools-quarkus`
 
+## Runtime Loading Config
+
+Synthesizer plugins can be loaded in two ways:
+
+1. Inside this repo (recommended for core-supported frameworks)
+2. External module path (recommended for private/internal frameworks)
+
+### Inside this repo
+
+Use this when you want the plugin to be part of this codebase.
+
+1. Create the package under `tools/synthesizers/tools-<framework>`.
+2. Export a valid `SynthesizerPlugin` from `src/plugin.ts`.
+3. Register it in `tools/core/tools-registry/src/plugin.loader.ts` inside `builtIns`.
+4. Build with `npm run build`.
+
+This makes the plugin available by default without extra runtime env config.
+
+### External module loading
+
+Use this when you do not want to commit framework logic into this repo.
+
+Set `MCP_SYNTHESIZER_PLUGIN_MODULES` to one or more module specifiers.
+
+PowerShell:
+
+```powershell
+$env:MCP_SYNTHESIZER_PLUGIN_MODULES="C:\plugins\acme-synth\dist\plugin.js"
+```
+
+Bash:
+
+```bash
+export MCP_SYNTHESIZER_PLUGIN_MODULES="/opt/plugins/acme-synth/dist/plugin.js"
+```
+
+Multiple modules are supported (comma or platform path delimiter):
+
+PowerShell:
+
+```powershell
+$env:MCP_SYNTHESIZER_PLUGIN_MODULES="C:\plugins\acme-a\dist\plugin.js,C:\plugins\acme-b\dist\plugin.js"
+```
+
+Bash:
+
+```bash
+export MCP_SYNTHESIZER_PLUGIN_MODULES="/opt/plugins/acme-a/dist/plugin.js:/opt/plugins/acme-b/dist/plugin.js"
+```
+
+Fail-closed behavior:
+- If any configured module fails to load or is API-incompatible, synthesis returns a deterministic `report` with `failedStep=plugin_bootstrap`.
+
 ---
 
 ## Implementation Walkthrough

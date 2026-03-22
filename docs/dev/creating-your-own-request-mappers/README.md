@@ -43,6 +43,53 @@ For example: `adapter-request-mapper-jaxrs-http`, `adapter-request-mapper-quarku
 
 If you need a non-HTTP transport such as gRPC, an adapter alone is not enough. The current `ResolvedMapping` contract, resolver success payload, and downstream synthesis flow are all HTTP-shaped and would need to be extended first.
 
+## Resolver Runtime Config
+
+Request mapper adapters are discovered via Java `ServiceLoader` on the resolver process classpath.
+
+You can wire adapters in two ways:
+
+1. Inside this repo (core-owned adapter module)
+2. External classpath/jar (private or out-of-repo adapter)
+
+### Inside this repo
+
+Use this when the adapter should live in this repository.
+
+1. Create `java-agent/mappers-adapters/adapter-request-mapper-<framework>`.
+2. Add `META-INF/services` registration for your extractor.
+3. Build the adapter jar.
+4. Ensure the resolver classpath includes both:
+   - `core-entrypoint-mapper` jar
+   - your adapter jar
+
+Example (PowerShell):
+
+```powershell
+$env:MCP_JAVA_REQUEST_MAPPING_RESOLVER_CLASSPATH="C:\repo\mcp-jvm-debugger\java-agent\core\core-entrypoint-mapper\target\mcp-java-dev-tools-core-entrypoint-mapper-0.1.0-all.jar;C:\repo\mcp-jvm-debugger\java-agent\mappers-adapters\adapter-request-mapper-acme-http\target\mcp-java-dev-tools-adapter-request-mapper-acme-http-0.1.0.jar"
+```
+
+### External adapter jars
+
+Use this when the adapter is maintained outside this repository.
+
+Point `MCP_JAVA_REQUEST_MAPPING_RESOLVER_CLASSPATH` at the resolver jar plus external adapter jars:
+
+PowerShell:
+
+```powershell
+$env:MCP_JAVA_REQUEST_MAPPING_RESOLVER_CLASSPATH="C:\resolver\mcp-java-dev-tools-core-entrypoint-mapper-0.1.0-all.jar;C:\internal\adapters\acme-http-mapper.jar"
+```
+
+Bash:
+
+```bash
+export MCP_JAVA_REQUEST_MAPPING_RESOLVER_CLASSPATH="/opt/resolver/mcp-java-dev-tools-core-entrypoint-mapper-0.1.0-all.jar:/opt/internal/adapters/acme-http-mapper.jar"
+```
+
+Alternative:
+- `MCP_JAVA_REQUEST_MAPPING_RESOLVER_JAR` can point to a single fat jar when your resolver and adapters are already bundled together.
+
 ---
 
 ## Implementation Checklist

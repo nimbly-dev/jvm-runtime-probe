@@ -7,6 +7,7 @@ import com.nimbly.mcpjavadevtools.agent.runtime.model.RuntimeState;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -112,6 +113,10 @@ public final class ProbeRuntime {
     ParsedLineKey parsed = parseLineKey(key);
     if (parsed == null) return false;
     LineTable table = RESOLVABLE_LINES_BY_METHOD.get(parsed.methodKey);
+    if (table == null) {
+      tryLoadClassWithoutInitialization(parsed.dottedClassName);
+      table = RESOLVABLE_LINES_BY_METHOD.get(parsed.methodKey);
+    }
     if (table == null) return false;
     return table.contains(parsed.lineNumber);
   }
@@ -230,6 +235,7 @@ public final class ProbeRuntime {
     int hash = key.lastIndexOf('#');
     int colon = key.lastIndexOf(':');
     if (hash <= 0 || colon <= hash + 1 || colon == key.length() - 1) return null;
+    String dottedClassName = key.substring(0, hash);
     String methodKey = key.substring(0, colon);
     String linePart = key.substring(colon + 1);
     int lineNumber;
@@ -239,14 +245,45 @@ public final class ProbeRuntime {
       return null;
     }
     if (lineNumber <= 0) return null;
-    return new ParsedLineKey(methodKey, lineNumber);
+    return new ParsedLineKey(dottedClassName, methodKey, lineNumber);
+  }
+
+  private static void tryLoadClassWithoutInitialization(String dottedClassName) {
+    if (dottedClassName == null || dottedClassName.isBlank()) return;
+    for (ClassLoader loader : discoverCandidateClassLoaders()) {
+      try {
+        Class.forName(dottedClassName, false, loader);
+        return;
+      } catch (Throwable ignored) {
+        // Try the next classloader candidate.
+      }
+    }
+  }
+
+  private static List<ClassLoader> discoverCandidateClassLoaders() {
+    LinkedHashSet<ClassLoader> ordered = new LinkedHashSet<>();
+    ClassLoader contextLoader = Thread.currentThread().getContextClassLoader();
+    if (contextLoader != null) ordered.add(contextLoader);
+    ClassLoader probeLoader = ProbeRuntime.class.getClassLoader();
+    if (probeLoader != null) ordered.add(probeLoader);
+    ClassLoader systemLoader = ClassLoader.getSystemClassLoader();
+    if (systemLoader != null) ordered.add(systemLoader);
+
+    for (Thread thread : Thread.getAllStackTraces().keySet()) {
+      if (thread == null) continue;
+      ClassLoader loader = thread.getContextClassLoader();
+      if (loader != null) ordered.add(loader);
+    }
+    return new ArrayList<>(ordered);
   }
 
   private static final class ParsedLineKey {
+    private final String dottedClassName;
     private final String methodKey;
     private final int lineNumber;
 
-    private ParsedLineKey(String methodKey, int lineNumber) {
+    private ParsedLineKey(String dottedClassName, String methodKey, int lineNumber) {
+      this.dottedClassName = dottedClassName;
       this.methodKey = methodKey;
       this.lineNumber = lineNumber;
     }
