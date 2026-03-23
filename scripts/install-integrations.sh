@@ -9,8 +9,7 @@ Usage:
   ./scripts/install-integrations.sh [options]
 
 Options:
-  --client <codex|kiro|both>      Target client(s). Default: both
-  --server-name <name>            MCP server name. Default: mcp-java-dev-tools
+  --client <codex|kiro>           Target client. Default: codex
   --skill-name <name>             Install only selected skill(s). Repeatable. Default: install all shipped skills
   --probe-base-url <url>          Default: http://127.0.0.1:9193
   --workspace-root <absPath>      Optional MCP_WORKSPACE_ROOT value
@@ -18,27 +17,26 @@ Options:
   --kiro-config <absPath>         Override Kiro MCP config path
   --kiro-skills-dir <absPath>     Override Kiro skills directory
   --update-skill-if-exists        Replace existing installed skill folder
-  --skip-skill                    Install MCP only
-  --skip-mcp                      Install skill only
   --no-build                      Do not run build when dist/server.js is missing
   --no-build-java                 Do not run Maven build for Java agent when jar is missing
   --jdk21-compat                  Enable Java 21 compatibility flag in generated -javaagent args
   --agent-include <glob>          Probe include glob for generated -javaagent args (default: com.**)
   --agent-exclude <glob>          Probe exclude glob for generated -javaagent args
-  --dev-mode                      Enable installer development mode
+  --dev-mode                      Enable installer development mode (implies dry-run)
   --interactive                   Prompt for values in terminal
-  --dry-run                       Dev-only: print actions without changing files/config (requires --dev-mode)
   --help                          Show this help
 
 Behavior:
 - Idempotent by default: skips if Skill/MCP already installed.
 - Use --update-skill-if-exists to replace existing installed skill folders.
 - Retired skill mcp-java-dev-tools-repro-orchestration is removed during skill install/update.
+- Installer always installs both Skill and MCP integration.
+- Node build step uses compile-only (no test execution).
 - If no args are provided, interactive mode is enabled automatically.
 EOF
 }
 
-CLIENT="both"
+CLIENT="codex"
 SERVER_NAME="mcp-java-dev-tools"
 SKILL_NAMES_DEFAULT=("mcp-java-dev-tools-line-probe-run" "mcp-java-dev-tools-regression-suite" "mcp-java-dev-tools-issue-report")
 SKILL_NAMES=("${SKILL_NAMES_DEFAULT[@]}")
@@ -49,8 +47,6 @@ WORKSPACE_ROOT=""
 CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
 KIRO_CONFIG=""
 KIRO_SKILLS_DIR=""
-SKIP_SKILL=0
-SKIP_MCP=0
 UPDATE_SKILL_IF_EXISTS=0
 BUILD_IF_MISSING=1
 BUILD_JAVA_IF_MISSING=1
@@ -58,7 +54,6 @@ JDK21_COMPAT=0
 AGENT_INCLUDE="com.**"
 AGENT_EXCLUDE="com.nimbly.mcpjavadevtools.agent.**,**.config.**,**Test"
 INTERACTIVE=0
-DRY_RUN=0
 DEV_MODE=0
 
 if [[ $# -eq 0 ]]; then
@@ -68,7 +63,6 @@ fi
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --client) CLIENT="${2:-}"; shift 2 ;;
-    --server-name) SERVER_NAME="${2:-}"; shift 2 ;;
     --skill-name)
       if [[ "$SKILL_NAME_OVERRIDE" -eq 0 ]]; then
         SKILL_NAMES=()
@@ -83,8 +77,6 @@ while [[ $# -gt 0 ]]; do
     --kiro-config) KIRO_CONFIG="${2:-}"; shift 2 ;;
     --kiro-skills-dir) KIRO_SKILLS_DIR="${2:-}"; shift 2 ;;
     --update-skill-if-exists) UPDATE_SKILL_IF_EXISTS=1; shift ;;
-    --skip-skill) SKIP_SKILL=1; shift ;;
-    --skip-mcp) SKIP_MCP=1; shift ;;
     --no-build) BUILD_IF_MISSING=0; shift ;;
     --no-build-java) BUILD_JAVA_IF_MISSING=0; shift ;;
     --jdk21-compat) JDK21_COMPAT=1; shift ;;
@@ -92,7 +84,6 @@ while [[ $# -gt 0 ]]; do
     --agent-exclude) AGENT_EXCLUDE="${2:-}"; shift 2 ;;
     --dev-mode) DEV_MODE=1; shift ;;
     --interactive) INTERACTIVE=1; shift ;;
-    --dry-run) DRY_RUN=1; shift ;;
     --help|-h) usage; exit 0 ;;
     *)
       echo "Unknown argument: $1" >&2
@@ -102,14 +93,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ "$CLIENT" != "codex" && "$CLIENT" != "kiro" && "$CLIENT" != "both" ]]; then
+if [[ "$CLIENT" != "codex" && "$CLIENT" != "kiro" ]]; then
   echo "Invalid --client: $CLIENT" >&2
   exit 1
 fi
 
-if [[ "$DRY_RUN" -eq 1 && "$DEV_MODE" -ne 1 ]]; then
-  echo "--dry-run is disabled by default and requires --dev-mode." >&2
-  exit 1
+DRY_RUN=0
+if [[ "$DEV_MODE" -eq 1 ]]; then
+  DRY_RUN=1
 fi
 
 expand_home() {
@@ -160,14 +151,20 @@ prompt_yes_no() {
   local label="$1"
   local default="$2" # y or n
   local result
-  if [[ "$default" == "y" ]]; then
-    read -r -p "$label [Y/n]: " result
-    [[ -z "$result" || "$result" =~ ^[Yy]$ ]] && return 0
-    return 1
-  fi
-  read -r -p "$label [y/N]: " result
-  [[ "$result" =~ ^[Yy]$ ]] && return 0
-  return 1
+  while true; do
+    read -r -p "$label [y/n]: " result
+    if [[ -z "$result" ]]; then
+      [[ "$default" == "y" ]] && return 0
+      return 1
+    fi
+    if [[ "$result" =~ ^[Yy]$ ]]; then
+      return 0
+    fi
+    if [[ "$result" =~ ^[Nn]$ ]]; then
+      return 1
+    fi
+    echo "Please enter y or n."
+  done
 }
 
 derive_probe_host_port() {
@@ -196,22 +193,16 @@ derive_probe_host_port() {
 
 if [[ "$INTERACTIVE" -eq 1 ]]; then
   echo "Interactive install configuration:"
-  CLIENT="$(prompt_default "Client (codex|kiro|both)" "$CLIENT")"
-  SERVER_NAME="$(prompt_default "MCP server name" "$SERVER_NAME")"
+  CLIENT="$(prompt_default "Client (codex|kiro)" "$CLIENT")"
   PROBE_BASE_URL="$(prompt_default "MCP_PROBE_BASE_URL" "$PROBE_BASE_URL")"
   read -r -p "MCP_WORKSPACE_ROOT (optional, empty to skip): " WORKSPACE_ROOT
   AGENT_INCLUDE="$(prompt_default "Java agent include glob" "$AGENT_INCLUDE")"
   AGENT_EXCLUDE="$(prompt_default "Java agent exclude glob" "$AGENT_EXCLUDE")"
   if prompt_yes_no "Enable Java 21 compatibility flag in javaagent args?" "n"; then JDK21_COMPAT=1; fi
-  if prompt_yes_no "Install Skill?" "y"; then SKIP_SKILL=0; else SKIP_SKILL=1; fi
-  if prompt_yes_no "Install MCP?" "y"; then SKIP_MCP=0; else SKIP_MCP=1; fi
   if prompt_yes_no "Update existing skill installs?" "n"; then UPDATE_SKILL_IF_EXISTS=1; fi
-  if [[ "$DEV_MODE" -eq 1 ]]; then
-    if prompt_yes_no "Dry run only?" "n"; then DRY_RUN=1; fi
-  fi
 fi
 
-if [[ "$CLIENT" != "codex" && "$CLIENT" != "kiro" && "$CLIENT" != "both" ]]; then
+if [[ "$CLIENT" != "codex" && "$CLIENT" != "kiro" ]]; then
   echo "Invalid client: $CLIENT" >&2
   exit 1
 fi
@@ -234,14 +225,9 @@ dedupe_skill_names() {
 }
 
 dedupe_skill_names
-if [[ "$SKIP_SKILL" -eq 0 && "${#SKILL_NAMES[@]}" -eq 0 ]]; then
+if [[ "${#SKILL_NAMES[@]}" -eq 0 ]]; then
   echo "No skills selected. Provide --skill-name <name> or omit --skill-name to install defaults." >&2
   exit 1
-fi
-
-if [[ "$SKIP_SKILL" -eq 1 && "$SKIP_MCP" -eq 1 ]]; then
-  echo "Nothing to do: both --skip-skill and --skip-mcp are set."
-  exit 0
 fi
 
 echo "Installing integrations (client=$CLIENT, dryRun=$DRY_RUN, devMode=$DEV_MODE)"
@@ -251,6 +237,7 @@ if [[ "$DEV_MODE" -eq 1 ]]; then
 fi
 
 ensure_build() {
+  ensure_node_build_deps
   if [[ "$BUILD_IF_MISSING" -eq 0 ]]; then
     if [[ ! -f "$SERVER_JS_PATH" ]]; then
       echo "Missing $SERVER_JS_PATH. Run npm run build first or remove --no-build." >&2
@@ -258,9 +245,28 @@ ensure_build() {
     fi
     return
   fi
-  echo "- Running npm run build"
+  echo "- Running npm run build:compile (skip tests)"
   if [[ "$DRY_RUN" -eq 0 ]]; then
-    (cd "$REPO_ROOT" && npm run build)
+    (cd "$REPO_ROOT" && npm run build:compile)
+  fi
+}
+
+ensure_node_build_deps() {
+  local tsc_bin="$REPO_ROOT/node_modules/.bin/tsc"
+  local tsc_alias_bin="$REPO_ROOT/node_modules/.bin/tsc-alias"
+  if [[ -f "$tsc_bin" && -f "$tsc_alias_bin" ]]; then
+    return
+  fi
+
+  echo "- TypeScript build tools missing. Installing Node dependencies (including devDependencies)"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    return
+  fi
+
+  if [[ -f "$REPO_ROOT/package-lock.json" ]]; then
+    (cd "$REPO_ROOT" && npm ci --include=dev)
+  else
+    (cd "$REPO_ROOT" && npm install --include=dev)
   fi
 }
 
@@ -498,47 +504,37 @@ console.log(`- Kiro MCP: added '${serverName}'`);
 NODE
 }
 
-if [[ "$SKIP_MCP" -eq 0 ]]; then
-  ensure_build
-  ensure_java_build
+ensure_build
+ensure_java_build
+
+if [[ "$CLIENT" == "codex" ]]; then
+  remove_retired_skill_if_present "$CODEX_HOME/skills" "$RETIRED_SKILL_NAME" "Codex skills"
+  for skill_name in "${SKILL_NAMES[@]}"; do
+    install_or_update_skill \
+      "$REPO_ROOT/skills/$skill_name" \
+      "$CODEX_HOME/skills/$skill_name" \
+      "Codex skill ($skill_name)" \
+      "$CODEX_HOME/skills"
+  done
+  append_codex_mcp_if_missing "$CODEX_HOME/config.toml" "$SERVER_NAME" "$SERVER_JS_PATH"
 fi
 
-if [[ "$CLIENT" == "codex" || "$CLIENT" == "both" ]]; then
-  if [[ "$SKIP_SKILL" -eq 0 ]]; then
-    remove_retired_skill_if_present "$CODEX_HOME/skills" "$RETIRED_SKILL_NAME" "Codex skills"
-    for skill_name in "${SKILL_NAMES[@]}"; do
-      install_or_update_skill \
-        "$REPO_ROOT/skills/$skill_name" \
-        "$CODEX_HOME/skills/$skill_name" \
-        "Codex skill ($skill_name)" \
-        "$CODEX_HOME/skills"
-    done
-  fi
-  if [[ "$SKIP_MCP" -eq 0 ]]; then
-    append_codex_mcp_if_missing "$CODEX_HOME/config.toml" "$SERVER_NAME" "$SERVER_JS_PATH"
-  fi
-fi
-
-if [[ "$CLIENT" == "kiro" || "$CLIENT" == "both" ]]; then
+if [[ "$CLIENT" == "kiro" ]]; then
   if [[ -z "$KIRO_SKILLS_DIR" ]]; then
     KIRO_SKILLS_DIR="$(detect_kiro_skills_dir)"
   fi
   if [[ -z "$KIRO_CONFIG" ]]; then
     KIRO_CONFIG="$(detect_kiro_config_path)"
   fi
-  if [[ "$SKIP_SKILL" -eq 0 ]]; then
-    remove_retired_skill_if_present "$KIRO_SKILLS_DIR" "$RETIRED_SKILL_NAME" "Kiro skills"
-    for skill_name in "${SKILL_NAMES[@]}"; do
-      install_or_update_skill \
-        "$REPO_ROOT/skills/$skill_name" \
-        "$KIRO_SKILLS_DIR/$skill_name" \
-        "Kiro skill ($skill_name)" \
-        "$KIRO_SKILLS_DIR"
-    done
-  fi
-  if [[ "$SKIP_MCP" -eq 0 ]]; then
-    install_kiro_mcp_if_missing "$KIRO_CONFIG" "$SERVER_NAME" "$SERVER_JS_PATH"
-  fi
+  remove_retired_skill_if_present "$KIRO_SKILLS_DIR" "$RETIRED_SKILL_NAME" "Kiro skills"
+  for skill_name in "${SKILL_NAMES[@]}"; do
+    install_or_update_skill \
+      "$REPO_ROOT/skills/$skill_name" \
+      "$KIRO_SKILLS_DIR/$skill_name" \
+      "Kiro skill ($skill_name)" \
+      "$KIRO_SKILLS_DIR"
+  done
+  install_kiro_mcp_if_missing "$KIRO_CONFIG" "$SERVER_NAME" "$SERVER_JS_PATH"
 fi
 
 echo "Done."
