@@ -20,10 +20,9 @@ async function main() {
 
   const server = new McpServer({
     name: "mcp-java-dev-tools",
-    version: "0.1.0",
+    version: "0.1.2",
   });
 
-  // Register at least one resource so Codex doesn't spam resources/list with "method not found".
   server.registerResource(
     "status",
     "mcp-java-dev-tools://status",
@@ -32,7 +31,7 @@ async function main() {
       const payload = {
         ok: true,
         name: "mcp-java-dev-tools",
-        version: "0.1.0",
+        version: "0.1.2",
         workspaceRoot: cfg.workspaceRootAbs,
         workspaceRootSource: cfg.workspaceRootSource,
         probe: {
@@ -74,7 +73,7 @@ async function main() {
       const structuredContent = {
         ok: true,
         serverTime: new Date().toISOString(),
-        version: "0.1.0",
+        version: "0.1.2",
       };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
@@ -111,7 +110,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    `mcp-java-dev-tools 0.1.0 running (stdio). workspaceRoot=${cfg.workspaceRootAbs} probeBaseUrl=${cfg.probeBaseUrl}`,
+    `mcp-java-dev-tools 0.1.2 running (stdio). workspaceRoot=${cfg.workspaceRootAbs} probeBaseUrl=${cfg.probeBaseUrl}`,
   );
 }
 
