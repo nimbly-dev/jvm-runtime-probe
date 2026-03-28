@@ -7,8 +7,10 @@ import {
   findLineNumberBySnippet,
   postControllerFqcn,
   postControllerSourceFileAbs,
+  postServiceFqcn,
+  postServiceSourceFileAbs,
   startPostAppWithAgent,
-} from "../support/spring/social-platform-post.fixture";
+} from "@test/integration/support/spring/social-platform-post.fixture";
 
 const postCreateRequestFqcn = "com.example.social.post.api.model.PostCreateRequest";
 const postUpdateRequestFqcn = "com.example.social.post.api.model.PostUpdateRequest";
@@ -134,6 +136,66 @@ test("java-agent IT: declaration-line strict key fails closed as invalid_line_ta
   const waitedStructured = waited.structuredContent as any;
   assert.equal(waitedStructured.result.reason, "invalid_line_target");
   assert.equal(waitedStructured.result.actionCode, "runtime_not_aligned");
+});
+
+test("java-agent IT: lambda-mapped source line is strict-probeable via owning method key", async () => {
+  if (!runtime) throw new Error("post-app runtime was not started");
+
+  const lambdaLine = await findLineNumberBySnippet(
+    postServiceSourceFileAbs,
+    ".filter(post -> !Objects.equals(post.authorUsername(), username))",
+  );
+  const key = buildLineKey({
+    fqcn: postServiceFqcn,
+    methodName: "getFeed",
+    line: lambdaLine,
+  });
+
+  const warmup = await fetch(`${runtime.apiBaseUrl}/api/v1/feed?page=0&size=5`, {
+    method: "GET",
+    headers: {
+      authorization: "Bearer alice-token",
+      "x-run-as-tenant": "fixture-tenant",
+      "x-run-as-user": "alice",
+    },
+  });
+  assert.equal(warmup.status, 200);
+
+  const preStatus = await probeStatus({
+    key,
+    baseUrl: runtime.probeBaseUrl,
+    statusPath: "/__probe/status",
+  });
+  const preStatusStructured = preStatus.structuredContent as any;
+  assert.equal(preStatusStructured.response.json.lineValidation, "resolvable");
+
+  await probeReset({
+    key,
+    baseUrl: runtime.probeBaseUrl,
+    resetPath: "/__probe/reset",
+  });
+
+  const response = await fetch(`${runtime.apiBaseUrl}/api/v1/feed?page=0&size=5`, {
+    method: "GET",
+    headers: {
+      authorization: "Bearer alice-token",
+      "x-run-as-tenant": "fixture-tenant",
+      "x-run-as-user": "alice",
+    },
+  });
+  assert.equal(response.status, 200);
+
+  const waited = await probeWaitHit({
+    key,
+    baseUrl: runtime.probeBaseUrl,
+    statusPath: "/__probe/status",
+    timeoutMs: 10_000,
+    pollIntervalMs: 250,
+    maxRetries: 2,
+  });
+  const waitedStructured = waited.structuredContent as any;
+  assert.equal(waitedStructured.result.hit, true);
+  assert.equal(waitedStructured.result.inline, true);
 });
 
 test("java-agent IT: actuate endpoint rejects unauthorized requests when token is configured", async () => {

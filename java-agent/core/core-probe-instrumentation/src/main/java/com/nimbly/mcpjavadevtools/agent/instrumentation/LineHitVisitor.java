@@ -96,7 +96,8 @@ public final class LineHitVisitor extends AsmVisitorWrapper.AbstractBase {
         MethodVisitor mv = super.visitMethod(access, name, descriptor, signature, exceptions);
         if (mv == null) return null;
         if ((access & Opcodes.ACC_ABSTRACT) != 0 || (access & Opcodes.ACC_NATIVE) != 0) return mv;
-        if (name != null && name.startsWith("lambda$")) return mv;
+        final String probeMethodName = resolveProbeMethodName(name);
+        if (probeMethodName == null || probeMethodName.isBlank()) return mv;
 
         return new MethodVisitor(Opcodes.ASM9, mv) {
           private int currentLine = -1;
@@ -106,9 +107,9 @@ public final class LineHitVisitor extends AsmVisitorWrapper.AbstractBase {
             super.visitLineNumber(line, start);
             if (line <= 0) return;
             currentLine = line;
-            ProbeRuntime.registerResolvableLine(dottedClassName, name, line);
+            ProbeRuntime.registerResolvableLine(dottedClassName, probeMethodName, line);
             super.visitLdcInsn(dottedClassName);
-            super.visitLdcInsn(name);
+            super.visitLdcInsn(probeMethodName);
             super.visitLdcInsn(line);
             super.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
@@ -127,7 +128,7 @@ public final class LineHitVisitor extends AsmVisitorWrapper.AbstractBase {
             }
 
             super.visitLdcInsn(dottedClassName);
-            super.visitLdcInsn(name);
+            super.visitLdcInsn(probeMethodName);
             super.visitLdcInsn(currentLine);
             super.visitMethodInsn(
                 Opcodes.INVOKESTATIC,
@@ -170,6 +171,16 @@ public final class LineHitVisitor extends AsmVisitorWrapper.AbstractBase {
         };
       }
     };
+  }
+
+  static String resolveProbeMethodName(String methodName) {
+    if (methodName == null || methodName.isBlank()) return methodName;
+    if (!methodName.startsWith("lambda$")) return methodName;
+    int start = "lambda$".length();
+    int end = methodName.lastIndexOf('$');
+    if (end <= start) return methodName;
+    String ownerMethod = methodName.substring(start, end).trim();
+    return ownerMethod.isEmpty() ? methodName : ownerMethod;
   }
 }
 

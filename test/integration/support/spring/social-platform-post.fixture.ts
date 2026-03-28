@@ -72,6 +72,20 @@ export const postControllerSourceFileAbs = path.join(
   "controller",
   "PostController.java",
 );
+export const postServiceFqcn = "com.example.social.post.app.service.PostService";
+export const postServiceSourceFileAbs = path.join(
+  postAppProjectRootAbs,
+  "src",
+  "main",
+  "java",
+  "com",
+  "example",
+  "social",
+  "post",
+  "app",
+  "service",
+  "PostService.java",
+);
 
 const LOG_TAIL_LIMIT = 200;
 

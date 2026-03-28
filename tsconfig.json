@@ -7,6 +7,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["tools/transport/tools-mcp-server/src/*"],
+      "@test/*": ["test/*"],
       "@tools-core/*": ["tools/core/tools-core/src/*"],
       "@tools-registry/*": ["tools/core/tools-registry/src/*"],
       "@tools-spring-http/*": ["tools/synthesizers/tools-spring-http/src/*"]
