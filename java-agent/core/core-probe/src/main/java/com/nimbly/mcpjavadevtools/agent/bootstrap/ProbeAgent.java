@@ -58,8 +58,34 @@ public final class ProbeAgent {
       System.err.println("[probe-agent] captureRedactionMode: " + cfg.captureRedactionMode);
       System.err.println("[probe-agent] byteBuddyExperimentalCompatibility: " + cfg.byteBuddyExperimentalCompatibility);
       System.err.println("[probe-agent] net.bytebuddy.experimental: " + System.getProperty(BYTE_BUDDY_EXPERIMENTAL_PROPERTY, "false"));
-      System.err.println("[probe-agent] include: " + String.join(",", cfg.includePatterns));
-      System.err.println("[probe-agent] exclude: " + String.join(",", cfg.excludePatterns));
+      System.err.println(
+          "[probe-agent] include: "
+              + (cfg.includePatterns.isEmpty() ? "(none)" : String.join(",", cfg.includePatterns))
+              + " (source: "
+              + cfg.includeSource
+              + ")"
+      );
+      System.err.println(
+          "[probe-agent] exclude: "
+              + (cfg.excludePatterns.isEmpty() ? "(none)" : String.join(",", cfg.excludePatterns))
+              + " (source: "
+              + cfg.excludeSource
+              + ")"
+      );
+      if (cfg.includePatterns.isEmpty()) {
+        System.err.println(
+            "[probe-agent][warn] Include scope is empty. "
+                + "No classes will be instrumented unless include is inferred or explicitly configured."
+        );
+      }
+      java.util.List<String> broadIncludePatterns = cfg.broadIncludePatterns();
+      if (!broadIncludePatterns.isEmpty()) {
+        System.err.println(
+            "[probe-agent][warn] Broad include patterns detected: "
+                + String.join(",", broadIncludePatterns)
+                + ". This may instrument far more classes than intended."
+        );
+      }
       // keep reference so GC doesn't collect server
       if (http.rawServer() == null) {
         throw new IllegalStateException("HTTP server failed to initialize");

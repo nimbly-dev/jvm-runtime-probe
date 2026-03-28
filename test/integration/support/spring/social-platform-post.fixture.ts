@@ -231,6 +231,8 @@ export async function startPostAppWithAgent(args?: {
   appPort?: number;
   probePort?: number;
   actuateAuthToken?: string;
+  agentInclude?: string;
+  agentExclude?: string;
 }): Promise<RunningApp> {
   const agentJarAbs = await resolveJarByPattern({
     dirAbs: agentTargetDirAbs,
@@ -252,9 +254,13 @@ export async function startPostAppWithAgent(args?: {
   const probeBaseUrl = `http://127.0.0.1:${probePort}`;
   const logBuffer: string[] = [];
 
-  const javaAgentArg =
-    `-javaagent:${agentJarAbs}=` +
-    `host=127.0.0.1;port=${probePort};include=com.example.social.**;exclude=**.config.**;allowJava21=true`;
+  const agentInclude = args?.agentInclude?.trim() ?? "com.example.social.**";
+  const agentExclude = args?.agentExclude?.trim() ?? "**.config.**";
+  const agentOptions = [`host=127.0.0.1`, `port=${probePort}`];
+  if (agentInclude.length > 0) agentOptions.push(`include=${agentInclude}`);
+  if (agentExclude.length > 0) agentOptions.push(`exclude=${agentExclude}`);
+  agentOptions.push("allowJava21=true");
+  const javaAgentArg = `-javaagent:${agentJarAbs}=` + agentOptions.join(";");
 
   const javaArgs = [javaAgentArg];
   if (typeof args?.actuateAuthToken === "string" && args.actuateAuthToken.trim().length > 0) {

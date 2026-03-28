@@ -27,6 +27,8 @@ public final class AgentConfig {
   public final boolean byteBuddyExperimentalCompatibility;
   public final List<String> includePatterns;
   public final List<String> excludePatterns;
+  public final String includeSource;
+  public final String excludeSource;
   private final List<Pattern> includeRegex;
   private final List<Pattern> excludeRegex;
 
@@ -46,7 +48,9 @@ public final class AgentConfig {
       String captureRedactionMode,
       boolean byteBuddyExperimentalCompatibility,
       List<String> includePatterns,
-      List<String> excludePatterns
+      List<String> excludePatterns,
+      String includeSource,
+      String excludeSource
   ) {
     this.host = host;
     this.port = port;
@@ -64,6 +68,8 @@ public final class AgentConfig {
     this.byteBuddyExperimentalCompatibility = byteBuddyExperimentalCompatibility;
     this.includePatterns = includePatterns;
     this.excludePatterns = excludePatterns;
+    this.includeSource = includeSource;
+    this.excludeSource = excludeSource;
     this.includeRegex = compilePatterns(includePatterns);
     this.excludeRegex = compilePatterns(excludePatterns);
   }
@@ -85,8 +91,12 @@ public final class AgentConfig {
     int captureStoredMaxChars = readDefaultCaptureStoredMaxChars();
     String captureRedactionMode = readDefaultCaptureRedactionMode();
     boolean byteBuddyExperimentalCompatibility = readDefaultByteBuddyExperimentalCompatibility();
-    List<String> includePatterns = parseCsv(readDefaultInclude());
-    List<String> excludePatterns = parseCsv(readDefaultExclude());
+    PatternSetting includeSetting = readDefaultInclude();
+    PatternSetting excludeSetting = readDefaultExclude();
+    List<String> includePatterns = parseCsv(includeSetting.value);
+    List<String> excludePatterns = parseCsv(excludeSetting.value);
+    String includeSource = includeSetting.source;
+    String excludeSource = excludeSetting.source;
 
     if (args != null && !args.trim().isEmpty()) {
       String[] parts = args.split(";");
@@ -151,12 +161,14 @@ public final class AgentConfig {
                 || "includePackages".equalsIgnoreCase(k)
         ) {
           includePatterns = parseCsv(v);
+          includeSource = "agent_arg:include";
         } else if (
             "exclude".equalsIgnoreCase(k)
                 || "excludes".equalsIgnoreCase(k)
                 || "excludePackages".equalsIgnoreCase(k)
         ) {
           excludePatterns = parseCsv(v);
+          excludeSource = "agent_arg:exclude";
         } else if ("rules".equalsIgnoreCase(k) || "rulesFile".equalsIgnoreCase(k)) {
           // Legacy option is intentionally ignored in generic mode.
           System.err.println("[probe-agent] rulesFile ignored; generic include/exclude mode is active.");
@@ -197,7 +209,9 @@ public final class AgentConfig {
         captureRedactionMode,
         byteBuddyExperimentalCompatibility,
         includePatterns,
-        excludePatterns
+        excludePatterns,
+        includeSource,
+        excludeSource
     );
   }
 
@@ -373,31 +387,41 @@ public final class AgentConfig {
     return "basic";
   }
 
-  private static String readDefaultInclude() {
+  private static PatternSetting readDefaultInclude() {
     // Priority: JVM system property -> environment variable -> global fallback.
     String fromProp = System.getProperty("mcp.probe.include");
-    if (fromProp != null && !fromProp.trim().isEmpty()) return fromProp;
+    if (fromProp != null && !fromProp.trim().isEmpty()) {
+      return new PatternSetting(fromProp, "system_property:mcp.probe.include");
+    }
 
     String fromEnv = System.getenv("MCP_PROBE_INCLUDE");
-    if (fromEnv != null && !fromEnv.trim().isEmpty()) return fromEnv;
+    if (fromEnv != null && !fromEnv.trim().isEmpty()) {
+      return new PatternSetting(fromEnv, "env:MCP_PROBE_INCLUDE");
+    }
 
     // Dynamic default: derive app base package from the launched class/jar.
     String inferred = inferIncludeFromStartup();
-    if (inferred != null && !inferred.trim().isEmpty()) return inferred;
+    if (inferred != null && !inferred.trim().isEmpty()) {
+      return new PatternSetting(inferred, "inferred:sun.java.command");
+    }
 
     // Fail closed: require explicit include if inference is unavailable.
-    return "";
+    return new PatternSetting("", "none");
   }
 
-  private static String readDefaultExclude() {
+  private static PatternSetting readDefaultExclude() {
     // Priority: JVM system property -> environment variable -> safe default exclusions.
     String fromProp = System.getProperty("mcp.probe.exclude");
-    if (fromProp != null && !fromProp.trim().isEmpty()) return fromProp;
+    if (fromProp != null && !fromProp.trim().isEmpty()) {
+      return new PatternSetting(fromProp, "system_property:mcp.probe.exclude");
+    }
 
     String fromEnv = System.getenv("MCP_PROBE_EXCLUDE");
-    if (fromEnv != null && !fromEnv.trim().isEmpty()) return fromEnv;
+    if (fromEnv != null && !fromEnv.trim().isEmpty()) {
+      return new PatternSetting(fromEnv, "env:MCP_PROBE_EXCLUDE");
+    }
 
-    return "com.nimbly.mcpjavadevtools.agent.**";
+    return new PatternSetting("com.nimbly.mcpjavadevtools.agent.**", "default");
   }
 
   private static String inferIncludeFromStartup() {
@@ -468,6 +492,36 @@ public final class AgentConfig {
     return c.substring(0, idx) + ".**";
   }
 
+  public List<String> broadIncludePatterns() {
+    List<String> broad = new ArrayList<>();
+    for (String pattern : includePatterns) {
+      if (isBroadIncludePattern(pattern)) {
+        broad.add(pattern);
+      }
+    }
+    return broad;
+  }
+
+  private static boolean isBroadIncludePattern(String pattern) {
+    if (pattern == null) return false;
+    String raw = pattern.trim();
+    if (raw.isEmpty()) return false;
+    if ("**".equals(raw) || "*".equals(raw)) return true;
+
+    String normalized = raw;
+    if (normalized.endsWith(".**")) {
+      normalized = normalized.substring(0, normalized.length() - 3);
+    }
+    normalized = normalized.replace("*", "");
+    while (normalized.endsWith(".")) {
+      normalized = normalized.substring(0, normalized.length() - 1);
+    }
+    if (normalized.isEmpty()) return true;
+
+    String[] segments = normalized.split("\\.");
+    return segments.length <= 1;
+  }
+
   public boolean shouldInstrument(String dottedClassName) {
     if (dottedClassName == null || dottedClassName.isEmpty()) return false;
     if (!matchesAny(includeRegex, dottedClassName)) return false;
@@ -503,8 +557,18 @@ public final class AgentConfig {
   }
 
   private static String toRegex(String globOrPrefix) {
-    // Supports '*' and '**' glob. If no wildcard exists, treat as prefix.
+    // Supports '*' and '**' glob.
+    // If no wildcard exists, treat likely class FQCNs as exact class targets;
+    // otherwise treat as package prefix.
     boolean hasWildcard = globOrPrefix.indexOf('*') >= 0;
+    if (!hasWildcard) {
+      String candidate = globOrPrefix.endsWith(".")
+          ? globOrPrefix.substring(0, globOrPrefix.length() - 1)
+          : globOrPrefix;
+      if (isLikelyExactClassName(candidate)) {
+        return "^" + Pattern.quote(candidate) + "(\\$.*)?$";
+      }
+    }
     String g = hasWildcard ? globOrPrefix : (globOrPrefix.endsWith(".") ? globOrPrefix + "**" : globOrPrefix + ".**");
 
     StringBuilder sb = new StringBuilder();
@@ -526,6 +590,31 @@ public final class AgentConfig {
     }
     sb.append("$");
     return sb.toString();
+  }
+
+  private static boolean isLikelyExactClassName(String value) {
+    if (value == null) return false;
+    String trimmed = value.trim();
+    if (trimmed.isEmpty()) return false;
+    int lastDot = trimmed.lastIndexOf('.');
+    if (lastDot <= 0 || lastDot >= trimmed.length() - 1) return false;
+    String lastSegment = trimmed.substring(lastDot + 1);
+    if (lastSegment.indexOf('*') >= 0) return false;
+    if (lastSegment.indexOf('$') >= 0) return true;
+    for (int i = 0; i < lastSegment.length(); i++) {
+      if (Character.isUpperCase(lastSegment.charAt(i))) return true;
+    }
+    return false;
+  }
+
+  private static final class PatternSetting {
+    final String value;
+    final String source;
+
+    PatternSetting(String value, String source) {
+      this.value = value == null ? "" : value;
+      this.source = source == null || source.trim().isEmpty() ? "unknown" : source;
+    }
   }
 }
 

@@ -20,7 +20,7 @@ Options:
   --no-build                      Do not run build when dist/server.js is missing
   --no-build-java                 Do not run Maven build for Java agent when jar is missing
   --jdk21-compat                  Enable Java 21 compatibility flag in generated -javaagent args
-  --agent-include <glob>          Probe include glob for generated -javaagent args (default: com.**)
+  --agent-include <basepathCsv>   Probe include basepaths for generated -javaagent args (comma-separated package globs or exact FQCNs). Default: omitted, auto-infer from startup class
   --agent-exclude <glob>          Probe exclude glob for generated -javaagent args
   --dev-mode                      Enable installer development mode (implies dry-run)
   --interactive                   Prompt for values in terminal
@@ -51,7 +51,7 @@ UPDATE_SKILL_IF_EXISTS=0
 BUILD_IF_MISSING=1
 BUILD_JAVA_IF_MISSING=1
 JDK21_COMPAT=0
-AGENT_INCLUDE="com.**"
+AGENT_INCLUDE=""
 AGENT_EXCLUDE="com.nimbly.mcpjavadevtools.agent.**,**.config.**,**Test"
 INTERACTIVE=0
 DEV_MODE=0
@@ -196,7 +196,7 @@ if [[ "$INTERACTIVE" -eq 1 ]]; then
   CLIENT="$(prompt_default "Client (codex|kiro)" "$CLIENT")"
   PROBE_BASE_URL="$(prompt_default "MCP_PROBE_BASE_URL" "$PROBE_BASE_URL")"
   read -r -p "MCP_WORKSPACE_ROOT (optional, empty to skip): " WORKSPACE_ROOT
-  AGENT_INCLUDE="$(prompt_default "Java agent include glob" "$AGENT_INCLUDE")"
+  AGENT_INCLUDE="$(prompt_default "Java agent include basepaths (optional CSV, empty=auto inference)" "$AGENT_INCLUDE")"
   AGENT_EXCLUDE="$(prompt_default "Java agent exclude glob" "$AGENT_EXCLUDE")"
   if prompt_yes_no "Enable Java 21 compatibility flag in javaagent args?" "n"; then JDK21_COMPAT=1; fi
   if prompt_yes_no "Update existing skill installs?" "n"; then UPDATE_SKILL_IF_EXISTS=1; fi
@@ -312,9 +312,22 @@ emit_javaagent_args() {
     compat_suffix=";allowJava21=true"
   fi
 
+  local agent_opts
+  agent_opts="host=$host;port=$port"
+  if [[ -n "${AGENT_INCLUDE// }" ]]; then
+    agent_opts="$agent_opts;include=$AGENT_INCLUDE"
+  fi
+  if [[ -n "${AGENT_EXCLUDE// }" ]]; then
+    agent_opts="$agent_opts;exclude=$AGENT_EXCLUDE"
+  fi
+  agent_opts="$agent_opts$compat_suffix"
+
   echo
   echo "Java agent JVM arg (copy/paste):"
-  echo "-javaagent:$jar_abs=host=$host;port=$port;include=$AGENT_INCLUDE;exclude=$AGENT_EXCLUDE$compat_suffix"
+  echo "-javaagent:$jar_abs=$agent_opts"
+  if [[ -z "${AGENT_INCLUDE// }" ]]; then
+    echo "Note: include was omitted; the agent will infer include scope from startup class/package."
+  fi
 }
 
 replace_skill_dir() {

@@ -10,6 +10,9 @@ import {
   startPostAppWithAgent,
 } from "../support/spring/social-platform-post.fixture";
 
+const postCreateRequestFqcn = "com.example.social.post.api.model.PostCreateRequest";
+const postUpdateRequestFqcn = "com.example.social.post.api.model.PostUpdateRequest";
+
 let runtime: Awaited<ReturnType<typeof startPostAppWithAgent>> | undefined;
 
 test.before(async () => {
@@ -162,5 +165,90 @@ test("java-agent IT: actuate endpoint rejects unauthorized requests when token i
     assert.equal(authorized.status, 200);
   } finally {
     await securedRuntime.stop();
+  }
+});
+
+test("java-agent IT: include supports additional package scope from sibling module", async () => {
+  const withoutExtraRuntime = await startPostAppWithAgent({
+    agentInclude: "com.example.social.post.app.**",
+  });
+  try {
+    const noExtraResponse = await fetch(`${withoutExtraRuntime.apiBaseUrl}/api/v1/posts`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer alice-token",
+        "x-run-as-tenant": "fixture-tenant",
+        "x-run-as-user": "alice",
+      },
+      body: JSON.stringify({
+        content: "No extra include should not instrument post-api DTO.",
+        visibility: "PUBLIC",
+        tags: ["fixture", "include-extra"],
+      }),
+    });
+    assert.equal(noExtraResponse.status, 201);
+    assert.equal(
+      withoutExtraRuntime.logs().includes(`[probe-agent] Instrumented: ${postCreateRequestFqcn}`),
+      false,
+    );
+  } finally {
+    await withoutExtraRuntime.stop();
+  }
+
+  const withExtraRuntime = await startPostAppWithAgent({
+    agentInclude: "com.example.social.post.app.**,com.example.social.post.api.model.**",
+  });
+  try {
+    const withExtraResponse = await fetch(`${withExtraRuntime.apiBaseUrl}/api/v1/posts`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer alice-token",
+        "x-run-as-tenant": "fixture-tenant",
+        "x-run-as-user": "alice",
+      },
+      body: JSON.stringify({
+        content: "Extra include should instrument post-api DTO.",
+        visibility: "PUBLIC",
+        tags: ["fixture", "include-extra"],
+      }),
+    });
+    assert.equal(withExtraResponse.status, 201);
+    assert.equal(
+      withExtraRuntime.logs().includes(`[probe-agent] Instrumented: ${postCreateRequestFqcn}`),
+      true,
+    );
+  } finally {
+    await withExtraRuntime.stop();
+  }
+});
+
+test("java-agent IT: include basepaths instrument an exact class outside include glob", async () => {
+  const classScopedRuntime = await startPostAppWithAgent({
+    agentInclude: `com.example.social.post.app.**,${postUpdateRequestFqcn}`,
+  });
+  try {
+    const response = await fetch(`${classScopedRuntime.apiBaseUrl}/api/v1/posts/101`, {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer alice-token",
+        "x-run-as-tenant": "fixture-tenant",
+        "x-run-as-user": "alice",
+      },
+      body: JSON.stringify({
+        content: "Exact class include should instrument PostUpdateRequest.",
+        visibility: "PUBLIC",
+        tags: ["fixture", "include-class"],
+      }),
+    });
+    assert.equal(response.status, 200);
+    assert.equal(
+      classScopedRuntime.logs().includes(`[probe-agent] Instrumented: ${postUpdateRequestFqcn}`),
+      true,
+    );
+  } finally {
+    await classScopedRuntime.stop();
   }
 });

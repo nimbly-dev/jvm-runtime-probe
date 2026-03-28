@@ -65,13 +65,18 @@ This installs the default skill set:
 
 The target JVM must run on **Java 17 or newer**. If you're on Java 21, see [Java 21 compatibility mode](#java-21-compatibility-mode) before continuing.
 
-Add the following as a JVM argument when launching your application, replacing `{desktopName}` and the `include` package with your own:
+Add the following as a JVM argument when launching your application, replacing `{desktopName}`:
 
 ```text
--javaagent:C:\Users\{desktopName}\repository\mcp-java-dev-tools\java-agent\core\core-probe\target\mcp-java-dev-tools-agent-0.1.0.jar=host=0.0.0.0;port=9191;include=com.{package_to_capture}.**;exclude=com.nimbly.mcpjavadevtools.agent.**,**.config.**,**Test
+-javaagent:C:\Users\{desktopName}\repository\mcp-java-dev-tools\java-agent\core\core-probe\target\mcp-java-dev-tools-agent-0.1.0.jar=host=0.0.0.0;port=9191;exclude=com.nimbly.mcpjavadevtools.agent.**,**.config.**,**Test
 ```
 
-> **Tip:** The `include` filter is optional. By default, the agent instruments all classes within the module it was run from. Setting `include` to your root package (e.g. `com.acme.**`) keeps instrumentation focused and avoids capturing classes you don't care about.
+> **Tip:** The `include` filter is optional. If omitted, the agent infers an include scope from startup command metadata (`sun.java.command`), usually the startup class package (for example `com.acme.app.**`). Set `include` explicitly when inference is ambiguous or too broad. `MCP_WORKSPACE_ROOT` does not control Java instrumentation scope.
+>
+> `include` supports comma-separated basepaths:
+> - package globs (for example `com.thirdparty.service.**`)
+> - exact class FQCNs (for example `com.example.ApiClass`)
+> - mixed module/class targeting in one value (for example `com.example.app.**,com.example.api.**,com.thirdparty.SomeClass`)
 
 To confirm the agent is instrumenting your classes, check the startup logs for lines like:
 
@@ -159,7 +164,7 @@ Default is `false`.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `MCP_WORKSPACE_ROOT` | — | Project root hint for path resolution |
+| `MCP_WORKSPACE_ROOT` | — | Project root hint for path resolution only (does not control Java instrumentation scope) |
 | `MCP_JAVA_REQUEST_MAPPING_RESOLVER_JAR` | — | |
 | `MCP_JAVA_REQUEST_MAPPING_RESOLVER_CLASSPATH` | — | |
 | `MCP_JAVA_BIN` | — | |
@@ -168,6 +173,15 @@ Default is `false`.
 | `MCP_PROBE_WAIT_UNREACHABLE_RETRY_ENABLED` | `false` | |
 | `MCP_PROBE_WAIT_UNREACHABLE_MAX_RETRIES` | `3` | Max: 10 |
 | `MCP_PROBE_INCLUDE_EXECUTION_PATHS` | `false` | Set `true` to include `executionPaths` arrays in probe payloads |
+
+### Configuration Scope Matrix
+
+| Setting | Consumed By | Affects |
+|---|---|---|
+| `MCP_WORKSPACE_ROOT` / `--workspace-root` | MCP server | Path resolution for project validation and synthesis search roots |
+| `MCP_PROBE_BASE_URL` / `--probe-base-url` | MCP server | Default probe endpoint for tool calls |
+| `include` / `exclude` in `-javaagent:...` (or `mcp.probe.include` / `MCP_PROBE_INCLUDE`) | Java agent | Which classes are instrumented at runtime |
+| `MCP_PROBE_INCLUDE_EXECUTION_PATHS` | MCP server | Whether `executionPaths` arrays are included in returned probe payloads |
 
 #### Probe Endpoints
 
