@@ -107,7 +107,10 @@ public final class ProbeHttpServer {
       boolean hasKey = selectedKey != null && !selectedKey.isBlank();
       boolean hasKeys = !keys.isEmpty();
       boolean hasClass = className != null && !className.isBlank();
-      int selectorCount = (hasKey ? 1 : 0) + (hasKeys ? 1 : 0) + (hasClass ? 1 : 0);
+      int selectorCount = 0;
+      if (hasKey) selectorCount++;
+      if (hasKeys) selectorCount++;
+      if (hasClass) selectorCount++;
       if (selectorCount == 0) {
         ProbeHttpJson.writeJson(exchange, 400, new ProbeHttpPayloads.ErrorEnvelope("missing_selector", null));
         return;

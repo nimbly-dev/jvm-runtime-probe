@@ -1,0 +1,41 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<ruleset name="mcp-java-dev-tools-java"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.github.io/schema/ruleset_2_0_0.xsd">
+  <description>
+    Java maintainability baseline: cyclomatic complexity and related method complexity checks.
+  </description>
+
+  <rule ref="category/java/design.xml/CyclomaticComplexity">
+    <properties>
+      <property name="methodReportLevel" value="10"/>
+      <property name="classReportLevel" value="80"/>
+    </properties>
+  </rule>
+
+  <rule ref="category/java/design.xml/NPathComplexity">
+    <properties>
+      <property name="reportLevel" value="200"/>
+    </properties>
+  </rule>
+
+  <rule name="TooManyTernaryOperatorsInMethod"
+        language="java"
+        message="Method has too many ternary operators; prefer explicit control flow."
+        class="net.sourceforge.pmd.lang.rule.xpath.XPathRule">
+    <description>
+      A method with several ternary operators is difficult to maintain even when individual ternaries are valid.
+    </description>
+    <priority>3</priority>
+    <properties>
+      <property name="xpath">
+        <value>
+          <![CDATA[
+            //MethodDeclaration[count(.//ConditionalExpression) > 2]
+          ]]>
+        </value>
+      </property>
+    </properties>
+  </rule>
+</ruleset>

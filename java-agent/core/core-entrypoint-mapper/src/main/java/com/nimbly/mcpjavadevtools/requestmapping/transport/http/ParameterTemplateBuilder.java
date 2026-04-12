@@ -2,6 +2,7 @@ package com.nimbly.mcpjavadevtools.requestmapping.transport.http;
 
 import com.github.javaparser.ast.body.Parameter;
 import com.github.javaparser.ast.expr.AnnotationExpr;
+import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.expr.NormalAnnotationExpr;
 import com.github.javaparser.ast.expr.SingleMemberAnnotationExpr;
 import com.github.javaparser.ast.expr.StringLiteralExpr;
@@ -98,8 +99,8 @@ public final class ParameterTemplateBuilder {
             return stringLiteral.getValue();
         }
         if (annotation instanceof NormalAnnotationExpr normalAnnotation) {
-            for (String candidate : java.util.List.of("name", "value")) {
-                Optional<com.github.javaparser.ast.expr.Expression> value = normalAnnotation.getPairs().stream()
+            for (String candidate : List.of("name", "value")) {
+                Optional<Expression> value = normalAnnotation.getPairs().stream()
                         .filter(pair -> pair.getNameAsString().equals(candidate))
                         .map(pair -> pair.getValue())
                         .findFirst();

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.nimbly</groupId>
     <artifactId>mcp-java-dev-tools-agent-parent</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.2</version>
     <relativePath>../../pom.xml</relativePath>
   </parent>
 
@@ -18,20 +18,16 @@
   <properties>
     <maven.compiler.release>17</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <javaparser.version>3.27.1</javaparser.version>
-    <jackson.version>2.20.0</jackson.version>
   </properties>
 
   <dependencies>
     <dependency>
       <groupId>com.github.javaparser</groupId>
       <artifactId>javaparser-core</artifactId>
-      <version>${javaparser.version}</version>
     </dependency>
     <dependency>
       <groupId>com.fasterxml.jackson.core</groupId>
       <artifactId>jackson-databind</artifactId>
-      <version>${jackson.version}</version>
     </dependency>
   </dependencies>
 
@@ -46,7 +42,6 @@
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
-        <version>3.5.3</version>
         <executions>
           <execution>
             <phase>package</phase>
@@ -69,4 +64,5 @@
     </plugins>
   </build>
 </project>
+
 

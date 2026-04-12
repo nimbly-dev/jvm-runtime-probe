@@ -124,12 +124,18 @@ public final class ProbeRuntime {
   public static KeyStatus keyStatus(String key) {
     boolean includeLineValidation = isLineKey(key);
     boolean lineResolvable = includeLineValidation && isLineResolvableKey(key);
+    Boolean lineResolvableValue = null;
+    String lineValidation = null;
+    if (includeLineValidation) {
+      lineResolvableValue = lineResolvable;
+      lineValidation = lineResolvable ? "resolvable" : "invalid_line_target";
+    }
     return new KeyStatus(
         key,
         countForKey(key),
         lastHitEpochForKey(key),
-        includeLineValidation ? lineResolvable : null,
-        includeLineValidation ? (lineResolvable ? "resolvable" : "invalid_line_target") : null
+        lineResolvableValue,
+        lineValidation
     );
   }
 

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
+﻿<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.nimbly</groupId>
     <artifactId>mcp-java-dev-tools-agent-parent</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.2</version>
     <relativePath>../pom.xml</relativePath>
   </parent>
 
@@ -15,7 +15,37 @@
   <packaging>pom</packaging>
   <name>mcp-java-dev-tools-mappers-adapters-parent</name>
 
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>enforce-mapper-adapter-layer-boundary</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <bannedDependencies>
+                  <searchTransitive>true</searchTransitive>
+                  <excludes>
+                    <exclude>com.nimbly:mcp-java-dev-tools-agent</exclude>
+                    <exclude>com.nimbly:mcp-java-dev-tools-core-probe*</exclude>
+                  </excludes>
+                </bannedDependencies>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
   <modules>
     <module>adapter-request-mapper-spring-http</module>
   </modules>
 </project>
+

@@ -151,17 +151,16 @@ public final class RequestMappingResolver {
         for (MethodContext context : methodContexts) {
             for (MappingExtractor extractor : extractors) {
                 Optional<ResolvedMapping> resolved = extractor.resolve(context, index);
-                if (resolved.isEmpty()) {
-                    continue;
+                if (resolved.isPresent()) {
+                    return success(
+                            request,
+                            projectRoot,
+                            primaryType,
+                            context,
+                            extractor.strategyId(),
+                            resolved.get()
+                    );
                 }
-                return success(
-                        request,
-                        projectRoot,
-                        primaryType,
-                        context,
-                        extractor.strategyId(),
-                        resolved.get()
-                );
             }
         }
 

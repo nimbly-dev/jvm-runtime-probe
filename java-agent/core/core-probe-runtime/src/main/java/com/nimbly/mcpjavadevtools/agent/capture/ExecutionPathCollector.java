@@ -7,7 +7,6 @@ import java.util.regex.Pattern;
 
 final class ExecutionPathCollector {
   private static final int CAPTURE_EXECUTION_PATH_MAX_FRAMES = 12;
-  private static final int EXECUTION_PATH_ROOT_PACKAGE_SEGMENTS = 2;
   private static final String[] EXECUTION_PATH_EXCLUDED_PREFIXES = new String[] {
       "com.nimbly.mcpjavadevtools.agent.",
       "java.",
@@ -33,7 +32,7 @@ final class ExecutionPathCollector {
     StackTraceElement[] stack = Thread.currentThread().getStackTrace();
     if (stack == null || stack.length == 0) {
       return Collections.singletonList(
-          formatExecutionFrame(dottedClassName, methodName, -1, deriveExecutionPathRootPackage(dottedClassName))
+          formatExecutionFrame(dottedClassName, methodName, -1)
       );
     }
 
@@ -54,11 +53,6 @@ final class ExecutionPathCollector {
     }
 
     Collections.reverse(frames);
-    String rootPackage =
-        !frames.isEmpty()
-            ? deriveExecutionPathRootPackage(frames.get(0).getClassName())
-            : deriveExecutionPathRootPackage(dottedClassName);
-
     List<String> out = new ArrayList<>();
     String previous = null;
     for (StackTraceElement frame : frames) {
@@ -70,7 +64,7 @@ final class ExecutionPathCollector {
           && fallbackLine > 0) {
         renderedLine = fallbackLine;
       }
-      String rendered = formatExecutionFrame(normalizedClassName, frame.getMethodName(), renderedLine, rootPackage);
+      String rendered = formatExecutionFrame(normalizedClassName, frame.getMethodName(), renderedLine);
       if (rendered.equals(previous)) continue;
       out.add(rendered);
       previous = rendered;
@@ -80,7 +74,7 @@ final class ExecutionPathCollector {
       out = new ArrayList<>(out.subList(out.size() - CAPTURE_EXECUTION_PATH_MAX_FRAMES, out.size()));
     }
     if (out.isEmpty()) {
-      out.add(formatExecutionFrame(dottedClassName, methodName, fallbackLine, rootPackage));
+      out.add(formatExecutionFrame(dottedClassName, methodName, fallbackLine));
     }
     return out;
   }
@@ -125,7 +119,7 @@ final class ExecutionPathCollector {
     String normalized =
         hasWildcard
             ? globOrPrefix
-            : (globOrPrefix.endsWith(".") ? globOrPrefix + "**" : globOrPrefix + ".**");
+            : globOrPrefix.endsWith(".") ? globOrPrefix + "**" : globOrPrefix + ".**";
 
     StringBuilder out = new StringBuilder("^");
     int idx = 0;
@@ -157,27 +151,10 @@ final class ExecutionPathCollector {
     return className;
   }
 
-  private static String deriveExecutionPathRootPackage(String className) {
-    if (className == null || className.isBlank()) return "";
-    int classDot = className.lastIndexOf('.');
-    if (classDot <= 0) return "";
-    String packageName = className.substring(0, classDot);
-    String[] segments = packageName.split("\\.");
-    if (segments.length == 0) return "";
-    int keep = Math.min(EXECUTION_PATH_ROOT_PACKAGE_SEGMENTS, segments.length);
-    StringBuilder out = new StringBuilder();
-    for (int i = 0; i < keep; i++) {
-      if (i > 0) out.append('.');
-      out.append(segments[i]);
-    }
-    return out.toString();
-  }
-
   private static String formatExecutionFrame(
       String className,
       String methodName,
-      int lineNumber,
-      String rootPackage
+      int lineNumber
   ) {
     String cls = (className == null || className.isBlank()) ? "UnknownClass" : className;
     String method = (methodName == null || methodName.isBlank()) ? "<unknown>" : methodName;

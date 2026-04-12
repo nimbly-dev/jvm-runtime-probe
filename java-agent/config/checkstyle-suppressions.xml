@@ -1,0 +1,14 @@
+﻿<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+  "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+  "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+<suppressions>
+  <!-- Legacy runtime capture methods retained for backward compatibility; enforce on new code paths. -->
+  <suppress files="CaptureValueSerializer\.java" checks="MethodLength"/>
+  <suppress files="CaptureValueSerializer\.java" checks="ParameterNumber"/>
+  <suppress files="CapturePreviewView\.java" checks="ParameterNumber"/>
+  <suppress files="ExecutionPathCollector\.java" checks="MethodLength"/>
+  <suppress files="LineHitVisitor\.java" checks="MethodLength"/>
+  <suppress files="RequestMappingResolver\.java" checks="MethodLength"/>
+  <suppress files="AgentConfig\.java" checks="MethodLength"/>
+</suppressions>

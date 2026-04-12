@@ -33,24 +33,25 @@ public final class SpringMappingMerger {
 
     public static Optional<SpringMethodMapping> resolveMethodMapping(MethodContext context, TypeIndex index) {
         MethodDeclaration method = context.method();
+        Optional<SpringMethodMapping> resolvedMapping = Optional.empty();
         for (AnnotationExpr annotation : method.getAnnotations()) {
             String simpleName = SpringAnnotationNames.simpleName(annotation.getNameAsString());
             String composedMethod = SpringAnnotationNames.COMPOSED_MAPPINGS.get(simpleName);
             if (composedMethod != null) {
                 String methodPath = resolvePathValue(annotation, context.owner(), index);
-                return Optional.of(new SpringMethodMapping(composedMethod, methodPath));
+                resolvedMapping = Optional.of(new SpringMethodMapping(composedMethod, methodPath));
+            } else if (simpleName.equals(SpringAnnotationNames.REQUEST_MAPPING)) {
+                Optional<String> httpMethod = resolveRequestMappingHttpMethod(annotation);
+                if (httpMethod.isPresent()) {
+                    String methodPath = resolvePathValue(annotation, context.owner(), index);
+                    resolvedMapping = Optional.of(new SpringMethodMapping(httpMethod.get(), methodPath));
+                }
             }
-            if (!simpleName.equals(SpringAnnotationNames.REQUEST_MAPPING)) {
-                continue;
+            if (resolvedMapping.isPresent()) {
+                break;
             }
-            Optional<String> httpMethod = resolveRequestMappingHttpMethod(annotation);
-            if (httpMethod.isEmpty()) {
-                continue;
-            }
-            String methodPath = resolvePathValue(annotation, context.owner(), index);
-            return Optional.of(new SpringMethodMapping(httpMethod.get(), methodPath));
         }
-        return Optional.empty();
+        return resolvedMapping;
     }
 
     private static String resolveTypeRequestMappingPath(TypeDescriptor owner, TypeIndex index) {
@@ -67,13 +68,13 @@ public final class SpringMappingMerger {
         if (!(annotation instanceof NormalAnnotationExpr normalAnnotation)) {
             return Optional.empty();
         }
+        Optional<String> resolvedMethod = Optional.empty();
         for (var pair : normalAnnotation.getPairs()) {
-            if (!pair.getNameAsString().equals("method")) {
-                continue;
+            if (pair.getNameAsString().equals("method")) {
+                resolvedMethod = resolveRequestMethodExpression(pair.getValue());
             }
-            return resolveRequestMethodExpression(pair.getValue());
         }
-        return Optional.empty();
+        return resolvedMethod;
     }
 
     private static Optional<String> resolveRequestMethodExpression(Expression expression) {

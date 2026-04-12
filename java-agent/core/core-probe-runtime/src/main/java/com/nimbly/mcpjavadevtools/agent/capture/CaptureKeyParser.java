@@ -25,16 +25,14 @@ final class CaptureKeyParser {
       return null;
     }
     if (lineNumber <= 0) return null;
-    return new ParsedLineKey(methodKey, lineNumber);
+    return new ParsedLineKey(methodKey);
   }
 
   private static final class ParsedLineKey {
     private final String methodKey;
-    private final int lineNumber;
 
-    private ParsedLineKey(String methodKey, int lineNumber) {
+    private ParsedLineKey(String methodKey) {
       this.methodKey = methodKey;
-      this.lineNumber = lineNumber;
     }
   }
 }

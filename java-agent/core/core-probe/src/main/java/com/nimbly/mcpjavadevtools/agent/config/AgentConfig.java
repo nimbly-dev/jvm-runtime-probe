@@ -2,6 +2,7 @@ package com.nimbly.mcpjavadevtools.agent.config;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -77,7 +78,7 @@ public final class AgentConfig {
   public static AgentConfig fromAgentArgs(String args) {
     // Example:
     // -javaagent:probe-agent.jar=host=127.0.0.1;port=9191;mode=observe;actuatorId=none;include=com.nimbly.**;exclude=com.nimbly.mcpjavadevtools.agent.**,**.config.**
-    String host = "127.0.0.1";
+    String host = InetAddress.getLoopbackAddress().getHostAddress();
     int port = 9191;
     String mode = readDefaultMode();
     String actuatorId = readDefaultActuatorId();
@@ -569,14 +570,21 @@ public final class AgentConfig {
         return "^" + Pattern.quote(candidate) + "(\\$.*)?$";
       }
     }
-    String g = hasWildcard ? globOrPrefix : (globOrPrefix.endsWith(".") ? globOrPrefix + "**" : globOrPrefix + ".**");
+    String g;
+    if (hasWildcard) {
+      g = globOrPrefix;
+    } else if (globOrPrefix.endsWith(".")) {
+      g = globOrPrefix + "**";
+    } else {
+      g = globOrPrefix + ".**";
+    }
 
     StringBuilder sb = new StringBuilder();
     sb.append("^");
     for (int i = 0; i < g.length(); i++) {
       char c = g.charAt(i);
       if (c == '*') {
-        boolean dbl = (i + 1 < g.length() && g.charAt(i + 1) == '*');
+        boolean dbl = i + 1 < g.length() && g.charAt(i + 1) == '*';
         if (dbl) {
           sb.append(".*");
           i++;
