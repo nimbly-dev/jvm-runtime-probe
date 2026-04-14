@@ -49,6 +49,8 @@ Capture timestamp naming:
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
 | `config` | Effective diagnose call configuration. | `probe_check` | true | `{"baseUrl":"http://127.0.0.1:9191"}` |
+| `config.authConfigured` | Whether `probe_check.http.headers` were provided and applied. | `probe_check` | true | `true` |
+| `config.authHeaderNames` | Header names applied to probe reset/status calls (values intentionally omitted). | `probe_check` | true | `["Authorization"]` |
 | `checks` | Aggregated endpoint checks. | `probe_check` | true | `{"reset":{"ok":true},"status":{"ok":true}}` |
 | `checks.reset` | Reset endpoint diagnostic result. | `probe_check` | true | `{"ok":true,"status":200}` |
 | `checks.status` | Status endpoint diagnostic result. | `probe_check` | true | `{"ok":true,"keyDecodingOk":true}` |

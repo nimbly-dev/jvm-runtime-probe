@@ -16,12 +16,15 @@ export function registerProbeCheckTool(server: McpServer, deps: ProbeCheckHandle
       description: PROBE_CHECK_TOOL.description,
       inputSchema: PROBE_CHECK_TOOL.inputSchema,
     },
-    async ({ baseUrl, timeoutMs }) => {
+    async ({ baseUrl, http, timeoutMs }) => {
       const diagnoseArgs: Parameters<typeof probeDiagnose>[0] = {
         baseUrl: baseUrl ?? deps.probeBaseUrl,
         statusPath: deps.probeStatusPath,
         resetPath: deps.probeResetPath,
       };
+      if (http && typeof http === "object" && http.headers && typeof http.headers === "object") {
+        diagnoseArgs.http = { headers: http.headers };
+      }
       if (typeof timeoutMs === "number") diagnoseArgs.timeoutMs = timeoutMs;
       return await probeDiagnose(diagnoseArgs);
     },

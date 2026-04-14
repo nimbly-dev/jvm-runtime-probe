@@ -42,6 +42,9 @@ export async function probeDiagnose(args: {
   baseUrl: string;
   statusPath: string;
   resetPath: string;
+  http?: {
+    headers?: Record<string, string>;
+  };
   timeoutMs?: number;
 }): Promise<{
   content: Array<{ type: "text"; text: string }>;
@@ -57,15 +60,24 @@ export async function probeDiagnose(args: {
   const statusUrl = new URL(joinUrl(args.baseUrl, args.statusPath));
   statusUrl.searchParams.set("key", probeKey);
   const resetUrl = joinUrl(args.baseUrl, args.resetPath);
-
   const checks: Record<string, unknown> = {};
   const recommendations: string[] = [];
+  const requestHeaders: Record<string, string> = {};
+  for (const [name, value] of Object.entries(args.http?.headers ?? {})) {
+    const normalizedName = name.trim();
+    const normalizedValue = String(value).trim();
+    if (!normalizedName || !normalizedValue) continue;
+    requestHeaders[normalizedName] = normalizedValue;
+  }
   let contractVersion: string | undefined;
 
   try {
     const reset = await fetchJson(resetUrl, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...requestHeaders,
+      },
       body: JSON.stringify({ key: probeKey }),
       timeoutMs,
     });
@@ -78,6 +90,11 @@ export async function probeDiagnose(args: {
       status: reset.status,
       ...(resetJson ? { json: resetJson } : {}),
     };
+    if (reset.status === 401 || reset.status === 403) {
+      recommendations.push(
+        "Probe reset endpoint is protected. Provide auth headers via probe_check.http.headers.",
+      );
+    }
   } catch (err) {
     checks.reset = { ok: false, error: err instanceof Error ? err.message : String(err) };
     recommendations.push(
@@ -86,7 +103,11 @@ export async function probeDiagnose(args: {
   }
 
   try {
-    const status = await fetchJson(statusUrl.toString(), { method: "GET", timeoutMs });
+    const status = await fetchJson(statusUrl.toString(), {
+      method: "GET",
+      headers: requestHeaders,
+      timeoutMs,
+    });
     const statusJson = sanitizeCheckPayload(status.json);
     if (!contractVersion && typeof status.json?.contractVersion === "string") {
       contractVersion = status.json.contractVersion;
@@ -97,14 +118,20 @@ export async function probeDiagnose(args: {
         : typeof status.json?.key === "string"
           ? status.json.key
           : undefined;
-    const decodeOk = responseKey === probeKey;
+    const statusOk = status.status >= 200 && status.status < 300;
+    const decodeOk = statusOk ? responseKey === probeKey : undefined;
     checks.status = {
-      ok: status.status >= 200 && status.status < 300,
+      ok: statusOk,
       status: status.status,
       ...(statusJson ? { json: statusJson } : {}),
-      keyDecodingOk: decodeOk,
+      ...(typeof decodeOk === "boolean" ? { keyDecodingOk: decodeOk } : {}),
     };
-    if (!decodeOk) {
+    if (status.status === 401 || status.status === 403) {
+      recommendations.push(
+        "Probe status endpoint is protected. Provide auth headers via probe_check.http.headers.",
+      );
+    }
+    if (decodeOk === false) {
       recommendations.push(
         "Probe key decoding mismatch detected. Rebuild/redeploy java-agent so query keys with # are decoded correctly.",
       );
@@ -122,6 +149,8 @@ export async function probeDiagnose(args: {
       statusPath: args.statusPath,
       resetPath: args.resetPath,
       timeoutMs,
+      authConfigured: Object.keys(requestHeaders).length > 0,
+      authHeaderNames: Object.keys(requestHeaders),
     },
     checks,
     recommendations,
