@@ -34,10 +34,17 @@ function mapResolverFailureToSynthFailure(
   failure: JvmAstRequestMappingFailure,
   input: SynthesizerInput,
 ): SynthesizerFailure {
-  if (failure.reasonCode === "ast_resolver_unavailable") {
+  if (
+    failure.reasonCode === "ast_resolver_unavailable" ||
+    failure.reasonCode === "project_root_invalid" ||
+    failure.reasonCode === "target_type_not_found" ||
+    failure.reasonCode === "target_type_ambiguous" ||
+    failure.reasonCode === "target_method_not_found" ||
+    failure.reasonCode === "mapper_plugin_unavailable"
+  ) {
     return {
       status: "report",
-      reasonCode: "ast_resolver_unavailable",
+      reasonCode: failure.reasonCode,
       failedStep: failure.failedStep,
       nextAction: failure.nextAction,
       evidence: failure.evidence,

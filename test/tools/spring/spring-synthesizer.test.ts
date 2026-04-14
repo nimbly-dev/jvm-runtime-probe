@@ -118,6 +118,36 @@ test("spring synthesizer surfaces AST resolver bootstrap failures distinctly", a
   assert.equal(result.failedStep, "request_mapping_resolver_bootstrap");
 });
 
+test("spring synthesizer preserves resolver-specific target ambiguity failures", async () => {
+  const result = await synthesizeSpringRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      searchRootsAbs: ["C:\\repo\\service"],
+      classHint: "CatalogController",
+      methodHint: "getCatalog",
+      intentMode: "regression_http_only",
+    },
+    {
+      resolveRequestMappingFn: async () => ({
+        status: "report",
+        contractVersion: "0.1.0",
+        reasonCode: "target_type_ambiguous",
+        failedStep: "request_mapping_resolution",
+        nextAction: "Narrow target type scope.",
+        evidence: ["matched_types=2"],
+        attemptedStrategies: ["java_ast_index_lookup", "java_ast_framework_resolution"],
+      }),
+    },
+  );
+
+  assert.equal(result.status, "report");
+  assert.equal(result.reasonCode, "target_type_ambiguous");
+  assert.equal(result.failedStep, "request_mapping_resolution");
+  assert.equal(result.nextAction, "Narrow target type scope.");
+  assert.deepEqual(result.evidence, ["matched_types=2"]);
+});
+
 test("spring synthesizer maps generic AST mapping failures to spring entrypoint failures", async () => {
   const result = await synthesizeSpringRecipe(
     {

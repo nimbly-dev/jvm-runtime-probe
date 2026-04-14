@@ -57,6 +57,13 @@ export const agentTargetDirAbs = path.join(
   "core-probe",
   "target",
 );
+export const coreEntrypointMapperTargetDirAbs = path.join(
+  repoRootAbs,
+  "java-agent",
+  "core",
+  "core-entrypoint-mapper",
+  "target",
+);
 export const mcpServerEntryAbs = path.join(repoRootAbs, "dist", "server.js");
 export const postControllerFqcn = "com.example.social.post.app.controller.PostController";
 export const postControllerSourceFileAbs = path.join(
@@ -326,6 +333,7 @@ export async function startPostAppWithAgent(args?: {
 export async function startMcpClient(args: {
   workspaceRootAbs: string;
   probeBaseUrl: string;
+  extraEnv?: Record<string, string>;
 }): Promise<RunningMcpClient> {
   await assertFileExists(mcpServerEntryAbs, "mcp server dist entry");
 
@@ -337,6 +345,7 @@ export async function startMcpClient(args: {
     env: {
       MCP_WORKSPACE_ROOT: args.workspaceRootAbs,
       MCP_PROBE_BASE_URL: args.probeBaseUrl,
+      ...(args.extraEnv ?? {}),
     },
     stderr: "pipe",
   });
@@ -362,4 +371,14 @@ export async function startMcpClient(args: {
     },
     logs: () => logBuffer.join(""),
   };
+}
+
+export async function resolveCoreEntrypointMapperJar(): Promise<string> {
+  const jarAbs = await resolveJarByPattern({
+    dirAbs: coreEntrypointMapperTargetDirAbs,
+    include: /^mcp-java-dev-tools-core-entrypoint-mapper-.*-all\.jar$/,
+    label: "core-entrypoint-mapper all jar",
+  });
+  await assertFileExists(jarAbs, "core-entrypoint-mapper all jar");
+  return jarAbs;
 }
