@@ -101,6 +101,7 @@ Capture timestamp naming:
 | `resultType` | Output category (`recipe` or `report`). | `probe_recipe_create` | true | `"recipe"` |
 | `status` | Recipe generation status for orchestration decisions (`*_ready` or fail-closed report status). | `probe_recipe_create` | true | `"single_line_probe_ready"` |
 | `reasonCode` | Deterministic synthesis/report reason code for fail-closed routing. | `probe_recipe_create` | false | `"spring_entrypoint_not_proven"` |
+| `reasonCode=target_ambiguous` | Multiple target candidates remained plausible for current `classHint`/`methodHint`, so orchestration failed closed before request synthesis. | `probe_recipe_create` | false | `"target_ambiguous"` |
 | `reasonCode=target_type_not_found` | Resolver could not match `classHint` to a unique target type in scope. | `probe_recipe_create` | false | `"target_type_not_found"` |
 | `reasonCode=target_type_ambiguous` | Resolver matched multiple target types and failed closed without picking one implicitly. | `probe_recipe_create` | false | `"target_type_ambiguous"` |
 | `reasonCode=target_method_not_found` | Resolver matched target type but not the requested method hint. | `probe_recipe_create` | false | `"target_method_not_found"` |
