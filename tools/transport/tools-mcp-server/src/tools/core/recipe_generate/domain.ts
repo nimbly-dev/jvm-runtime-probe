@@ -56,17 +56,19 @@ function buildUnknownTargetAuth(): AuthResolution {
   };
 }
 
-function buildMissingRouteAuth(): AuthResolution {
+function buildMissingRouteAuth(args: { genericAuth: { provided: boolean } }): AuthResolution {
+  const hasProvidedAuthInput = args.genericAuth.provided;
   return {
     required: "unknown",
-    status: "needs_user_input",
+    status: "unknown",
     strategy: "unknown",
-    missing: ["authToken"],
     nextAction:
-      "Entrypoint/auth requirements could not be inferred. Ask user for authToken (Bearer) or confirm no auth is required.",
+      "Entrypoint/auth requirements could not be inferred because no executable request candidate was synthesized. Resolve route synthesis first; then provide required auth headers/credentials if execution still needs them.",
     notes: [
       "No controller->method mapping was inferred, so route-level auth inference is unavailable.",
-      "Automatic credential discovery is disabled; credentials must be provided explicitly.",
+      ...(hasProvidedAuthInput
+        ? ["Caller provided auth inputs, but they cannot be validated until route synthesis succeeds."]
+        : ["Auth requirements are unresolved until route synthesis succeeds."]),
     ],
   };
 }
@@ -527,7 +529,14 @@ export async function generateRecipe(
           authUsername: normalized.authUsername,
           authPassword: normalized.authPassword,
         })
-      : buildMissingRouteAuth();
+      : buildMissingRouteAuth({
+          genericAuth: {
+            provided:
+              Boolean(normalized.authToken) ||
+              Boolean(normalized.authUsername) ||
+              Boolean(normalized.authPassword),
+          },
+        });
 
   const executionPlan = buildRecipeExecutionPlan({
     decision: routingDecision,

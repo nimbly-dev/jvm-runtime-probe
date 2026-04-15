@@ -370,6 +370,59 @@ test("reports request_inference failure when target is inferred but request cand
   assert.equal(result.failureReasonCode, "request_candidate_missing");
   assert.equal(result.inferenceDiagnostics.target.matched, true);
   assert.equal(result.inferenceDiagnostics.request.matched, false);
+  assert.equal(result.auth.status, "unknown");
+  assert.equal(Array.isArray(result.auth.missing), false);
+});
+
+test("does not claim missing authToken in report mode when caller already provided auth input", async () => {
+  const result = await generateRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      classHint: "PostController",
+      methodHint: "updatePost",
+      intentMode: "regression_http_only",
+      authToken: "provided-token",
+    },
+    {
+      inferTargetsFn: async () => ({
+        scannedJavaFiles: 20,
+        candidates: [
+          {
+            file: "C:\\repo\\service\\src\\main\\java\\PostController.java",
+            className: "PostController",
+            methodName: "updatePost",
+            line: 42,
+            key: "com.example.social.post.app.controller.PostController#updatePost",
+            reasons: ["method exact match"],
+          },
+        ],
+      }),
+      synthesizerRegistry: {
+        synthesize: async () => ({
+          status: "report",
+          reasonCode: "spring_entrypoint_not_proven",
+          failedStep: "spring_entrypoint_resolution",
+          nextAction: "Refine classHint/methodHint/lineHint.",
+          evidence: ["resolver=stub"],
+          attemptedStrategies: ["stub_strategy"],
+          synthesizerUsed: "spring",
+        }),
+      },
+    },
+  );
+
+  assert.equal(result.resultType, "report");
+  assert.equal(result.status, "api_request_not_inferred");
+  assert.equal(result.reasonCode, "spring_entrypoint_not_proven");
+  assert.equal(result.auth.status, "unknown");
+  assert.equal(Array.isArray(result.auth.missing), false);
+  assert.equal(
+    result.auth.notes.includes(
+      "Caller provided auth inputs, but they cannot be validated until route synthesis succeeds.",
+    ),
+    true,
+  );
 });
 
 test("reports auth_resolution when request exists but auth input is still required", async () => {
