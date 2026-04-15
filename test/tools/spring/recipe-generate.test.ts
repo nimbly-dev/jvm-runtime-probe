@@ -211,6 +211,70 @@ test("keeps generic target_not_inferred guidance when class inventory has multip
   assert.equal(result.inferenceDiagnostics.request.matched, false);
 });
 
+test("fails closed when multiple module candidates remain target-ambiguous", async () => {
+  const result = await generateRecipe(
+    {
+      rootAbs: "C:\\repo\\workspace",
+      workspaceRootAbs: "C:\\repo",
+      classHint: "com.example.social.post.app.controller.PostController",
+      methodHint: "listPosts",
+      intentMode: "regression_http_only",
+    },
+    {
+      inferTargetsFn: async () => ({
+        scannedJavaFiles: 48,
+        candidates: [
+          {
+            file: "C:\\repo\\workspace\\post-service\\post-app\\src\\main\\java\\com\\example\\social\\post\\app\\controller\\PostController.java",
+            className: "PostController",
+            fqcn: "com.example.social.post.app.controller.PostController",
+            methodName: "listPosts",
+            declarationLine: 20,
+            line: 22,
+            key: "com.example.social.post.app.controller.PostController#listPosts",
+            reasons: ["class fqcn exact match", "method exact match"],
+          },
+          {
+            file: "C:\\repo\\workspace\\user-service\\shadow-app\\src\\main\\java\\com\\example\\social\\post\\app\\controller\\PostController.java",
+            className: "PostController",
+            fqcn: "com.example.social.post.app.controller.PostController",
+            methodName: "listPosts",
+            declarationLine: 18,
+            line: 20,
+            key: "com.example.social.post.app.controller.PostController#listPosts",
+            reasons: ["class fqcn exact match", "method exact match"],
+          },
+        ],
+      }),
+      discoverClassMethodsFn: async () => ({
+        scannedJavaFiles: 48,
+        matchMode: "none",
+        classes: [],
+      }),
+      synthesizerRegistry: {
+        synthesize: async () => {
+          throw new Error("synthesizer should not run when target selection is ambiguous");
+        },
+      },
+      resolveAuthForRecipeFn: async () => okAuth,
+    },
+  );
+
+  assert.equal(result.status, "target_not_inferred");
+  assert.equal(result.resultType, "report");
+  assert.equal(result.failurePhase, "target_inference");
+  assert.equal(result.failureReasonCode, "target_ambiguous");
+  assert.equal(result.reasonCode, "target_ambiguous");
+  assert.equal(result.failedStep, "target_selection");
+  assert.equal(result.requestCandidates.length, 0);
+  assert.equal(result.inferenceDiagnostics.target.matched, false);
+  assert.equal(result.inferenceDiagnostics.target.candidateCount, 2);
+  assert.deepEqual(result.attemptedStrategies, [
+    "target_inference_exact_match",
+    "target_selection_disambiguation",
+  ]);
+});
+
 test("keeps target_not_inferred for probe mode when strict line target is unavailable", async () => {
   const result = await generateRecipe(
     {
@@ -704,6 +768,43 @@ test("passes additionalSourceRootsAbs into target inference for deterministic cr
 
   assert.equal(result.status, "target_not_inferred");
   assert.deepEqual(seenAdditionalRoots, ["C:\\repo\\core\\src\\main\\java"]);
+});
+
+test("requests at least two target candidates so ambiguity can be fail-closed", async () => {
+  let seenMaxCandidates;
+  const result = await generateRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      classHint: "CatalogController",
+      methodHint: "listCatalogShoes",
+      maxCandidates: 1,
+      intentMode: "regression_http_only",
+    },
+    {
+      inferTargetsFn: async (args: any) => {
+        seenMaxCandidates = args.maxCandidates;
+        return {
+          scannedJavaFiles: 20,
+          candidates: [],
+        };
+      },
+      discoverClassMethodsFn: async () => ({
+        scannedJavaFiles: 20,
+        matchMode: "none",
+        classes: [],
+      }),
+      synthesizerRegistry: {
+        synthesize: async () => {
+          throw new Error("synthesizer should not run when target is not inferred");
+        },
+      },
+      resolveAuthForRecipeFn: async () => okAuth,
+    },
+  );
+
+  assert.equal(result.status, "target_not_inferred");
+  assert.equal(seenMaxCandidates, 2);
 });
 
 

@@ -1,0 +1,56 @@
+import type { AuthResolution } from "@/models/auth_resolution.model";
+import type { SynthesisHttpTrigger } from "@/models/synthesis/synthesizer_output.model";
+import type { IntentMode, RecipeStatus } from "@tools-core/recipe_constants.util";
+import type {
+  ExecutionReadiness,
+  InferenceDiagnostics,
+  InferenceFailurePhase,
+  MissingExecutionInput,
+  RecipeCandidate,
+  RecipeExecutionPlan,
+} from "@tools-core/recipe_types.util";
+import type { resolveAuthForRecipe } from "@/utils/recipe_generate/auth_resolve.util";
+import type { SynthesizerRegistry } from "@tools-registry/plugin.loader";
+import type {
+  discoverClassMethods,
+  inferTargets,
+} from "@/tools/core/target_infer/domain";
+
+export type RecipeResultType = "recipe" | "report";
+
+export type GenerateRecipeResult = {
+  inferredTarget?: {
+    key?: string;
+    file: string;
+    line?: number;
+  };
+  requestCandidates: RecipeCandidate[];
+  executionPlan: RecipeExecutionPlan;
+  resultType: RecipeResultType;
+  status: RecipeStatus;
+  selectedMode: IntentMode;
+  lineTargetProvided: boolean;
+  probeIntentRequested: boolean;
+  executionReadiness: ExecutionReadiness;
+  missingInputs: MissingExecutionInput[];
+  nextAction?: string;
+  failurePhase?: InferenceFailurePhase;
+  failureReasonCode?: string;
+  reasonCode?: string;
+  failedStep?: string;
+  synthesizerUsed?: string;
+  applicationType?: string;
+  attemptedStrategies: string[];
+  evidence: string[];
+  trigger?: SynthesisHttpTrigger;
+  inferenceDiagnostics: InferenceDiagnostics;
+  auth: AuthResolution;
+  notes: string[];
+};
+
+export type GenerateRecipeDeps = {
+  inferTargetsFn?: typeof inferTargets;
+  discoverClassMethodsFn?: typeof discoverClassMethods;
+  synthesizerRegistry?: SynthesizerRegistry;
+  resolveAuthForRecipeFn?: typeof resolveAuthForRecipe;
+};

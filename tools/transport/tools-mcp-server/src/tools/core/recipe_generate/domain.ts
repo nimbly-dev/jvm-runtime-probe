@@ -20,44 +20,23 @@ import {
 } from "@/utils/recipe_generate/mode.util";
 import { normalizeRecipeGenerateInput } from "@/utils/recipe_generate/normalize_input.util";
 import { buildRunNotes } from "@/utils/recipe_generate/run_notes.util";
+import { selectAmbiguousCandidates } from "@/utils/recipe_generate/target_ambiguity.util";
+import type {
+  GenerateRecipeDeps,
+  GenerateRecipeResult,
+  RecipeResultType,
+} from "@/models/recipe_generate.model";
 import {
   createDefaultSynthesizerRegistry,
-  type SynthesizerRegistry,
 } from "@tools-registry/plugin.loader";
 import { discoverClassMethods, inferTargets } from "@/tools/core/target_infer/domain";
 
 export type { RecipeCandidate, RecipeExecutionPlan } from "@tools-core/recipe_types.util";
-export type RecipeResultType = "recipe" | "report";
-
-export type GenerateRecipeResult = {
-  inferredTarget?: {
-    key?: string;
-    file: string;
-    line?: number;
-  };
-  requestCandidates: RecipeCandidate[];
-  executionPlan: RecipeExecutionPlan;
-  resultType: RecipeResultType;
-  status: RecipeStatus;
-  selectedMode: IntentMode;
-  lineTargetProvided: boolean;
-  probeIntentRequested: boolean;
-  executionReadiness: ExecutionReadiness;
-  missingInputs: MissingExecutionInput[];
-  nextAction?: string;
-  failurePhase?: InferenceFailurePhase;
-  failureReasonCode?: string;
-  reasonCode?: string;
-  failedStep?: string;
-  synthesizerUsed?: string;
-  applicationType?: string;
-  attemptedStrategies: string[];
-  evidence: string[];
-  trigger?: SynthesisHttpTrigger;
-  inferenceDiagnostics: InferenceDiagnostics;
-  auth: AuthResolution;
-  notes: string[];
-};
+export type {
+  GenerateRecipeDeps,
+  GenerateRecipeResult,
+  RecipeResultType,
+} from "@/models/recipe_generate.model";
 
 function deriveApplicationTypeFromSynthesizer(synthesizerUsed?: string): string | undefined {
   if (!synthesizerUsed) return undefined;
@@ -66,13 +45,6 @@ function deriveApplicationTypeFromSynthesizer(synthesizerUsed?: string): string 
   if (normalized === "spring") return "spring";
   return normalized;
 }
-
-export type GenerateRecipeDeps = {
-  inferTargetsFn?: typeof inferTargets;
-  discoverClassMethodsFn?: typeof discoverClassMethods;
-  synthesizerRegistry?: SynthesizerRegistry;
-  resolveAuthForRecipeFn?: typeof resolveAuthForRecipe;
-};
 
 function buildUnknownTargetAuth(): AuthResolution {
   return {
@@ -221,7 +193,7 @@ export async function generateRecipe(
       : {}),
     classHint: normalized.classHint,
     methodHint: normalized.methodHint,
-    maxCandidates: normalized.maxCandidates,
+    maxCandidates: Math.max(2, normalized.maxCandidates),
   };
   if (typeof normalized.lineHint === "number") inferArgs.lineHint = normalized.lineHint;
   const inferred = await inferTargetsFn(inferArgs);
@@ -297,6 +269,97 @@ export async function generateRecipe(
         `lineTargetProvided=${String(routingDecision.lineTargetProvided)}`,
       ],
       inferenceDiagnostics: inferenceDiagnosticsBase,
+      auth,
+      notes: runNotes.filter(
+        (note) =>
+          note.startsWith("execution_readiness=") ||
+          note.startsWith("inference_target=") ||
+          note.startsWith("inference_request=") ||
+          note.startsWith("failure_") ||
+          note.startsWith("synthesis_"),
+      ),
+    };
+  }
+
+  const ambiguousCandidates = top
+    ? selectAmbiguousCandidates({
+        candidates: inferred.candidates,
+        classHint: normalized.classHint,
+        ...(typeof normalized.lineHint === "number" ? { lineHint: normalized.lineHint } : {}),
+      })
+    : [];
+  if (ambiguousCandidates.length > 1) {
+    const auth = buildUnknownTargetAuth();
+    const executionPlan = buildRecipeExecutionPlan({
+      decision: routingDecision,
+      auth,
+      actuationEnabled: normalized.actuationEnabled,
+      ...(typeof normalized.actuationReturnBoolean === "boolean"
+        ? { actuationReturnBoolean: normalized.actuationReturnBoolean }
+        : {}),
+      ...(normalized.actuationActuatorId
+        ? { actuationActuatorId: normalized.actuationActuatorId }
+        : {}),
+    });
+    const readiness = buildExecutionReadiness({
+      selectedMode: routingDecision.selectedMode,
+      lineTargetProvided: routingDecision.lineTargetProvided,
+      auth,
+      actuationEnabled: normalized.actuationEnabled,
+      ...(typeof normalized.actuationReturnBoolean === "boolean"
+        ? { actuationReturnBoolean: normalized.actuationReturnBoolean }
+        : {}),
+    });
+    const runNotes = buildRunNotes({
+      selectedMode: routingDecision.selectedMode,
+      ...(typeof normalized.lineHint === "number" ? { lineHint: normalized.lineHint } : {}),
+      auth,
+      executionPlan,
+      readiness: readiness.executionReadiness,
+    });
+    runNotes.push(
+      `inference_target=matched:false candidates:${inferenceDiagnosticsBase.target.candidateCount}`,
+    );
+    runNotes.push("inference_request=matched:false");
+    runNotes.push("failure_phase=target_inference");
+    runNotes.push("failure_reason=target_ambiguous");
+    runNotes.push("synthesis_reason_code=target_ambiguous");
+    runNotes.push("synthesis_failed_step=target_selection");
+    return {
+      requestCandidates: [],
+      executionPlan,
+      resultType: "report",
+      status: "target_not_inferred",
+      selectedMode: routingDecision.selectedMode,
+      lineTargetProvided: routingDecision.lineTargetProvided,
+      probeIntentRequested: routingDecision.probeIntentRequested,
+      executionReadiness: readiness.executionReadiness,
+      missingInputs: readiness.missingInputs,
+      nextAction:
+        "Multiple module candidates matched current hints. Narrow projectRootAbs/additionalSourceRoots to the intended module (or provide disambiguating lineHint) and rerun probe_recipe_create.",
+      failurePhase: "target_inference",
+      failureReasonCode: "target_ambiguous",
+      reasonCode: "target_ambiguous",
+      failedStep: "target_selection",
+      attemptedStrategies: ["target_inference_exact_match", "target_selection_disambiguation"],
+      evidence: [
+        `classHint=${normalized.classHint}`,
+        `methodHint=${normalized.methodHint}`,
+        `lineHint=${typeof normalized.lineHint === "number" ? String(normalized.lineHint) : "(none)"}`,
+        `candidateCount=${inferred.candidates.length}`,
+        `ambiguousCandidates=${ambiguousCandidates.length}`,
+        `ambiguousCandidateFiles=${ambiguousCandidates
+          .map((candidate) => candidate.file)
+          .slice(0, 8)
+          .join("|")}`,
+      ],
+      inferenceDiagnostics: {
+        ...inferenceDiagnosticsBase,
+        target: {
+          ...inferenceDiagnosticsBase.target,
+          matched: false,
+        },
+      },
       auth,
       notes: runNotes.filter(
         (note) =>
