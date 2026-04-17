@@ -1,0 +1,17 @@
+{
+  "status": "blocked",
+  "preflight": {
+    "status": "stale_plan",
+    "reasonCode": "strict_probe_key_invalid",
+    "whatChanged": [
+      "Pinned strict probe key does not resolve to a valid executable line in current source."
+    ],
+    "requiredUserAction": [
+      "Regenerate or update runtimeVerification.strictProbeKey for affected targets."
+    ]
+  },
+  "startedAt": null,
+  "endedAt": null,
+  "steps": []
+}
+

@@ -1,0 +1,17 @@
+{
+  "status": "blocked",
+  "preflight": {
+    "status": "blocked_ambiguous",
+    "reasonCode": "target_ambiguous",
+    "whatChanged": [
+      "Multiple candidates matched fqcn selector in current workspace roots."
+    ],
+    "requiredUserAction": [
+      "Add or update selectors.sourceRoot to disambiguate target resolution."
+    ]
+  },
+  "startedAt": null,
+  "endedAt": null,
+  "steps": []
+}
+

@@ -47,6 +47,7 @@ Notes:
 - `key` (string): context key required by one or more steps
 - `required` (boolean)
 - `secret` (boolean)
+- `default` (string/number/boolean/object, optional): default value used only when runtime input is absent; do not use for secrets
 
 ### `steps[]`
 
@@ -54,9 +55,18 @@ Notes:
 - `id` (string): stable step identifier
 - `targetRef` (number): zero-based index into `targets[]`
 - `protocol` (string): protocol classification (`http`, `grpc`, `kafka`, `custom`, etc.)
-- `transport` (object, optional): protocol-specific execution details
-- `inputs` (object, optional): context/fixture references used by the step
+- `transport` (object, required): protocol-specific execution details under `transport.<protocol>`
 - `extract` (array, optional): extraction mapping from output into run context
+
+Validation rule:
+
+- `protocol` must map to exactly one key in `transport` with the same value (for example `protocol=http` requires `transport.http`).
+- mismatched or missing transport key fails closed.
+
+`extract` semantics:
+
+- `extract[].from`: output path to read from current step result
+- `extract[].as`: context key to store for subsequent steps
 
 ### `expectations[]`
 

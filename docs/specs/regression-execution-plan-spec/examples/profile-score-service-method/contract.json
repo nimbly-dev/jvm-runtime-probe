@@ -14,7 +14,8 @@
     {
       "key": "userId",
       "required": true,
-      "secret": false
+      "secret": false,
+      "default": "user-509"
     },
     {
       "key": "scoreSignalRef",
@@ -29,11 +30,13 @@
       "targetRef": 0,
       "protocol": "custom",
       "transport": {
-        "actionType": "invoke_method"
-      },
-      "inputs": {
-        "arg.userId": "${userId}",
-        "arg.signalMapRef": "${scoreSignalRef}"
+        "custom": {
+          "actionType": "invoke_method",
+          "args": {
+            "userId": "${userId}",
+            "signalMapRef": "${scoreSignalRef}"
+          }
+        }
       },
       "extract": [
         {

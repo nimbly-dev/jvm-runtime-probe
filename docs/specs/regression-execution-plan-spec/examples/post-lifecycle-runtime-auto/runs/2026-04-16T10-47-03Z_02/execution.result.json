@@ -1,0 +1,17 @@
+{
+  "status": "blocked",
+  "preflight": {
+    "status": "needs_user_input",
+    "reasonCode": "missing_prerequisites",
+    "missing": [
+      "auth.bearer"
+    ],
+    "requiredUserAction": [
+      "Provide auth.bearer"
+    ]
+  },
+  "startedAt": null,
+  "endedAt": null,
+  "steps": []
+}
+

@@ -1,0 +1,20 @@
+{
+  "targetResolution": [
+    {
+      "stepOrder": 1,
+      "fqcn": "com.example.social.post.app.controller.PostController",
+      "method": "createPost"
+    },
+    {
+      "stepOrder": 2,
+      "fqcn": "com.example.social.post.app.controller.PostController",
+      "method": "updatePost"
+    }
+  ],
+  "probe": {
+    "enabled": true,
+    "mode": "pinned",
+    "status": "invalid_target"
+  }
+}
+
