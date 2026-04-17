@@ -16,6 +16,7 @@ Each regression plan lives under:
 | `contract.json` | Authoritative machine contract |
 | `plan.md` | Human-readable execution plan |
 | `runs/<run_id>/...` | Immutable outputs for each run |
+| `artifact-schema.md` | Normative run artifact contract (`MUST/SHOULD/MAY`) |
 
 
 ## Design Principles
