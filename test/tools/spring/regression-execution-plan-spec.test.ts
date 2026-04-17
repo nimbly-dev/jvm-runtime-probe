@@ -7,7 +7,7 @@ const {
   buildTimestampRunId,
   resolvePrerequisiteContext,
   resolveStepTransport,
-} = require("@tools-core/regression_execution_plan_spec.util");
+} = require("@tools-regression-execution-plan-spec/regression_execution_plan_spec.util");
 
 function baseMetadata(overrides = {}) {
   return {
