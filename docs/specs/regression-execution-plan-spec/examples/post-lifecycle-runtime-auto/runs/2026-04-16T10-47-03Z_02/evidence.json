@@ -1,0 +1,16 @@
+{
+  "targetResolution": [
+    {
+      "stepOrder": 1,
+      "fqcn": "com.example.social.post.app.controller.PostController",
+      "method": "createPost",
+      "sourceRoot": "test/fixtures/spring-apps/social-platform/post-service/post-app"
+    }
+  ],
+  "probe": {
+    "enabled": true,
+    "mode": "auto",
+    "status": "not_executed"
+  }
+}
+

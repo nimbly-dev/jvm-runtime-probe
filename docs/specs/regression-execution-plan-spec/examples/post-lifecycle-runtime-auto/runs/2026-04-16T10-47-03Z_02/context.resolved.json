@@ -1,0 +1,9 @@
+{
+  "tenantId": "tenant-social-001",
+  "auth": {
+    "scheme": "bearer",
+    "provided": false
+  },
+  "resolvedAt": "2026-04-16T10:47:04Z"
+}
+

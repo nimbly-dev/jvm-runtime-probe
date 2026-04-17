@@ -27,14 +27,15 @@
   ],
   "prerequisites": [
     {
+      "key": "tenantId",
+      "required": true,
+      "secret": false,
+      "default": "tenant-social-001"
+    },
+    {
       "key": "auth.bearer",
       "required": true,
       "secret": true
-    },
-    {
-      "key": "tenantId",
-      "required": true,
-      "secret": false
     }
   ],
   "steps": [
@@ -44,12 +45,20 @@
       "targetRef": 0,
       "protocol": "http",
       "transport": {
-        "method": "POST",
-        "path": "/api/v1/posts"
-      },
-      "inputs": {
-        "query.tenantId": "${tenantId}",
-        "bodyRef": "fixtures/post/create_post_minimal.json"
+        "http": {
+          "method": "POST",
+          "pathTemplate": "/api/v1/posts",
+          "path": {},
+          "query": {
+            "tenantId": "${tenantId}"
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "title": "Hello World!"
+          }
+        }
       },
       "extract": [
         {
@@ -64,12 +73,20 @@
       "targetRef": 1,
       "protocol": "http",
       "transport": {
-        "method": "PUT",
-        "path": "/api/v1/posts/${postId}"
-      },
-      "inputs": {
-        "query.tenantId": "${tenantId}",
-        "bodyRef": "fixtures/post/update_post_title_only.json"
+        "http": {
+          "method": "PUT",
+          "pathTemplate": "/api/v1/posts/${postId}",
+          "path": {},
+          "query": {
+            "tenantId": "${tenantId}"
+          },
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "title": "Hello World! (Updated)"
+          }
+        }
       }
     }
   ],

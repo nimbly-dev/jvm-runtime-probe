@@ -21,14 +21,15 @@
   ],
   "prerequisites": [
     {
+      "key": "creatorId",
+      "required": true,
+      "secret": false,
+      "default": "creator-221"
+    },
+    {
       "key": "auth.bearer",
       "required": true,
       "secret": true
-    },
-    {
-      "key": "creatorId",
-      "required": true,
-      "secret": false
     }
   ],
   "steps": [
@@ -38,11 +39,16 @@
       "targetRef": 0,
       "protocol": "http",
       "transport": {
-        "method": "GET",
-        "path": "/api/v2/creators/${creatorId}/digest"
-      },
-      "inputs": {
-        "query.includeStats": "true"
+        "http": {
+          "method": "GET",
+          "pathTemplate": "/api/v2/creators/${creatorId}/digest",
+          "path": {},
+          "query": {
+            "includeStats": "true"
+          },
+          "headers": {},
+          "body": {}
+        }
       }
     },
     {
@@ -51,11 +57,19 @@
       "targetRef": 1,
       "protocol": "http",
       "transport": {
-        "method": "PATCH",
-        "path": "/api/v2/creators/not-found/digest"
-      },
-      "inputs": {
-        "bodyRef": "fixtures/post/patch_creator_digest_minimal.json"
+        "http": {
+          "method": "PATCH",
+          "pathTemplate": "/api/v2/creators/not-found/digest",
+          "path": {},
+          "query": {},
+          "headers": {
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "digestVersion": 2,
+            "summary": "patched summary"
+          }
+        }
       }
     }
   ],
