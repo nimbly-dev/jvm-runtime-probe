@@ -3,7 +3,7 @@ import type {
   PlanPrerequisite,
   PlanStep,
   PreflightResult,
-} from "@tools-core/models/regression_execution_plan_spec.model";
+} from "@tools-regression-execution-plan-spec/models/regression_execution_plan_spec.model";
 
 export type {
   BuildPreflightArgs,
@@ -15,7 +15,7 @@ export type {
   PreflightResult,
   PreflightStatus,
   RegressionExecutionIntent,
-} from "@tools-core/models/regression_execution_plan_spec.model";
+} from "@tools-regression-execution-plan-spec/models/regression_execution_plan_spec.model";
 
 function hasDuplicate(values: number[]): boolean {
   return new Set(values).size !== values.length;
@@ -212,3 +212,4 @@ export function buildTimestampRunId(now: Date, seq: number): string {
   const iso = now.toISOString().replace(/:/g, "-").replace(/\.\d{3}Z$/, "Z");
   return `${iso}_${String(seq).padStart(2, "0")}`;
 }
+
