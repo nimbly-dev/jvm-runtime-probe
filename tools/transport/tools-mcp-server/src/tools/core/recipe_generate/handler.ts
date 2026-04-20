@@ -248,6 +248,60 @@ export function registerRecipeCreateTool(
         probeStatusPath: deps.probeStatusPath,
       });
 
+      const strictRuntimeLineUnresolved =
+        generated.resultType === "recipe" &&
+        generated.probeIntentRequested &&
+        typeof inferredLine === "number" &&
+        runtimeCapture.lineValidation === "invalid_line_target";
+
+      const normalizedGenerated = strictRuntimeLineUnresolved
+        ? {
+            ...generated,
+            requestCandidates: [],
+            resultType: "report" as const,
+            status: "target_not_inferred" as const,
+            executionReadiness: "needs_user_input" as const,
+            missingInputs: [
+              {
+                category: "probe" as const,
+                field: "lineHint",
+                reason: "runtime_line_unresolved",
+                suggestedAction:
+                  "Use probe_target_infer class_methods/ranked_candidates to select a runtime-resolvable line and rerun probe_recipe_create.",
+              },
+            ],
+            nextAction:
+              "Strict line target is not runtime-resolvable for current JVM/source alignment. Select a validated runtime line via probe_target_infer and rerun probe_recipe_create.",
+            failurePhase: "target_inference" as const,
+            failureReasonCode: "runtime_line_unresolved",
+            reasonCode: "runtime_line_unresolved",
+            failedStep: "line_validation",
+            attemptedStrategies: [
+              ...generated.attemptedStrategies,
+              "runtime_line_validation_precheck",
+            ],
+            evidence: [
+              ...generated.evidence,
+              `probeKey=${inferredKey ?? "(missing)"}:${inferredLine}`,
+              "lineValidation=invalid_line_target",
+            ],
+            notes: [
+              ...(generated.notes ?? []).filter(
+                (note) =>
+                  note.startsWith("execution_readiness=") ||
+                  note.startsWith("inference_target=") ||
+                  note.startsWith("inference_request=") ||
+                  note.startsWith("failure_") ||
+                  note.startsWith("synthesis_"),
+              ),
+              "failure_phase=target_inference",
+              "failure_reason=runtime_line_unresolved",
+              "synthesis_reason_code=runtime_line_unresolved",
+              "synthesis_failed_step=line_validation",
+            ],
+          }
+        : generated;
+
       const structuredContent = {
         projectRoot,
         hints: {
@@ -269,71 +323,83 @@ export function registerRecipeCreateTool(
               file: path.relative(projectRoot, generated.inferredTarget.file),
             }
           : undefined,
-        requestCandidates: generated.requestCandidates,
+        requestCandidates: normalizedGenerated.requestCandidates,
         executionPlan: compactExecutionPlanForOutput({
-          resultType: generated.resultType,
-          executionPlan: generated.executionPlan,
+          resultType: normalizedGenerated.resultType,
+          executionPlan: normalizedGenerated.executionPlan,
         }),
-        resultType: generated.resultType,
-        status: generated.status,
-        selectedMode: generated.selectedMode,
-        lineTargetProvided: generated.lineTargetProvided,
-        probeIntentRequested: generated.probeIntentRequested,
-        executionReadiness: generated.executionReadiness,
-        missingInputs: generated.missingInputs,
-        ...(generated.nextAction ? { nextAction: generated.nextAction } : {}),
-        ...(generated.failurePhase ? { failurePhase: generated.failurePhase } : {}),
-        ...(generated.failureReasonCode ? { failureReasonCode: generated.failureReasonCode } : {}),
-        ...(generated.reasonCode ? { reasonCode: generated.reasonCode } : {}),
-        ...(generated.failedStep ? { failedStep: generated.failedStep } : {}),
-        ...(generated.synthesizerUsed ? { synthesizerUsed: generated.synthesizerUsed } : {}),
-        ...(generated.applicationType ? { applicationType: generated.applicationType } : {}),
-        ...(generated.trigger ? { trigger: generated.trigger } : {}),
-        attemptedStrategies: generated.attemptedStrategies,
-        evidence: generated.evidence,
-        inferenceDiagnostics: generated.inferenceDiagnostics,
-        auth: generated.auth,
-        notes: generated.notes,
+        resultType: normalizedGenerated.resultType,
+        status: normalizedGenerated.status,
+        selectedMode: normalizedGenerated.selectedMode,
+        lineTargetProvided: normalizedGenerated.lineTargetProvided,
+        probeIntentRequested: normalizedGenerated.probeIntentRequested,
+        executionReadiness: normalizedGenerated.executionReadiness,
+        missingInputs: normalizedGenerated.missingInputs,
+        ...(normalizedGenerated.nextAction ? { nextAction: normalizedGenerated.nextAction } : {}),
+        ...(normalizedGenerated.failurePhase ? { failurePhase: normalizedGenerated.failurePhase } : {}),
+        ...(normalizedGenerated.failureReasonCode
+          ? { failureReasonCode: normalizedGenerated.failureReasonCode }
+          : {}),
+        ...(normalizedGenerated.reasonCode ? { reasonCode: normalizedGenerated.reasonCode } : {}),
+        ...(normalizedGenerated.failedStep ? { failedStep: normalizedGenerated.failedStep } : {}),
+        ...(normalizedGenerated.synthesizerUsed
+          ? { synthesizerUsed: normalizedGenerated.synthesizerUsed }
+          : {}),
+        ...(normalizedGenerated.applicationType
+          ? { applicationType: normalizedGenerated.applicationType }
+          : {}),
+        ...(normalizedGenerated.trigger ? { trigger: normalizedGenerated.trigger } : {}),
+        attemptedStrategies: normalizedGenerated.attemptedStrategies,
+        evidence: normalizedGenerated.evidence,
+        inferenceDiagnostics: normalizedGenerated.inferenceDiagnostics,
+        auth: normalizedGenerated.auth,
+        notes: normalizedGenerated.notes,
         runtimeCapture,
         ...(rendered ? { rendered } : {}),
       };
 
       const internalContent = {
-        resultType: generated.resultType,
-        status: generated.status,
-        selectedMode: generated.selectedMode,
-        lineTargetProvided: generated.lineTargetProvided,
-        probeIntentRequested: generated.probeIntentRequested,
-        executionReadiness: generated.executionReadiness,
-        missingInputs: generated.missingInputs,
-        ...(generated.nextAction ? { nextAction: generated.nextAction } : {}),
-        ...(generated.failurePhase ? { failurePhase: generated.failurePhase } : {}),
-        ...(generated.failureReasonCode ? { failureReasonCode: generated.failureReasonCode } : {}),
-        ...(generated.reasonCode ? { reasonCode: generated.reasonCode } : {}),
-        ...(generated.failedStep ? { failedStep: generated.failedStep } : {}),
-        ...(generated.synthesizerUsed ? { synthesizerUsed: generated.synthesizerUsed } : {}),
-        ...(generated.applicationType ? { applicationType: generated.applicationType } : {}),
-        ...(generated.trigger
+        resultType: normalizedGenerated.resultType,
+        status: normalizedGenerated.status,
+        selectedMode: normalizedGenerated.selectedMode,
+        lineTargetProvided: normalizedGenerated.lineTargetProvided,
+        probeIntentRequested: normalizedGenerated.probeIntentRequested,
+        executionReadiness: normalizedGenerated.executionReadiness,
+        missingInputs: normalizedGenerated.missingInputs,
+        ...(normalizedGenerated.nextAction ? { nextAction: normalizedGenerated.nextAction } : {}),
+        ...(normalizedGenerated.failurePhase ? { failurePhase: normalizedGenerated.failurePhase } : {}),
+        ...(normalizedGenerated.failureReasonCode
+          ? { failureReasonCode: normalizedGenerated.failureReasonCode }
+          : {}),
+        ...(normalizedGenerated.reasonCode ? { reasonCode: normalizedGenerated.reasonCode } : {}),
+        ...(normalizedGenerated.failedStep ? { failedStep: normalizedGenerated.failedStep } : {}),
+        ...(normalizedGenerated.synthesizerUsed
+          ? { synthesizerUsed: normalizedGenerated.synthesizerUsed }
+          : {}),
+        ...(normalizedGenerated.applicationType
+          ? { applicationType: normalizedGenerated.applicationType }
+          : {}),
+        ...(normalizedGenerated.trigger
           ? {
               trigger: {
-                kind: generated.trigger.kind,
-                method: generated.trigger.method,
-                path: generated.trigger.path,
-                queryTemplate: generated.trigger.queryTemplate,
+                kind: normalizedGenerated.trigger.kind,
+                method: normalizedGenerated.trigger.method,
+                path: normalizedGenerated.trigger.path,
+                queryTemplate: normalizedGenerated.trigger.queryTemplate,
               },
             }
           : {}),
-        attemptedStrategies: generated.attemptedStrategies.slice(0, 6),
-        inferenceDiagnostics: generated.inferenceDiagnostics,
-        routingReason: generated.executionPlan.routingReason,
+        attemptedStrategies: normalizedGenerated.attemptedStrategies.slice(0, 6),
+        inferenceDiagnostics: normalizedGenerated.inferenceDiagnostics,
+        routingReason: normalizedGenerated.executionPlan.routingReason,
         inferredTarget: structuredContent.inferredTarget,
-        requestCandidates: generated.requestCandidates.map((candidate) => ({
+        requestCandidates: normalizedGenerated.requestCandidates.map((candidate) => ({
           method: candidate.method,
           path: candidate.path,
           queryTemplate: candidate.queryTemplate,
         })),
-        executionPlan: compactExecutionPlanForText(generated.executionPlan),
-        auth: generated.auth,
+        executionPlan: compactExecutionPlanForText(normalizedGenerated.executionPlan),
+        auth: normalizedGenerated.auth,
         runtimeCapture:
           runtimeCapture.status === "available"
             ? {
@@ -347,7 +413,7 @@ export function registerRecipeCreateTool(
                 lineResolvable: runtimeCapture.lineResolvable,
               }
             : runtimeCapture,
-        notes: generated.notes.slice(0, 6),
+        notes: normalizedGenerated.notes.slice(0, 6),
       };
       return {
         content: [

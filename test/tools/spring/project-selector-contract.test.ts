@@ -238,6 +238,104 @@ test("probe_recipe_create passes configured workspace root into generateRecipe",
   });
 });
 
+test("probe_recipe_create fails closed when strict runtime line is unresolved", async () => {
+  await withTempDir(async (dir: string) => {
+    const originalGenerateRecipe = recipeGenerateDomain.generateRecipe;
+    recipeGenerateDomain.generateRecipe = async () => ({
+      inferredTarget: {
+        file: path.join(dir, "src", "main", "java", "com", "example", "CatalogController.java"),
+        key: "com.example.CatalogController#save",
+        line: 50,
+      },
+      requestCandidates: [
+        {
+          method: "POST",
+          path: "/catalog",
+          queryTemplate: "",
+          fullUrlHint: "/catalog",
+          rationale: ["controller mapping"],
+        },
+      ],
+      executionPlan: {
+        selectedMode: "single_line_probe",
+        routingReason: "single_line_probe",
+        steps: [],
+        probeCallPlan: {
+          total: 2,
+          verificationMethod: "probe_wait_for_hit",
+          actuated: false,
+          byTool: {
+            probe_reset: 1,
+            probe_wait_for_hit: 1,
+            probe_get_status: 0,
+            probe_enable: 0,
+          },
+        },
+      },
+      resultType: "recipe",
+      status: "single_line_probe_ready",
+      selectedMode: "single_line_probe",
+      lineTargetProvided: true,
+      probeIntentRequested: true,
+      executionReadiness: "ready",
+      missingInputs: [],
+      attemptedStrategies: ["spring_entrypoint_resolution"],
+      evidence: ["resolver=stub"],
+      inferenceDiagnostics: {
+        target: { attempted: true, matched: true, candidateCount: 1 },
+        request: { attempted: true, matched: true, source: "spring_mvc" },
+      },
+      auth: {
+        required: "unknown",
+        status: "ok",
+        strategy: "none",
+        nextAction: "none",
+        notes: [],
+      },
+      notes: [],
+    });
+
+    try {
+      const handler = captureRegisteredHandler((server: any) =>
+        registerRecipeCreateTool(server, {
+          probeBaseUrl: "http://127.0.0.1:9193",
+          probeStatusPath: "/__probe/status",
+          workspaceRootAbs: "C:\\repo",
+        }),
+      );
+
+      await withMockedFetch(async () => {
+        return new Response(
+          JSON.stringify({
+            key: "com.example.CatalogController#save:50",
+            hitCount: 0,
+            lastHitEpoch: 0,
+            lineResolvable: false,
+            lineValidation: "invalid_line_target",
+            capturePreview: { available: false },
+          }),
+          { status: 200, headers: { "content-type": "application/json; charset=utf-8" } },
+        );
+      }, async () => {
+        const out = await handler({
+          projectRootAbs: dir,
+          classHint: "com.example.CatalogController",
+          methodHint: "save",
+          lineHint: 50,
+          intentMode: "single_line_probe",
+        });
+        assert.equal(out.structuredContent.resultType, "report");
+        assert.equal(out.structuredContent.status, "target_not_inferred");
+        assert.equal(out.structuredContent.reasonCode, "runtime_line_unresolved");
+        assert.equal(out.structuredContent.failedStep, "line_validation");
+        assert.equal(out.structuredContent.executionReadiness, "needs_user_input");
+      });
+    } finally {
+      recipeGenerateDomain.generateRecipe = originalGenerateRecipe;
+    }
+  });
+});
+
 test("probe_target_infer ranked_candidates requires exact classHint", async () => {
   const handler = captureRegisteredHandler((server: any) =>
     registerTargetInferTool(server, {

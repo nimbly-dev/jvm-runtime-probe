@@ -440,6 +440,16 @@ public final class AgentConfig {
 
     // Class launch mode (java com.example.Main ...)
     if (entry.indexOf('.') > 0 && entry.indexOf('/') < 0 && entry.indexOf('\\') < 0) {
+      if (isFrameworkLauncherClass(entry)) {
+        String loaderMain = readSpringLoaderMainClass();
+        String inferredFromLoaderMain = classNameToPackageInclude(loaderMain);
+        if (inferredFromLoaderMain != null) {
+          return inferredFromLoaderMain;
+        }
+        // Spring launcher mode may hide the app main class from sun.java.command.
+        // Fall back to broad include to avoid missing app instrumentation entirely.
+        return "**";
+      }
       return classNameToPackageInclude(entry);
     }
 
@@ -491,6 +501,26 @@ public final class AgentConfig {
     int idx = c.lastIndexOf('.');
     if (idx <= 0) return null;
     return c.substring(0, idx) + ".**";
+  }
+
+  private static boolean isFrameworkLauncherClass(String fqcn) {
+    if (fqcn == null || fqcn.trim().isEmpty()) return false;
+    String value = fqcn.trim();
+    return "org.springframework.boot.loader.JarLauncher".equals(value)
+        || "org.springframework.boot.loader.PropertiesLauncher".equals(value)
+        || "org.springframework.boot.loader.WarLauncher".equals(value)
+        || "org.springframework.boot.loader.launch.JarLauncher".equals(value)
+        || "org.springframework.boot.loader.launch.PropertiesLauncher".equals(value)
+        || "org.springframework.boot.loader.launch.WarLauncher".equals(value);
+  }
+
+  private static String readSpringLoaderMainClass() {
+    String fromProp = System.getProperty("loader.main");
+    if (fromProp != null && !fromProp.trim().isEmpty()) return fromProp.trim();
+
+    String fromEnv = System.getenv("LOADER_MAIN");
+    if (fromEnv != null && !fromEnv.trim().isEmpty()) return fromEnv.trim();
+    return null;
   }
 
   public List<String> broadIncludePatterns() {
