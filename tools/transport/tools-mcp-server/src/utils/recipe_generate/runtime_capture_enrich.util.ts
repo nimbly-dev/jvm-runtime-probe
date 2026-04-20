@@ -12,6 +12,8 @@ export type RuntimeCaptureSummary =
   | {
       status: "not_captured_yet" | "unavailable";
       reason: string;
+      lineValidation?: string;
+      lineResolvable?: boolean;
     };
 
 export async function enrichRuntimeCapture(args: {
@@ -63,6 +65,12 @@ export async function enrichRuntimeCapture(args: {
     return {
       status: "not_captured_yet",
       reason: "status_checked_but_capture_unavailable",
+      ...(typeof statusJson?.lineValidation === "string"
+        ? { lineValidation: statusJson.lineValidation }
+        : {}),
+      ...(typeof statusJson?.lineResolvable === "boolean"
+        ? { lineResolvable: statusJson.lineResolvable }
+        : {}),
     };
   } catch (err) {
     return {
