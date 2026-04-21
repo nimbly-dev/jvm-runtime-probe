@@ -20,7 +20,7 @@ async function main() {
 
   const server = new McpServer({
     name: "mcp-java-dev-tools",
-    version: "0.1.3",
+    version: "0.1.4",
   });
 
   server.registerResource(
@@ -31,7 +31,7 @@ async function main() {
       const payload = {
         ok: true,
         name: "mcp-java-dev-tools",
-        version: "0.1.3",
+        version: "0.1.4",
         workspaceRoot: cfg.workspaceRootAbs,
         workspaceRootSource: cfg.workspaceRootSource,
         probe: {
@@ -73,7 +73,7 @@ async function main() {
       const structuredContent = {
         ok: true,
         serverTime: new Date().toISOString(),
-        version: "0.1.3",
+        version: "0.1.4",
       };
       return {
         content: [{ type: "text", text: JSON.stringify(structuredContent, null, 2) }],
@@ -110,7 +110,7 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    `mcp-java-dev-tools 0.1.3 running (stdio). workspaceRoot=${cfg.workspaceRootAbs} probeBaseUrl=${cfg.probeBaseUrl}`,
+    `mcp-java-dev-tools 0.1.4 running (stdio). workspaceRoot=${cfg.workspaceRootAbs} probeBaseUrl=${cfg.probeBaseUrl}`,
   );
 }
 
