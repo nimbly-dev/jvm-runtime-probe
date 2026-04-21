@@ -10,7 +10,7 @@ Column meanings:
 - `exampleValue`: Representative value.
 
 Deterministic contract policy:
-- Orchestration decisions must use deterministic fields (`resultType`, `status`, `reasonCode`, `failedStep`, `nextAction`).
+- Orchestration decisions must use deterministic fields (`resultType`, `status`, `reasonCode`, `nextActionCode`, `failedStep`).
 - Confidence/heuristic scores are not part of the public MCP output contract.
 
 Text vs structured content policy (probe tools):
@@ -21,6 +21,71 @@ Text vs structured content policy (probe tools):
 
 Capture timestamp naming:
 - Capture timestamp fields use `capturedAtEpoch`.
+
+## Global Failure Diagnostics Contract
+
+Fail-closed/report outputs use this shared diagnostics shape:
+
+```json
+{
+  "reasonCode": "line_unresolvable",
+  "nextActionCode": "select_resolvable_line",
+  "reasonMeta": {
+    "failedStep": "line_validation",
+    "fqcn": "com.example.Catalog"
+  }
+}
+```
+
+Rules:
+- `reasonCode` is the stable cause-oriented routing key.
+- `nextActionCode` is the stable verb-style action key.
+- `reasonMeta` is optional typed context; unknown keys are ignored.
+- Routing must not depend on `reasonMeta`.
+
+examples:
+
+`probe_recipe_create`:
+```json
+{
+  "resultType": "report",
+  "status": "execution_input_required",
+  "reasonCode": "line_target_required_for_probe_mode",
+  "nextActionCode": "provide_line_hint",
+  "reasonMeta": {
+    "failedStep": "intent_routing"
+  }
+}
+```
+
+`probe_target_infer`:
+```json
+{
+  "resultType": "report",
+  "status": "runtime_unreachable",
+  "reasonCode": "runtime_unreachable",
+  "nextActionCode": "verify_probe_reachability",
+  "reasonMeta": {
+    "failedStep": "runtime_line_validation"
+  }
+}
+```
+
+`probe_wait_for_hit`:
+```json
+{
+  "result": {
+    "hit": false,
+    "inline": false,
+    "reason": "timeout_no_inline_hit",
+    "actionCode": "line_not_executed_in_window",
+    "nextActionCode": "verify_trigger_path",
+    "reasonMeta": {
+      "failedStep": "wait_poll"
+    }
+  }
+}
+```
 
 ## debug_check
 
@@ -78,8 +143,10 @@ Capture timestamp naming:
 | `methods[].firstExecutableLine` | First runtime-probe-validated executable line for each method (`null` when unresolved). | `probe_target_infer` | false | `45` |
 | `methods[].lineSelectionStatus` | Runtime line selection outcome per method (`validated` or `unresolved`). | `probe_target_infer` | false | `"unresolved"` |
 | `methods[].lineSelectionSource` | Source of validated executable line per method when available. | `probe_target_infer` | false | `"runtime_probe_validation"` |
+| `nextActionCode` | Verb-style deterministic follow-up action key for fail-closed outputs. | `probe_target_infer` | false | `"refine_class_hint"` |
 | `nextAction` | Required follow-up action when status is non-ready. | `probe_target_infer` | false | `"Refine classHint and rerun"` |
 | `reasonCode` | Deterministic failure/disambiguation code for fail-closed routing. | `probe_target_infer` | false | `"target_ambiguous"` |
+| `reasonMeta` | Optional compact typed context for diagnostics rendering. | `probe_target_infer` | false | `{"failedStep":"target_selection","classHint":"CatalogController"}` |
 | `failedStep` | Stage where deterministic selection failed. | `probe_target_infer` | false | `"target_selection"` |
 | `status=runtime_unreachable` | Fail-closed status when runtime line validation cannot reach probe endpoint. | `probe_target_infer` | false | `"runtime_unreachable"` |
 | `reasonCode=additional_source_roots_invalid` | Input validation failed because one or more `additionalSourceRoots` paths are missing or non-directory. | `probe_target_infer` | false | `"additional_source_roots_invalid"` |
@@ -101,6 +168,8 @@ Capture timestamp naming:
 | `resultType` | Output category (`recipe` or `report`). | `probe_recipe_create` | true | `"recipe"` |
 | `status` | Recipe generation status for orchestration decisions (`*_ready` or fail-closed report status). | `probe_recipe_create` | true | `"single_line_probe_ready"` |
 | `reasonCode` | Deterministic synthesis/report reason code for fail-closed routing. | `probe_recipe_create` | false | `"spring_entrypoint_not_proven"` |
+| `nextActionCode` | Verb-style deterministic follow-up action key for fail-closed/report outputs. | `probe_recipe_create` | false | `"select_resolvable_line"` |
+| `reasonMeta` | Optional compact typed context for diagnostics rendering. | `probe_recipe_create` | false | `{"failedStep":"line_validation","fqcn":"com.example.Catalog"}` |
 | `reasonCode=target_ambiguous` | Multiple target candidates remained plausible for current `classHint`/`methodHint`, so orchestration failed closed before request synthesis. | `probe_recipe_create` | false | `"target_ambiguous"` |
 | `reasonCode=target_type_not_found` | Resolver could not match `classHint` to a unique target type in scope. | `probe_recipe_create` | false | `"target_type_not_found"` |
 | `reasonCode=target_type_ambiguous` | Resolver matched multiple target types and failed closed without picking one implicitly. | `probe_recipe_create` | false | `"target_type_ambiguous"` |
@@ -195,7 +264,9 @@ Capture timestamp naming:
 | `result.inline` | Whether detected hit is inline to current execution window. | `probe_wait_for_hit` | true | `true` |
 | `result.reason` | Failure reason when no inline hit is confirmed. | `probe_wait_for_hit` | false | `"timeout_no_inline_hit"` |
 | `result.actionCode` | Action code for deterministic orchestrator next-step routing. | `probe_wait_for_hit` | false | `"line_not_executed_in_window"` |
+| `result.nextActionCode` | Verb-style deterministic follow-up action key for wait failure outputs. | `probe_wait_for_hit` | false | `"verify_trigger_path"` |
 | `result.nextAction` | Human-readable follow-up action. | `probe_wait_for_hit` | false | `"verify_trigger_path_or_branch_then_rerun_probe_wait_for_hit"` |
+| `result.reasonMeta` | Optional compact typed context for diagnostics rendering. | `probe_wait_for_hit` | false | `{"failedStep":"wait_poll","waitedMs":4000}` |
 | `result.lastStatus` | Last observed probe status payload. | `probe_wait_for_hit` | false | `{"hitCount":0}` |
 
 ## Skill-Orchestrated Route Pushback (`mcp-java-dev-tools-line-probe-run`, `mcp-java-dev-tools-regression-suite`)
