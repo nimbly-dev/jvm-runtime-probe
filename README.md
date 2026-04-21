@@ -223,8 +223,6 @@ The guide distinguishes between:
 
 Start there before opening a large pull request or changing public tool contracts.
 
----
-
 ## MCP Tools
 
 | Tool | |
