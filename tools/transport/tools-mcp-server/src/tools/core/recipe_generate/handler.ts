@@ -5,6 +5,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { renderRecipeTemplate } from "@/lib/recipe_template";
 import { buildRecipeTemplateModel } from "@/models/recipe_output_model";
 import { validateProjectRootAbs } from "@/utils/project_root_validate.util";
+import { deriveNextActionCode, normalizeReasonMeta } from "@/utils/failure_diagnostics.util";
 import { enrichRuntimeCapture } from "@/utils/recipe_generate/runtime_capture_enrich.util";
 import { resolveAdditionalSourceRoots } from "@/utils/source_roots_resolve.util";
 import { generateRecipe } from "@/tools/core/recipe_generate/domain";
@@ -15,6 +16,8 @@ export type RecipeGenerateHandlerDeps = {
   probeStatusPath: string;
   workspaceRootAbs: string;
 };
+
+const RECIPE_REASON_META_KEYS = ["failedStep", "classHint", "methodHint", "lineHint", "selectedMode"] as const;
 
 function isFqcn(value: string): boolean {
   const trimmed = value.trim();
@@ -135,13 +138,19 @@ export function registerRecipeCreateTool(
 
       const validated = await validateProjectRootAbs(projectRootAbs);
       if (!validated.ok) {
+        const reasonCode = validated.status;
         const structuredContent = {
           projectRoot: validated.value ?? projectRootAbs ?? "(project_root_unset)",
           hints: inputHints,
           resultType: "report",
-          status: validated.status,
-          reasonCode: validated.status,
+          status: reasonCode,
+          reasonCode,
+          nextActionCode: deriveNextActionCode(reasonCode),
           failedStep: "project_root_validation",
+          reasonMeta: normalizeReasonMeta(
+            { failedStep: "project_root_validation", classHint, methodHint, lineHint },
+            RECIPE_REASON_META_KEYS,
+          ),
           evidence: [validated.reason],
           attemptedStrategies: ["project_root_validation"],
           reason: validated.reason,
@@ -162,13 +171,19 @@ export function registerRecipeCreateTool(
           : {}),
       });
       if (!additionalRoots.ok) {
+        const reasonCode = additionalRoots.reasonCode;
         const structuredContent = {
           projectRoot,
           hints: inputHints,
           resultType: "report",
           status: "project_selector_invalid",
-          reasonCode: additionalRoots.reasonCode,
+          reasonCode,
+          nextActionCode: deriveNextActionCode(reasonCode),
           failedStep: additionalRoots.failedStep,
+          reasonMeta: normalizeReasonMeta(
+            { failedStep: additionalRoots.failedStep, classHint, methodHint, lineHint },
+            RECIPE_REASON_META_KEYS,
+          ),
           evidence: additionalRoots.evidence,
           attemptedStrategies: ["additional_source_roots_validation"],
           reason: additionalRoots.reason,
@@ -181,13 +196,19 @@ export function registerRecipeCreateTool(
       }
 
       if (!isFqcn(classHint)) {
+        const reasonCode = "class_hint_not_fqcn";
         const structuredContent = {
           projectRoot,
           hints: inputHints,
           resultType: "report",
-          status: "class_hint_not_fqcn",
-          reasonCode: "class_hint_not_fqcn",
+          status: reasonCode,
+          reasonCode,
+          nextActionCode: deriveNextActionCode(reasonCode),
           failedStep: "input_validation",
+          reasonMeta: normalizeReasonMeta(
+            { failedStep: "input_validation", classHint, methodHint, lineHint },
+            RECIPE_REASON_META_KEYS,
+          ),
           evidence: [`classHint=${classHint}`],
           attemptedStrategies: ["class_hint_validation"],
           reason: "classHint must be a fully qualified class name (FQCN).",
@@ -272,10 +293,18 @@ export function registerRecipeCreateTool(
             ],
             nextAction:
               "Strict line target is not runtime-resolvable for current JVM/source alignment. Select a validated runtime line via probe_target_infer and rerun probe_recipe_create.",
+            nextActionCode: "select_resolvable_line",
             failurePhase: "target_inference" as const,
             failureReasonCode: "runtime_line_unresolved",
             reasonCode: "runtime_line_unresolved",
             failedStep: "line_validation",
+            reasonMeta: {
+              failedStep: "line_validation",
+              classHint,
+              methodHint,
+              lineHint: inferredLine,
+              selectedMode: generated.selectedMode,
+            },
             attemptedStrategies: [
               ...generated.attemptedStrategies,
               "runtime_line_validation_precheck",
@@ -301,6 +330,30 @@ export function registerRecipeCreateTool(
             ],
           }
         : generated;
+
+      const effectiveReasonCode =
+        normalizedGenerated.resultType === "report"
+          ? normalizedGenerated.reasonCode ??
+            normalizedGenerated.failureReasonCode ??
+            normalizedGenerated.status
+          : undefined;
+      const effectiveNextActionCode =
+        normalizedGenerated.resultType === "report"
+          ? normalizedGenerated.nextActionCode ?? deriveNextActionCode(effectiveReasonCode)
+          : undefined;
+      const effectiveReasonMeta =
+        normalizedGenerated.resultType === "report"
+          ? normalizeReasonMeta(
+              normalizedGenerated.reasonMeta ?? {
+                failedStep: normalizedGenerated.failedStep,
+                classHint,
+                methodHint,
+                lineHint,
+                selectedMode: normalizedGenerated.selectedMode,
+              },
+              RECIPE_REASON_META_KEYS,
+            )
+          : undefined;
 
       const structuredContent = {
         projectRoot,
@@ -336,12 +389,14 @@ export function registerRecipeCreateTool(
         executionReadiness: normalizedGenerated.executionReadiness,
         missingInputs: normalizedGenerated.missingInputs,
         ...(normalizedGenerated.nextAction ? { nextAction: normalizedGenerated.nextAction } : {}),
+        ...(effectiveNextActionCode ? { nextActionCode: effectiveNextActionCode } : {}),
         ...(normalizedGenerated.failurePhase ? { failurePhase: normalizedGenerated.failurePhase } : {}),
         ...(normalizedGenerated.failureReasonCode
           ? { failureReasonCode: normalizedGenerated.failureReasonCode }
           : {}),
-        ...(normalizedGenerated.reasonCode ? { reasonCode: normalizedGenerated.reasonCode } : {}),
+        ...(effectiveReasonCode ? { reasonCode: effectiveReasonCode } : {}),
         ...(normalizedGenerated.failedStep ? { failedStep: normalizedGenerated.failedStep } : {}),
+        ...(effectiveReasonMeta ? { reasonMeta: effectiveReasonMeta } : {}),
         ...(normalizedGenerated.synthesizerUsed
           ? { synthesizerUsed: normalizedGenerated.synthesizerUsed }
           : {}),
@@ -367,12 +422,14 @@ export function registerRecipeCreateTool(
         executionReadiness: normalizedGenerated.executionReadiness,
         missingInputs: normalizedGenerated.missingInputs,
         ...(normalizedGenerated.nextAction ? { nextAction: normalizedGenerated.nextAction } : {}),
+        ...(effectiveNextActionCode ? { nextActionCode: effectiveNextActionCode } : {}),
         ...(normalizedGenerated.failurePhase ? { failurePhase: normalizedGenerated.failurePhase } : {}),
         ...(normalizedGenerated.failureReasonCode
           ? { failureReasonCode: normalizedGenerated.failureReasonCode }
           : {}),
-        ...(normalizedGenerated.reasonCode ? { reasonCode: normalizedGenerated.reasonCode } : {}),
+        ...(effectiveReasonCode ? { reasonCode: effectiveReasonCode } : {}),
         ...(normalizedGenerated.failedStep ? { failedStep: normalizedGenerated.failedStep } : {}),
+        ...(effectiveReasonMeta ? { reasonMeta: effectiveReasonMeta } : {}),
         ...(normalizedGenerated.synthesizerUsed
           ? { synthesizerUsed: normalizedGenerated.synthesizerUsed }
           : {}),

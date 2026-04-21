@@ -4,6 +4,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import type { ServerConfig } from "@/config/server-config";
 import { clampInt } from "@/lib/safety";
+import { deriveNextActionCode, normalizeReasonMeta } from "@/utils/failure_diagnostics.util";
 import { validateProjectRootAbs } from "@/utils/project_root_validate.util";
 import {
   RuntimeProbeUnreachableError,
@@ -17,18 +18,34 @@ export type TargetInferHandlerDeps = {
   config: ServerConfig;
 };
 
+const TARGET_INFER_REASON_META_KEYS = [
+  "failedStep",
+  "classHint",
+  "methodHint",
+  "lineHint",
+  "discoveryMode",
+  "candidateCount",
+  "resolvedCandidateCount",
+] as const;
+
 function runtimeUnavailableResponse(args: {
   rootAbs: string;
   hints: Record<string, unknown>;
   reason: string;
 }) {
+  const reasonCode = "runtime_unreachable";
   const structuredContent = {
     resultType: "report",
-    status: "runtime_unreachable",
-    reasonCode: "runtime_unreachable",
+    status: reasonCode,
+    reasonCode,
+    nextActionCode: deriveNextActionCode(reasonCode),
     failedStep: "line_validation",
     projectRoot: args.rootAbs,
     hints: args.hints,
+    reasonMeta: normalizeReasonMeta(
+      { failedStep: "line_validation", ...args.hints },
+      TARGET_INFER_REASON_META_KEYS,
+    ),
     reason: args.reason,
     nextAction:
       "Verify probe runtime reachability (probe base URL/port) and rerun probe_target_infer.",
@@ -87,11 +104,26 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
         maxCandidates,
         additionalSourceRoots,
       } = input;
+      const selectedDiscoveryMode = discoveryMode ?? "ranked_candidates";
       const validated = await validateProjectRootAbs(projectRootAbs);
       if (!validated.ok) {
+        const reasonCode = validated.status;
         const structuredContent = {
           resultType: "report",
-          status: validated.status,
+          status: reasonCode,
+          reasonCode,
+          nextActionCode: deriveNextActionCode(reasonCode),
+          failedStep: "project_root_validation",
+          reasonMeta: normalizeReasonMeta(
+            {
+              failedStep: "project_root_validation",
+              classHint,
+              methodHint,
+              lineHint,
+              discoveryMode: discoveryMode ?? "ranked_candidates",
+            },
+            TARGET_INFER_REASON_META_KEYS,
+          ),
           reason: validated.reason,
           ...(validated.value ? { projectRootAbs: validated.value } : {}),
           nextAction: validated.nextAction,
@@ -111,13 +143,25 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
           : {}),
       });
       if (!additionalRoots.ok) {
+        const reasonCode = additionalRoots.reasonCode;
         const structuredContent = {
           resultType: "report",
           status: "project_selector_invalid",
-          reasonCode: additionalRoots.reasonCode,
+          reasonCode,
+          nextActionCode: deriveNextActionCode(reasonCode),
           failedStep: additionalRoots.failedStep,
           projectRoot: rootAbs,
           hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint, additionalSourceRoots },
+          reasonMeta: normalizeReasonMeta(
+            {
+              failedStep: additionalRoots.failedStep,
+              classHint,
+              methodHint,
+              lineHint,
+              discoveryMode: selectedDiscoveryMode,
+            },
+            TARGET_INFER_REASON_META_KEYS,
+          ),
           reason: additionalRoots.reason,
           nextAction: additionalRoots.nextAction,
           evidence: additionalRoots.evidence,
@@ -128,15 +172,27 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
           structuredContent,
         };
       }
-      const selectedDiscoveryMode = discoveryMode ?? "ranked_candidates";
-
       if (selectedDiscoveryMode === "class_methods") {
         const classHintTrimmed = classHint?.trim();
         if (!classHintTrimmed) {
+          const reasonCode = "class_hint_required";
           const structuredContent = {
             resultType: "report",
-            status: "class_hint_required",
+            status: reasonCode,
+            reasonCode,
+            nextActionCode: deriveNextActionCode(reasonCode),
+            failedStep: "input_validation",
             projectRoot: rootAbs,
+            reasonMeta: normalizeReasonMeta(
+              {
+                failedStep: "input_validation",
+                classHint,
+                methodHint,
+                lineHint,
+                discoveryMode: selectedDiscoveryMode,
+              },
+              TARGET_INFER_REASON_META_KEYS,
+            ),
             nextAction:
               "Provide classHint and rerun probe_target_infer with discoveryMode=class_methods.",
           };
@@ -156,15 +212,27 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
         const chosenMatches = discovered.classes;
 
         if (chosenMatches.length === 0) {
+          const reasonCode = "class_not_found";
           const structuredContent = {
             resultType: "class_methods",
-            status: "class_not_found",
+            status: reasonCode,
+            reasonCode,
+            nextActionCode: deriveNextActionCode(reasonCode),
+            failedStep: "target_inference",
             projectRoot: rootAbs,
             hints: { projectRootAbs: rootAbs, classHint },
             ...(additionalRoots.normalizedAdditionalSourceRoots.length > 0
               ? { additionalSourceRoots: additionalRoots.normalizedAdditionalSourceRoots }
               : {}),
             scannedJavaFiles: discovered.scannedJavaFiles,
+            reasonMeta: normalizeReasonMeta(
+              {
+                failedStep: "target_inference",
+                classHint,
+                discoveryMode: selectedDiscoveryMode,
+              },
+              TARGET_INFER_REASON_META_KEYS,
+            ),
             nextAction:
               "Refine classHint (prefer exact class name or fully qualified class name) and rerun probe_target_infer.",
           };
@@ -181,9 +249,13 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
         }));
 
         if (matches.length > 1) {
+          const reasonCode = "class_ambiguous";
           const structuredContent = {
             resultType: "disambiguation",
-            status: "class_ambiguous",
+            status: reasonCode,
+            reasonCode,
+            nextActionCode: deriveNextActionCode(reasonCode),
+            failedStep: "target_selection",
             projectRoot: rootAbs,
             hints: { projectRootAbs: rootAbs, classHint },
             ...(additionalRoots.normalizedAdditionalSourceRoots.length > 0
@@ -191,6 +263,15 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
               : {}),
             scannedJavaFiles: discovered.scannedJavaFiles,
             matches,
+            reasonMeta: normalizeReasonMeta(
+              {
+                failedStep: "target_selection",
+                classHint,
+                discoveryMode: selectedDiscoveryMode,
+                candidateCount: matches.length,
+              },
+              TARGET_INFER_REASON_META_KEYS,
+            ),
             nextAction: "Refine classHint to exact FQCN to resolve a single class.",
           };
           return {
@@ -251,16 +332,28 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
       }
 
       if (!classHint?.trim()) {
+        const reasonCode = "class_hint_required";
         const structuredContent = {
           resultType: "report",
-          status: "class_hint_required",
-          reasonCode: "class_hint_required",
+          status: reasonCode,
+          reasonCode,
+          nextActionCode: deriveNextActionCode(reasonCode),
           failedStep: "input_validation",
           projectRoot: rootAbs,
           hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint },
           ...(additionalRoots.normalizedAdditionalSourceRoots.length > 0
             ? { additionalSourceRoots: additionalRoots.normalizedAdditionalSourceRoots }
             : {}),
+          reasonMeta: normalizeReasonMeta(
+            {
+              failedStep: "input_validation",
+              classHint,
+              methodHint,
+              lineHint,
+              discoveryMode: selectedDiscoveryMode,
+            },
+            TARGET_INFER_REASON_META_KEYS,
+          ),
           reason: "ranked_candidates requires exact classHint for deterministic target selection.",
           nextAction:
             "Provide classHint as exact FQCN (preferred) or exact class name, then rerun probe_target_infer.",
@@ -283,10 +376,12 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
       });
 
       if (inferred.candidates.length === 0) {
+        const reasonCode = "target_not_found";
         const structuredContent = {
           resultType: "report",
-          status: "target_not_found",
-          reasonCode: "target_not_found",
+          status: reasonCode,
+          reasonCode,
+          nextActionCode: deriveNextActionCode(reasonCode),
           failedStep: "target_inference",
           projectRoot: rootAbs,
           hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint },
@@ -294,6 +389,16 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
             ? { additionalSourceRoots: additionalRoots.normalizedAdditionalSourceRoots }
             : {}),
           scannedJavaFiles: inferred.scannedJavaFiles,
+          reasonMeta: normalizeReasonMeta(
+            {
+              failedStep: "target_inference",
+              classHint,
+              methodHint,
+              lineHint,
+              discoveryMode: selectedDiscoveryMode,
+            },
+            TARGET_INFER_REASON_META_KEYS,
+          ),
           nextAction:
             "Refine classHint/methodHint to exact runtime identifiers and rerun probe_target_infer.",
         };
@@ -349,10 +454,12 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
           candidate.lineSelectionStatus === "validated" && typeof candidate.line === "number",
       );
       if (runtimeResolvedCandidates.length === 0) {
+        const reasonCode = "runtime_line_unresolved";
         const structuredContent = {
           resultType: "report",
           status: "target_not_found",
-          reasonCode: "runtime_line_unresolved",
+          reasonCode,
+          nextActionCode: deriveNextActionCode(reasonCode),
           failedStep: "line_validation",
           projectRoot: rootAbs,
           hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint },
@@ -360,6 +467,17 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
             ? { additionalSourceRoots: additionalRoots.normalizedAdditionalSourceRoots }
             : {}),
           scannedJavaFiles: inferred.scannedJavaFiles,
+          reasonMeta: normalizeReasonMeta(
+            {
+              failedStep: "line_validation",
+              classHint,
+              methodHint,
+              lineHint,
+              discoveryMode: selectedDiscoveryMode,
+              candidateCount: validatedCandidates.length,
+            },
+            TARGET_INFER_REASON_META_KEYS,
+          ),
           evidence: [
             `candidateCount=${validatedCandidates.length}`,
             `maxScanLines=${deps.config.probeLineSelectionMaxScanLines}`,
@@ -379,10 +497,12 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
           ? runtimeResolvedCandidates.filter((candidate) => candidate.line === lineHint)
           : [];
       if (typeof lineHint === "number" && lineMatches.length === 0) {
+        const reasonCode = "line_hint_not_resolvable";
         const structuredContent = {
           resultType: "report",
           status: "target_not_found",
-          reasonCode: "line_hint_not_resolvable",
+          reasonCode,
+          nextActionCode: deriveNextActionCode(reasonCode),
           failedStep: "line_validation",
           projectRoot: rootAbs,
           hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint },
@@ -390,6 +510,17 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
             ? { additionalSourceRoots: additionalRoots.normalizedAdditionalSourceRoots }
             : {}),
           scannedJavaFiles: inferred.scannedJavaFiles,
+          reasonMeta: normalizeReasonMeta(
+            {
+              failedStep: "line_validation",
+              classHint,
+              methodHint,
+              lineHint,
+              discoveryMode: selectedDiscoveryMode,
+              resolvedCandidateCount: runtimeResolvedCandidates.length,
+            },
+            TARGET_INFER_REASON_META_KEYS,
+          ),
           evidence: [
             `lineHint=${lineHint}`,
             `resolvedCandidateCount=${runtimeResolvedCandidates.length}`,
@@ -408,10 +539,12 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
         typeof lineHint === "number" ? lineMatches : runtimeResolvedCandidates;
 
       if (selectedCandidates.length > 1) {
+        const reasonCode = "target_ambiguous";
         const structuredContent = {
           resultType: "disambiguation",
           status: "target_ambiguous",
-          reasonCode: "target_ambiguous",
+          reasonCode,
+          nextActionCode: deriveNextActionCode(reasonCode),
           failedStep: "target_selection",
           projectRoot: rootAbs,
           hints: { projectRootAbs: rootAbs, classHint, methodHint, lineHint },
@@ -419,6 +552,17 @@ export function registerTargetInferTool(server: McpServer, deps: TargetInferHand
             ? { additionalSourceRoots: additionalRoots.normalizedAdditionalSourceRoots }
             : {}),
           scannedJavaFiles: inferred.scannedJavaFiles,
+          reasonMeta: normalizeReasonMeta(
+            {
+              failedStep: "target_selection",
+              classHint,
+              methodHint,
+              lineHint,
+              discoveryMode: selectedDiscoveryMode,
+              candidateCount: selectedCandidates.length,
+            },
+            TARGET_INFER_REASON_META_KEYS,
+          ),
           matches: selectedCandidates.map((candidate) => ({
             ...candidate,
             file: path.relative(rootAbs, candidate.file) || candidate.file,
