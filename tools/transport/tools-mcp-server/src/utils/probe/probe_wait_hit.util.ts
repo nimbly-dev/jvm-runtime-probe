@@ -104,7 +104,7 @@ export async function probeWaitHit(args: {
         unreachableRetryEnabled,
         unreachableMaxRetries,
       },
-      result: { hit: false, inline: false, reason: "line_key_required" },
+      result: { hit: false, inline: false, reason: "line_key_required", reasonCode: "line_key_required" },
       runNotes: "probe_wait_for_hit strict line mode",
     });
   }

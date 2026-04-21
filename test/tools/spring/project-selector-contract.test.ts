@@ -81,7 +81,9 @@ test("probe_recipe_create fails closed when additionalSourceRoots contains an in
 
   assert.equal(out.structuredContent.status, "project_selector_invalid");
   assert.equal(out.structuredContent.reasonCode, "additional_source_roots_invalid");
+  assert.equal(out.structuredContent.nextActionCode, "fix_additional_source_roots");
   assert.equal(out.structuredContent.failedStep, "input_validation");
+  assert.equal((out.structuredContent.reasonMeta as any).failedStep, "input_validation");
 });
 
 test("probe_target_infer fails closed when additionalSourceRoots exceeds max count", async () => {
@@ -101,7 +103,9 @@ test("probe_target_infer fails closed when additionalSourceRoots exceeds max cou
 
   assert.equal(out.structuredContent.status, "project_selector_invalid");
   assert.equal(out.structuredContent.reasonCode, "additional_source_roots_limit_exceeded");
+  assert.equal(out.structuredContent.nextActionCode, "reduce_additional_source_roots");
   assert.equal(out.structuredContent.failedStep, "input_validation");
+  assert.equal((out.structuredContent.reasonMeta as any).failedStep, "input_validation");
 });
 
 test("probe_recipe_create requires explicit projectRootAbs", async () => {
@@ -120,6 +124,8 @@ test("probe_recipe_create requires explicit projectRootAbs", async () => {
   });
 
   assert.equal(out.structuredContent.status, "project_selector_required");
+  assert.equal(out.structuredContent.reasonCode, "project_selector_required");
+  assert.equal(out.structuredContent.nextActionCode, "provide_project_root");
   assert.equal(out.structuredContent.projectRoot, "(project_root_unset)");
   assert.equal(out.structuredContent.resultType, "report");
 });
@@ -137,6 +143,8 @@ test("probe_target_infer requires explicit projectRootAbs", async () => {
   });
 
   assert.equal(out.structuredContent.status, "project_selector_required");
+  assert.equal(out.structuredContent.reasonCode, "project_selector_required");
+  assert.equal(out.structuredContent.nextActionCode, "provide_project_root");
 });
 
 test("probe_recipe_create fails closed when classHint is not an FQCN", async () => {
@@ -159,7 +167,9 @@ test("probe_recipe_create fails closed when classHint is not an FQCN", async () 
   assert.equal(out.structuredContent.projectRoot, path.resolve(__dirname, "..", ".."));
   assert.equal(typeof out.structuredContent.hints, "object");
   assert.equal(out.structuredContent.reasonCode, "class_hint_not_fqcn");
+  assert.equal(out.structuredContent.nextActionCode, "provide_class_fqcn");
   assert.equal(out.structuredContent.failedStep, "input_validation");
+  assert.equal((out.structuredContent.reasonMeta as any).failedStep, "input_validation");
   assert.equal(Array.isArray(out.structuredContent.evidence), true);
   assert.equal(Array.isArray(out.structuredContent.attemptedStrategies), true);
   assert.match(out.structuredContent.nextAction, /Provide exact FQCN/i);
@@ -327,7 +337,9 @@ test("probe_recipe_create fails closed when strict runtime line is unresolved", 
         assert.equal(out.structuredContent.resultType, "report");
         assert.equal(out.structuredContent.status, "target_not_inferred");
         assert.equal(out.structuredContent.reasonCode, "runtime_line_unresolved");
+        assert.equal(out.structuredContent.nextActionCode, "select_resolvable_line");
         assert.equal(out.structuredContent.failedStep, "line_validation");
+        assert.equal((out.structuredContent.reasonMeta as any).failedStep, "line_validation");
         assert.equal(out.structuredContent.executionReadiness, "needs_user_input");
       });
     } finally {
@@ -350,6 +362,8 @@ test("probe_target_infer ranked_candidates requires exact classHint", async () =
 
   assert.equal(out.structuredContent.resultType, "report");
   assert.equal(out.structuredContent.status, "class_hint_required");
+  assert.equal(out.structuredContent.reasonCode, "class_hint_required");
+  assert.equal(out.structuredContent.nextActionCode, "provide_class_hint");
   assert.equal(out.structuredContent.failedStep, "input_validation");
 });
 
@@ -443,7 +457,9 @@ test("probe_target_infer fails closed when runtime probe is unreachable", async 
       assert.equal(out.structuredContent.resultType, "report");
       assert.equal(out.structuredContent.status, "runtime_unreachable");
       assert.equal(out.structuredContent.reasonCode, "runtime_unreachable");
+      assert.equal(out.structuredContent.nextActionCode, "verify_probe_reachability");
       assert.equal(out.structuredContent.failedStep, "line_validation");
+      assert.equal((out.structuredContent.reasonMeta as any).failedStep, "line_validation");
     });
   });
 });

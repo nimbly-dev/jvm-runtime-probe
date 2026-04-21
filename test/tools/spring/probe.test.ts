@@ -194,7 +194,10 @@ test("probe_wait_for_hit exits immediately for invalid_line_target", async () =>
     assert.equal(parsed.nextAction, "rebuild_app_artifact_and_restart_jvm_then_rerun_probe");
     assert.equal((parsed as any).httpResponse, undefined);
     assert.equal(out.structuredContent.result.reason, "invalid_line_target");
+    assert.equal(out.structuredContent.result.reasonCode, "invalid_line_target");
     assert.equal(out.structuredContent.result.actionCode, "runtime_not_aligned");
+    assert.equal(out.structuredContent.result.nextActionCode, "align_runtime_and_artifact");
+    assert.equal(out.structuredContent.result.reasonMeta.failedStep, "line_validation");
   });
   assert.equal(calls, 1);
 });
@@ -219,6 +222,9 @@ test("probe_wait_for_hit returns structured service_unreachable by default", asy
     assert.equal(parsed.actionCode, "probe_connectivity_issue");
     assert.equal(parsed.nextAction, "verify_probe_base_url_and_agent_reachability_then_rerun");
     assert.equal(out.structuredContent.result.reason, "service_unreachable");
+    assert.equal(out.structuredContent.result.reasonCode, "service_unreachable");
+    assert.equal(out.structuredContent.result.nextActionCode, "verify_probe_connectivity");
+    assert.equal(out.structuredContent.result.reasonMeta.failedStep, "baseline_status_check");
     assert.equal(out.structuredContent.result.unreachableAttempts, 1);
     assert.equal(out.structuredContent.result.unreachableRetryEnabled, false);
   });
@@ -277,6 +283,9 @@ test("probe_wait_for_hit returns structured service_unreachable after unreachabl
     assert.equal(parsed.actionCode, "probe_connectivity_issue");
     assert.equal(parsed.nextAction, "verify_probe_base_url_and_agent_reachability_then_rerun");
     assert.equal(out.structuredContent.result.reason, "service_unreachable");
+    assert.equal(out.structuredContent.result.reasonCode, "service_unreachable");
+    assert.equal(out.structuredContent.result.nextActionCode, "verify_probe_connectivity");
+    assert.equal(out.structuredContent.result.reasonMeta.failedStep, "baseline_status_check");
     assert.equal(out.structuredContent.result.unreachableAttempts, 2);
     assert.equal(out.structuredContent.result.unreachableRetryEnabled, true);
   });
@@ -309,7 +318,10 @@ test("probe_wait_for_hit timeout_no_inline_hit returns line-not-executed guidanc
     assert.equal(parsed.actionCode, "line_not_executed_in_window");
     assert.equal(parsed.nextAction, "verify_trigger_path_or_branch_then_rerun_probe_wait_for_hit");
     assert.equal(out.structuredContent.result.reason, "timeout_no_inline_hit");
+    assert.equal(out.structuredContent.result.reasonCode, "timeout_no_inline_hit");
     assert.equal(out.structuredContent.result.actionCode, "line_not_executed_in_window");
+    assert.equal(out.structuredContent.result.nextActionCode, "verify_trigger_path");
+    assert.equal(out.structuredContent.result.reasonMeta.failedStep, "wait_poll");
   });
   assert.ok(calls >= 2);
 });
@@ -355,6 +367,19 @@ test("probe_wait_for_hit emits minimal non-duplicative epoch fields", async () =
     Date.now = originalNow;
     LAST_RESET_EPOCH_BY_KEY.delete(key);
   }
+});
+
+test("probe_wait_for_hit line_key_required includes reasonCode", async () => {
+  const out = await probeWaitHit({
+    key: "com.example.social.post.app.controller.PostController#updatePost",
+    baseUrl: "http://127.0.0.1:9191",
+    statusPath: "/__probe/status",
+    timeoutMs: 250,
+    pollIntervalMs: 100,
+    maxRetries: 1,
+  });
+  assert.equal(out.structuredContent.result.reason, "line_key_required");
+  assert.equal(out.structuredContent.result.reasonCode, "line_key_required");
 });
 
 test("probe_get_status remains backward-compatible when line validation fields are absent", async () => {
