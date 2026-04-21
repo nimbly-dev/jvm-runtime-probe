@@ -17,8 +17,8 @@ Options:
   --kiro-config <absPath>         Override Kiro MCP config path
   --kiro-skills-dir <absPath>     Override Kiro skills directory
   --update-skill-if-exists        Replace existing installed skill folder
-  --no-build                      Do not run build when dist/server.js is missing
-  --no-build-java                 Do not run Maven build for Java agent when jar is missing
+  --no-build                      Do not run npm build
+  --no-build-java                 Do not run Maven install for Java agent
   --jdk21-compat                  Enable Java 21 compatibility flag in generated -javaagent args
   --agent-include <basepathCsv>   Probe include basepaths for generated -javaagent args (comma-separated package globs or exact FQCNs). Default: omitted, auto-infer from startup class
   --agent-exclude <glob>          Probe exclude glob for generated -javaagent args
@@ -31,7 +31,7 @@ Behavior:
 - Use --update-skill-if-exists to replace existing installed skill folders.
 - Retired skill mcp-java-dev-tools-repro-orchestration is removed during skill install/update.
 - Installer always installs both Skill and MCP integration.
-- Node build step uses compile-only (no test execution).
+- Installer runs npm build and Maven install by default (unless --no-build/--no-build-java are used).
 - If no args are provided, interactive mode is enabled automatically.
 EOF
 }
@@ -244,15 +244,16 @@ fi
 ensure_build() {
   ensure_node_build_deps
   if [[ "$BUILD_IF_MISSING" -eq 0 ]]; then
-    if [[ ! -f "$SERVER_JS_PATH" ]]; then
-      echo "Missing $SERVER_JS_PATH. Run npm run build first or remove --no-build." >&2
-      exit 1
-    fi
+    echo "- Skipping npm build (--no-build)"
     return
   fi
-  echo "- Running npm run build:compile (skip tests)"
+  echo "- Running npm run build"
   if [[ "$DRY_RUN" -eq 0 ]]; then
-    (cd "$REPO_ROOT" && npm run build:compile)
+    (cd "$REPO_ROOT" && npm run build)
+  fi
+  if [[ ! -f "$SERVER_JS_PATH" ]]; then
+    echo "Missing $SERVER_JS_PATH after npm build." >&2
+    exit 1
   fi
 }
 
@@ -276,19 +277,20 @@ ensure_node_build_deps() {
 }
 
 ensure_java_build() {
+  if [[ "$BUILD_JAVA_IF_MISSING" -eq 0 ]]; then
+    echo "- Skipping Java agent Maven install (--no-build-java)"
+    return
+  fi
+  echo "- Running Maven install for java-agent"
+  if [[ "$DRY_RUN" -eq 0 ]]; then
+    (cd "$REPO_ROOT" && mvn -f java-agent/pom.xml install)
+  fi
   local agent_target_dir="$REPO_ROOT/java-agent/core/core-probe/target"
   local existing
   existing="$(ls -1 "$agent_target_dir"/mcp-java-dev-tools-agent-*-all.jar 2>/dev/null | head -n1 || true)"
-  if [[ -n "$existing" ]]; then
-    return
-  fi
-  if [[ "$BUILD_JAVA_IF_MISSING" -eq 0 ]]; then
-    echo "Missing Java agent jar under $agent_target_dir. Run mvn -f java-agent/pom.xml package first or remove --no-build-java." >&2
+  if [[ -z "$existing" ]]; then
+    echo "Missing Java agent jar under $agent_target_dir after Maven install." >&2
     exit 1
-  fi
-  echo "- Java agent jar not found. Running Maven build"
-  if [[ "$DRY_RUN" -eq 0 ]]; then
-    (cd "$REPO_ROOT" && mvn -f java-agent/pom.xml -pl core/core-probe -am package -DskipTests)
   fi
 }
 
