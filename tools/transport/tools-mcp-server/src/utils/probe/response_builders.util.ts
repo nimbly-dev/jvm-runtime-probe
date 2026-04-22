@@ -72,6 +72,7 @@ function summarizeBatchResults(results: BatchResultRow[]): Array<Record<string, 
     if (typeof row.key === "string") summary.key = row.key;
     summary.apiOutcome = row.apiOutcome;
     if (typeof row.reproStatus === "string") summary.reproStatus = row.reproStatus;
+    if (typeof row.reasonCode === "string") summary.reasonCode = row.reasonCode;
     if (typeof row.actionCode === "string") summary.actionCode = row.actionCode;
     if (typeof row.nextActionCode === "string") summary.nextActionCode = row.nextActionCode;
     if (typeof row.nextAction === "string") summary.nextAction = row.nextAction;

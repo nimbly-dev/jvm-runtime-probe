@@ -1,6 +1,7 @@
 import { fetchJson } from "@/lib/http";
 import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "@/lib/safety";
 import type { ToolTextResponse } from "@/models/tool_response.model";
+import { deriveNextActionCode, normalizeReasonMeta } from "@/utils/failure_diagnostics.util";
 import { joinUrl, probeUnreachableMessage } from "@/utils/probe.util";
 import { formatProbeOutput } from "@/utils/probe/output.util";
 import { isLineKey, resolveProbeKey } from "@/utils/probe/key.util";
@@ -48,6 +49,7 @@ async function probeResetSingle(args: {
   const url = joinUrl(args.baseUrl, args.resetPath);
 
   if (!isLineKey(resolvedKey)) {
+    const reasonCode = "line_key_required";
     return buildLineKeyRequiredResponse({
       request: buildSelectorRequest({
         key: args.key,
@@ -61,7 +63,13 @@ async function probeResetSingle(args: {
       requestUrl: url,
       requestHeaders: { "content-type": "application/json" },
       requestBody: { key: resolvedKey },
-      result: { reset: false, reason: "line_key_required" },
+      result: {
+        reset: false,
+        reason: reasonCode,
+        reasonCode,
+        nextActionCode: deriveNextActionCode(reasonCode),
+        reasonMeta: normalizeReasonMeta({ failedStep: "input_validation" }),
+      },
       runNotes: "probe_reset strict line mode",
     });
   }
@@ -97,10 +105,14 @@ async function probeResetSingle(args: {
     LAST_RESET_EPOCH_BY_KEY.set(resolvedKey, Date.now());
   }
   if (lineValidation.invalidLineTarget) {
+    const reasonCode = "invalid_line_target";
     structuredContent.result = {
-      reason: "invalid_line_target",
+      reason: reasonCode,
+      reasonCode,
       actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
+      nextActionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.nextActionCode,
       nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
+      reasonMeta: normalizeReasonMeta({ failedStep: "line_validation" }),
     };
   }
 
@@ -160,6 +172,9 @@ async function probeResetBatch(args: {
           executionHit: "not_applicable",
           apiOutcome: "error",
           reproStatus: "line_key_required",
+          reasonCode: "line_key_required",
+          nextActionCode: deriveNextActionCode("line_key_required"),
+          reasonMeta: normalizeReasonMeta({ failedStep: "input_validation" }),
           probeHit: "line probe key required (Class#method:<line>); method-only checks disabled",
           httpCode: 400,
         });
@@ -214,8 +229,11 @@ async function probeResetBatch(args: {
         : "counter reset requested",
       ...(lineValidation.invalidLineTarget
         ? {
+            reasonCode: "invalid_line_target",
             actionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.actionCode,
+            nextActionCode: GUIDANCE_RUNTIME_NOT_ALIGNED.nextActionCode,
             nextAction: GUIDANCE_RUNTIME_NOT_ALIGNED.nextAction,
+            reasonMeta: normalizeReasonMeta({ failedStep: "line_validation" }),
           }
         : {}),
       httpCode: res.status,
@@ -228,6 +246,8 @@ async function probeResetBatch(args: {
       executionHit: "not_applicable",
       apiOutcome: "error",
       reproStatus: "reset_failed",
+      reasonCode: "reset_failed",
+      nextActionCode: deriveNextActionCode("reset_failed"),
       probeHit: "missing batch reset row for key",
       httpCode: res.status,
     });

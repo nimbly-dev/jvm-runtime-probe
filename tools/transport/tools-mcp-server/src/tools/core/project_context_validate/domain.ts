@@ -1,6 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
+import { deriveNextActionCode, normalizeReasonMeta } from "@/utils/failure_diagnostics.util";
 import { validateProjectRootAbs } from "@/utils/project_root_validate.util";
 
 async function dirExists(abs: string): Promise<boolean> {
@@ -29,9 +30,18 @@ export async function projectContextValidateDomain(input: {
 }> {
   const validated = await validateProjectRootAbs(input.projectRootAbs);
   if (!validated.ok) {
+    const reasonCode = validated.status;
+    const failedStep = "project_root_validation";
     const structuredContent = {
       resultType: "report",
-      status: validated.status,
+      status: reasonCode,
+      reasonCode,
+      nextActionCode: deriveNextActionCode(reasonCode),
+      failedStep,
+      reasonMeta: normalizeReasonMeta({
+        failedStep,
+        projectRootAbs: input.projectRootAbs,
+      }),
       reason: validated.reason,
       ...(validated.value ? { projectRootAbs: validated.value } : {}),
       nextAction: validated.nextAction,

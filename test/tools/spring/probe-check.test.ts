@@ -73,6 +73,7 @@ test("probe_check forwards http.headers to reset and status calls", async () => 
     assert.equal(result.structuredContent.config.authConfigured, true);
     assert.equal(result.structuredContent.checks.reset.ok, true);
     assert.equal(result.structuredContent.checks.status.ok, true);
+    assert.equal(result.structuredContent.status, "ok");
   });
 
   assert.equal(calls.length, 2);
@@ -110,6 +111,10 @@ test("probe_check surfaces deterministic guidance for protected endpoints", asyn
 
     assert.equal(result.structuredContent.checks.reset.ok, false);
     assert.equal(result.structuredContent.checks.status.ok, false);
+    assert.equal(result.structuredContent.status, "diagnose_failed");
+    assert.equal(result.structuredContent.reasonCode, "diagnose_failed");
+    assert.equal(result.structuredContent.nextActionCode, "resolve_probe_diagnostics");
+    assert.equal((result.structuredContent.reasonMeta as any).failedStep, "probe_diagnostics");
     assert.equal(result.structuredContent.checks.status.keyDecodingOk, undefined);
     assert.equal(
       result.structuredContent.recommendations.includes(

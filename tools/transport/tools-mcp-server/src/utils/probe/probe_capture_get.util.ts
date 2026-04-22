@@ -2,6 +2,7 @@ import { fetchJson } from "@/lib/http";
 import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "@/lib/safety";
 import type { ProbeCaptureRecordPayload } from "@/models/probe_runtime_capture.model";
 import type { ToolTextResponse } from "@/models/tool_response.model";
+import { deriveNextActionCode, normalizeReasonMeta } from "@/utils/failure_diagnostics.util";
 import { compactCaptureRecord } from "@/utils/probe/compact_payload.util";
 import { joinUrl, probeUnreachableMessage } from "@/utils/probe.util";
 import { buildTextResponse } from "@/utils/probe/response_builders.util";
@@ -54,6 +55,11 @@ export async function probeCaptureGet(args: {
       : {
           found: false,
           reason: typeof json?.error === "string" ? json.error : "capture_unavailable",
+          reasonCode: typeof json?.error === "string" ? json.error : "capture_unavailable",
+          nextActionCode: deriveNextActionCode(
+            typeof json?.error === "string" ? json.error : "capture_unavailable",
+          ),
+          reasonMeta: normalizeReasonMeta({ failedStep: "capture_lookup" }),
         },
   };
 

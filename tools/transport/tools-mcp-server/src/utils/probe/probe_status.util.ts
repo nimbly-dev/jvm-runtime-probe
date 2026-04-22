@@ -1,6 +1,7 @@
 import { fetchJson } from "@/lib/http";
 import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "@/lib/safety";
 import type { ToolTextResponse } from "@/models/tool_response.model";
+import { deriveNextActionCode, normalizeReasonMeta } from "@/utils/failure_diagnostics.util";
 import { joinUrl, probeUnreachableMessage } from "@/utils/probe.util";
 import { classifyExecutionHitStrictLine, isLineKey, resolveProbeKey } from "@/utils/probe/key.util";
 import {
@@ -54,6 +55,7 @@ async function probeStatusSingle(args: {
   const urlString = `${joinUrl(args.baseUrl, args.statusPath)}?key=${encodeURIComponent(resolvedKey)}`;
 
   if (!isLineKey(resolvedKey)) {
+    const reasonCode = "line_key_required";
     return buildLineKeyRequiredResponse({
       request: buildSelectorRequest({
         key: args.key,
@@ -65,7 +67,13 @@ async function probeStatusSingle(args: {
       httpRequest: `GET ${urlString}`,
       requestMethod: "GET",
       requestUrl: urlString,
-      result: { hit: false, reason: "line_key_required" },
+      result: {
+        hit: false,
+        reason: reasonCode,
+        reasonCode,
+        nextActionCode: deriveNextActionCode(reasonCode),
+        reasonMeta: normalizeReasonMeta({ failedStep: "input_validation" }),
+      },
       runNotes: "probe_get_status strict line mode",
     });
   }
@@ -105,10 +113,14 @@ async function probeStatusSingle(args: {
       : "No JSON probe payload";
   const guidance = lineValidation.invalidLineTarget ? GUIDANCE_RUNTIME_NOT_ALIGNED : undefined;
   if (guidance) {
+    const reasonCode = "invalid_line_target";
     structuredContent.result = {
-      reason: "invalid_line_target",
+      reason: reasonCode,
+      reasonCode,
       actionCode: guidance.actionCode,
+      nextActionCode: guidance.nextActionCode,
       nextAction: guidance.nextAction,
+      reasonMeta: normalizeReasonMeta({ failedStep: "line_validation" }),
     };
   }
 
@@ -153,6 +165,9 @@ async function probeStatusBatch(args: {
         executionHit: "not_hit",
         apiOutcome: "error",
         reproStatus: "line_key_required",
+        reasonCode: "line_key_required",
+        nextActionCode: deriveNextActionCode("line_key_required"),
+        reasonMeta: normalizeReasonMeta({ failedStep: "input_validation" }),
         probeHit: "line probe key required (Class#method:<line>); method-only checks disabled",
         httpCode: 400,
       });
@@ -192,6 +207,8 @@ async function probeStatusBatch(args: {
         executionHit: "not_hit",
         apiOutcome: "error",
         reproStatus: "status_failed",
+        reasonCode: "status_failed",
+        nextActionCode: deriveNextActionCode("status_failed"),
         probeHit: "missing batch status row for key",
         httpCode: remoteResponse?.status ?? 500,
       });
@@ -221,10 +238,23 @@ async function probeStatusBatch(args: {
             ? "ok"
             : "error",
       reproStatus: lineValidation.invalidLineTarget ? "invalid_line_target" : "status_checked",
+      ...(lineValidation.invalidLineTarget
+        ? {
+            reasonCode: "invalid_line_target",
+            nextActionCode: guidance?.nextActionCode ?? deriveNextActionCode("invalid_line_target"),
+            reasonMeta: normalizeReasonMeta({ failedStep: "line_validation" }),
+          }
+        : {}),
       probeHit: lineValidation.invalidLineTarget
         ? invalidLineTargetProbeHitMessage(hitCount)
           : `hitCount=${hitCount}, lastHitEpoch=${typeof row.lastHitEpoch === "number" ? row.lastHitEpoch : 0}`,
-      ...(guidance ? { actionCode: guidance.actionCode, nextAction: guidance.nextAction } : {}),
+      ...(guidance
+        ? {
+            actionCode: guidance.actionCode,
+            nextActionCode: guidance.nextActionCode,
+            nextAction: guidance.nextAction,
+          }
+        : {}),
       httpCode: remoteResponse?.status ?? 200,
       runtimeMode: typeof row.mode === "string" ? row.mode : undefined,
       ...(typeof row.capturePreview === "object" && row.capturePreview !== null

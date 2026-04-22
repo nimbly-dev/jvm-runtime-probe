@@ -8,6 +8,7 @@ import {
   HARD_MAX_PROBE_WAIT_MAX_RETRIES,
 } from "@/lib/safety";
 import type { ToolTextResponse } from "@/models/tool_response.model";
+import { deriveNextActionCode, normalizeReasonMeta } from "@/utils/failure_diagnostics.util";
 import { joinUrl, parseProbeSnapshot } from "@/utils/probe.util";
 import { isLineKey, resolveProbeKey } from "@/utils/probe/key.util";
 import { buildLineKeyRequiredResponse } from "@/utils/probe/response_builders.util";
@@ -104,7 +105,14 @@ export async function probeWaitHit(args: {
         unreachableRetryEnabled,
         unreachableMaxRetries,
       },
-      result: { hit: false, inline: false, reason: "line_key_required", reasonCode: "line_key_required" },
+      result: {
+        hit: false,
+        inline: false,
+        reason: "line_key_required",
+        reasonCode: "line_key_required",
+        nextActionCode: deriveNextActionCode("line_key_required"),
+        reasonMeta: normalizeReasonMeta({ failedStep: "input_validation" }),
+      },
       runNotes: "probe_wait_for_hit strict line mode",
     });
   }

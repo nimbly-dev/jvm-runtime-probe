@@ -6,6 +6,7 @@ const {
   probeStatus,
   probeWaitHit,
   probeCaptureGet,
+  probeActuate,
 } = require("@/tools/core/probe/domain");
 const { LAST_RESET_EPOCH_BY_KEY } = require("@/utils/probe/constants.util");
 
@@ -66,7 +67,9 @@ test("probe_get_status returns invalid_line_target for unresolved runtime line",
     assert.equal((parsed as any).requestDetails?.headers, undefined);
     assert.equal((parsed as any).requestDetails?.body, undefined);
     assert.equal(out.structuredContent.response.json.lineValidation, "invalid_line_target");
+    assert.equal(out.structuredContent.result.reasonCode, "invalid_line_target");
     assert.equal(out.structuredContent.result.actionCode, "runtime_not_aligned");
+    assert.equal(out.structuredContent.result.nextActionCode, "align_runtime_and_artifact");
   });
   assert.equal(calls, 1);
 });
@@ -157,7 +160,9 @@ test("probe_reset returns invalid_line_target semantics when runtime line is unr
     assert.equal(parsed.apiOutcome, "error");
     assert.match(parsed.probeHit, /counter reset requested/i);
     assert.equal(out.structuredContent.result.reason, "invalid_line_target");
+    assert.equal(out.structuredContent.result.reasonCode, "invalid_line_target");
     assert.equal(out.structuredContent.result.actionCode, "runtime_not_aligned");
+    assert.equal(out.structuredContent.result.nextActionCode, "align_runtime_and_artifact");
     assert.equal(
       out.structuredContent.request.key,
       "com.example.social.post.app.controller.PostController#updatePost:122",
@@ -369,7 +374,7 @@ test("probe_wait_for_hit emits minimal non-duplicative epoch fields", async () =
   }
 });
 
-test("probe_wait_for_hit line_key_required includes reasonCode", async () => {
+test("probe_wait_for_hit line_key_required includes diagnostics contract", async () => {
   const out = await probeWaitHit({
     key: "com.example.social.post.app.controller.PostController#updatePost",
     baseUrl: "http://127.0.0.1:9191",
@@ -380,6 +385,8 @@ test("probe_wait_for_hit line_key_required includes reasonCode", async () => {
   });
   assert.equal(out.structuredContent.result.reason, "line_key_required");
   assert.equal(out.structuredContent.result.reasonCode, "line_key_required");
+  assert.equal(out.structuredContent.result.nextActionCode, "provide_strict_line_key");
+  assert.equal(out.structuredContent.result.reasonMeta.failedStep, "input_validation");
 });
 
 test("probe_get_status remains backward-compatible when line validation fields are absent", async () => {
@@ -447,6 +454,8 @@ test("probe_get_status supports keys[] batch with partial success semantics", as
     if (!firstFailure) throw new Error("expected first failure row");
     assert.equal(firstFailure.key, nonLineKey);
     assert.equal(firstFailure.reproStatus, "line_key_required");
+    assert.equal(firstFailure.reasonCode, "line_key_required");
+    assert.equal(firstFailure.nextActionCode, "provide_strict_line_key");
   });
 
   assert.equal(calls, 1);
@@ -578,6 +587,8 @@ test("probe_get_capture returns not found state when capture is missing", async 
     assert.equal((parsed as any).result.reason, "capture_not_found");
     assert.equal(out.structuredContent.result.found, false);
     assert.equal(out.structuredContent.result.reason, "capture_not_found");
+    assert.equal(out.structuredContent.result.reasonCode, "capture_not_found");
+    assert.equal(out.structuredContent.result.nextActionCode, "request_new_capture");
   });
 });
 
@@ -628,6 +639,8 @@ test("probe_reset supports keys[] batch with partial success semantics", async (
     if (!invalidRow) throw new Error("expected invalid line row in batch response");
     assert.equal(invalidRow.apiOutcome, "error");
     assert.equal(invalidRow.reproStatus, "invalid_line_target");
+    assert.equal(invalidRow.reasonCode, "invalid_line_target");
+    assert.equal(invalidRow.nextActionCode, "align_runtime_and_artifact");
   });
 
   assert.equal(calls, 1);
@@ -692,6 +705,18 @@ test("probe_get_status rejects conflicting or missing selectors", async () => {
     }),
     /does not allow lineHint with keys\[\]/i,
   );
+});
+
+test("probe_enable actuation mode requires strict line target key", async () => {
+  const out = await probeActuate({
+    mode: "actuate",
+    targetKey: "com.example.social.post.app.controller.PostController#updatePost",
+    baseUrl: "http://127.0.0.1:9191",
+    actuatePath: "/__probe/actuate",
+  });
+  assert.equal(out.structuredContent.result.reason, "line_key_required");
+  assert.equal(out.structuredContent.result.reasonCode, "line_key_required");
+  assert.equal(out.structuredContent.result.nextActionCode, "provide_strict_line_key");
 });
 
 test("probe_reset rejects conflicting or missing selectors", async () => {

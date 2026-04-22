@@ -41,5 +41,8 @@ test("project_context_validate fails for non-existent selector", async () => {
     projectRootAbs: "C:\\definitely\\missing\\project",
   });
   assert.equal(out.structuredContent.status, "project_selector_invalid");
+  assert.equal(out.structuredContent.reasonCode, "project_selector_invalid");
+  assert.equal(out.structuredContent.nextActionCode, "fix_project_selector_input");
+  assert.equal((out.structuredContent.reasonMeta as any).failedStep, "project_root_validation");
   assert.equal(out.structuredContent.reason, "projectRootAbs does not exist");
 });

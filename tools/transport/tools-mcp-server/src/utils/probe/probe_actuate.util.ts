@@ -1,6 +1,7 @@
 import { fetchJson } from "@/lib/http";
 import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "@/lib/safety";
 import type { ToolTextResponse } from "@/models/tool_response.model";
+import { deriveNextActionCode, normalizeReasonMeta } from "@/utils/failure_diagnostics.util";
 import { joinUrl, probeUnreachableMessage } from "@/utils/probe.util";
 import { isLineKey } from "@/utils/probe/key.util";
 import { formatProbeOutput } from "@/utils/probe/output.util";
@@ -19,6 +20,7 @@ export async function probeActuate(args: {
   const url = joinUrl(args.baseUrl, args.actuatePath);
 
   if (args.mode === "actuate" && (!args.targetKey || !isLineKey(args.targetKey))) {
+    const reasonCode = "line_key_required";
     const structuredContent: Record<string, unknown> = {
       request: {
         mode: args.mode,
@@ -26,7 +28,13 @@ export async function probeActuate(args: {
         returnBoolean: args.returnBoolean,
         timeoutMs,
       },
-      result: { actuated: false, reason: "line_key_required" },
+      result: {
+        actuated: false,
+        reason: reasonCode,
+        reasonCode,
+        nextActionCode: deriveNextActionCode(reasonCode),
+        reasonMeta: normalizeReasonMeta({ failedStep: "input_validation", mode: args.mode }),
+      },
     };
     const text = formatProbeOutput({
       probeKey: args.targetKey ?? "probe_actuation",

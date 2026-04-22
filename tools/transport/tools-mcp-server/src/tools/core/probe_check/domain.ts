@@ -1,5 +1,6 @@
 import { fetchJson } from "@/lib/http";
 import { clampInt, DEFAULT_PROBE_TIMEOUT_MS, HARD_MAX_PROBE_TIMEOUT_MS } from "@/lib/safety";
+import { deriveNextActionCode, normalizeReasonMeta } from "@/utils/failure_diagnostics.util";
 import { joinUrl } from "@/utils/probe.util";
 import { formatProbeOutput } from "@/utils/probe/output.util";
 
@@ -160,6 +161,19 @@ export async function probeDiagnose(args: {
     (checks.reset as any)?.ok === true &&
     (checks.status as any)?.ok === true &&
     (checks.status as any)?.keyDecodingOk !== false;
+  if (!allOk) {
+    const reasonCode = "diagnose_failed";
+    structuredContent.status = "diagnose_failed";
+    structuredContent.reasonCode = reasonCode;
+    structuredContent.nextActionCode = deriveNextActionCode(reasonCode);
+    structuredContent.reasonMeta = normalizeReasonMeta({
+      failedStep: "probe_diagnostics",
+      resetOk: (checks.reset as any)?.ok === true,
+      statusOk: (checks.status as any)?.ok === true,
+    });
+  } else {
+    structuredContent.status = "ok";
+  }
   const text = formatProbeOutput({
     probeKey,
     httpRequest: `POST ${resetUrl} + GET ${statusUrl.toString()}`,

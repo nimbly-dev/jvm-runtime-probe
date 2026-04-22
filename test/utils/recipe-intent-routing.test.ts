@@ -46,3 +46,21 @@ test("combined intent without line target stays in combined mode for fail-closed
   assert.equal(decision.probeIntentRequested, true);
   assert.equal(decision.lineTargetProvided, false);
 });
+
+test("routing decision parity is unchanged when diagnostics fields are present", () => {
+  const baselineContext = buildRoutingContext({
+    intentMode: "regression_plus_line_probe",
+    lineHint: 42,
+  });
+  const baselineDecision = resolveSelectedMode(baselineContext);
+
+  const diagnosticAugmentedContext = {
+    ...baselineContext,
+    reasonCode: "runtime_line_unresolved",
+    nextActionCode: "select_resolvable_line",
+    reasonMeta: { failedStep: "line_validation", unknownKey: "ignored" },
+  };
+  const augmentedDecision = resolveSelectedMode(diagnosticAugmentedContext as any);
+
+  assert.deepEqual(augmentedDecision, baselineDecision);
+});
