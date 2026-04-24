@@ -9,6 +9,9 @@ final class CaptureEntry {
   final String methodKey;
 
   private final long capturedAtEpoch;
+  private final long executionStartedAtEpoch;
+  private final long executionEndedAtEpoch;
+  private final long executionDurationMs;
   private final List<CaptureValue> args;
   private final CaptureValue returnValue;
   private final CaptureValue thrownValue;
@@ -19,6 +22,9 @@ final class CaptureEntry {
       String captureId,
       String methodKey,
       long capturedAtEpoch,
+      long executionStartedAtEpoch,
+      long executionEndedAtEpoch,
+      long executionDurationMs,
       List<CaptureValue> args,
       CaptureValue returnValue,
       CaptureValue thrownValue,
@@ -28,6 +34,9 @@ final class CaptureEntry {
     this.captureId = captureId;
     this.methodKey = methodKey;
     this.capturedAtEpoch = capturedAtEpoch;
+    this.executionStartedAtEpoch = executionStartedAtEpoch;
+    this.executionEndedAtEpoch = executionEndedAtEpoch;
+    this.executionDurationMs = executionDurationMs;
     this.args = args;
     this.returnValue = returnValue;
     this.thrownValue = thrownValue;
@@ -53,6 +62,9 @@ final class CaptureEntry {
         captureId,
         methodKey,
         capturedAtEpoch,
+        executionStartedAtEpoch,
+        executionEndedAtEpoch,
+        executionDurationMs,
         redactionMode,
         previewArgs,
         returnPreview,
@@ -78,6 +90,9 @@ final class CaptureEntry {
         captureId,
         methodKey,
         capturedAtEpoch,
+        executionStartedAtEpoch,
+        executionEndedAtEpoch,
+        executionDurationMs,
         redactionMode,
         outArgs,
         outReturn,

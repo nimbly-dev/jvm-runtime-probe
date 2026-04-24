@@ -155,9 +155,19 @@ public final class ProbeRuntime {
       String methodName,
       Object[] allArguments,
       Object returnValue,
-      Throwable thrown
+      Throwable thrown,
+      long executionStartedAtEpoch,
+      long executionEndedAtEpoch
   ) {
-    ProbeCaptureStore.captureByClassMethod(dottedClassName, methodName, allArguments, returnValue, thrown);
+    ProbeCaptureStore.captureByClassMethod(
+        dottedClassName,
+        methodName,
+        allArguments,
+        returnValue,
+        thrown,
+        executionStartedAtEpoch,
+        executionEndedAtEpoch
+    );
   }
 
   public static void hitLineByClassMethod(String dottedClassName, String methodName, int lineNumber) {

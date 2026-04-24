@@ -21,6 +21,7 @@ Text vs structured content policy (probe tools):
 
 Capture timestamp naming:
 - Capture timestamp fields use `capturedAtEpoch`.
+- Execution timing fields use `executionStartedAtEpoch`, `executionEndedAtEpoch`, and `executionDurationMs`.
 
 ## Global Failure Diagnostics Contract
 
@@ -234,6 +235,9 @@ examples:
 | `response.json.lineValidation` | Line validation verdict (`resolvable` or `invalid_line_target`). | `probe_get_status` | false | `"resolvable"` |
 | `response.json.capturePreview` | Compact runtime preview metadata from Java agent (`available`, `captureId`, timestamp, optional path list). | `probe_get_status` | false | `{"available":true,"captureId":"abc123"}` |
 | `response.json.capturePreview.capturedAtEpoch` | Capture preview Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200456` |
+| `response.json.capturePreview.executionStartedAtEpoch` | Invocation start Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200401` |
+| `response.json.capturePreview.executionEndedAtEpoch` | Invocation end Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_status` | false | `1739671200456` |
+| `response.json.capturePreview.executionDurationMs` | Invocation elapsed wall-clock duration in milliseconds (`executionEndedAtEpoch - executionStartedAtEpoch`, non-negative). | `probe_get_status` | false | `55` |
 | `response.json.capturePreview.executionPaths` | Optional execution-path frames captured at runtime when `MCP_PROBE_INCLUDE_EXECUTION_PATHS=true`. | `probe_get_status` | false | `["CatalogController.listCatalogShoes()#42"]` |
 | `response.json.runtime` | Runtime observe/session-actuation payload. | `probe_get_status` | false | `{"mode":"observe","activeSessionCount":0}` |
 | `response.json.runtime.sessionId` | Representative active session id when actuation is armed. | `probe_get_status` | false | `"regression-run-42"` |
@@ -256,6 +260,9 @@ examples:
 | `result.found` | Whether capture payload exists and was returned. | `probe_get_capture` | true | `true` |
 | `result.capture` | Compact capture metadata (`captureId`, `methodKey`, timestamp, args/return/thrown presence flags). | `probe_get_capture` | false | `{"captureId":"abc123","argsCount":1,"hasReturnValue":true}` |
 | `result.capture.capturedAtEpoch` | Capture Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_capture` | false | `1739671200456` |
+| `result.capture.executionStartedAtEpoch` | Invocation start Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_capture` | false | `1739671200401` |
+| `result.capture.executionEndedAtEpoch` | Invocation end Unix-epoch timestamp in JVM host wall-clock milliseconds. | `probe_get_capture` | false | `1739671200456` |
+| `result.capture.executionDurationMs` | Invocation elapsed wall-clock duration in milliseconds (`executionEndedAtEpoch - executionStartedAtEpoch`, non-negative). | `probe_get_capture` | false | `55` |
 | `result.capture.executionPaths` | Optional execution-path frames when `MCP_PROBE_INCLUDE_EXECUTION_PATHS=true`. | `probe_get_capture` | false | `["CatalogService.save()#88"]` |
 | `result.reason` | Error reason when capture is unavailable. | `probe_get_capture` | false | `"capture_not_found"` |
 

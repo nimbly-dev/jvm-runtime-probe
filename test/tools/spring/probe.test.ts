@@ -89,6 +89,9 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
         available: true,
         captureId: "abc123",
         capturedAtEpoch: 5555,
+        executionStartedAtEpoch: 5500,
+        executionEndedAtEpoch: 5555,
+        executionDurationMs: 55,
             executionPaths: [
               "CatalogController.listCatalogShoes()#42",
               "CatalogService.listCatalogShoes()#101",
@@ -127,6 +130,9 @@ test("probe_get_status supports 0.1.0 nested envelope", async () => {
     assert.equal(out.structuredContent.response.json.contractVersion, "0.1.0");
     assert.equal(out.structuredContent.response.json.capturePreview.captureId, "abc123");
     assert.equal(out.structuredContent.response.json.capturePreview.capturedAtEpoch, 5555);
+    assert.equal(out.structuredContent.response.json.capturePreview.executionStartedAtEpoch, 5500);
+    assert.equal(out.structuredContent.response.json.capturePreview.executionEndedAtEpoch, 5555);
+    assert.equal(out.structuredContent.response.json.capturePreview.executionDurationMs, 55);
     assert.equal(out.structuredContent.response.json.capturePreview.executionPaths, undefined);
     assert.equal(out.structuredContent.response.json.runtime.applicationType, undefined);
     assert.equal(out.structuredContent.response.json.runtime.serverEpoch, undefined);
@@ -483,6 +489,9 @@ test("probe_get_status supports 0.1.0 batch rows with nested probe payload", asy
             available: true,
             captureId: "cap-1",
             capturedAtEpoch: 4444,
+            executionStartedAtEpoch: 4420,
+            executionEndedAtEpoch: 4444,
+            executionDurationMs: 24,
               executionPaths: ["CatalogController.listCatalogShoes()#42"],
           },
           runtime: {
@@ -525,6 +534,9 @@ test("probe_get_status supports 0.1.0 batch rows with nested probe payload", asy
     assert.equal(firstRow.lastHitEpoch, 2222);
     assert.equal(firstRow.runtimeMode, "observe");
     assert.equal(firstRow.capturePreview.captureId, "cap-1");
+    assert.equal(firstRow.capturePreview.executionStartedAtEpoch, 4420);
+    assert.equal(firstRow.capturePreview.executionEndedAtEpoch, 4444);
+    assert.equal(firstRow.capturePreview.executionDurationMs, 24);
     assert.equal(firstRow.capturePreview.executionPaths, undefined);
   });
 });
@@ -537,6 +549,9 @@ test("probe_get_capture returns capture payload when available", async () => {
         captureId: "abc123",
         methodKey: "com.example.social.post.app.controller.PostController#updatePost",
         capturedAtEpoch: 1000,
+        executionStartedAtEpoch: 950,
+        executionEndedAtEpoch: 1000,
+        executionDurationMs: 50,
         redactionMode: "basic",
         args: [{ index: 0, value: "{\"sku\":\"A1\"}", truncated: false, originalLength: 12, redacted: false }],
         returnValue: { value: "{\"ok\":true}", truncated: false, originalLength: 11, redacted: false },
@@ -555,12 +570,18 @@ test("probe_get_capture returns capture payload when available", async () => {
     assert.equal(parsed.mode, "probe_get_capture");
     assert.equal((parsed as any).result.found, true);
     assert.equal((parsed as any).result.captureId, "abc123");
+    assert.equal((parsed as any).result.executionStartedAtEpoch, 950);
+    assert.equal((parsed as any).result.executionEndedAtEpoch, 1000);
+    assert.equal((parsed as any).result.executionDurationMs, 50);
     assert.equal((parsed as any).result.argsCount, 1);
     assert.equal((parsed as any).result.executionPathCount, 1);
     assert.equal((parsed as any).result.capture, undefined);
     assert.equal(parsed.notes, "Use structuredContent.result.capture for full payload.");
     assert.equal(out.structuredContent.result.found, true);
     assert.equal(out.structuredContent.result.capture.captureId, "abc123");
+    assert.equal(out.structuredContent.result.capture.executionStartedAtEpoch, 950);
+    assert.equal(out.structuredContent.result.capture.executionEndedAtEpoch, 1000);
+    assert.equal(out.structuredContent.result.capture.executionDurationMs, 50);
     assert.equal(out.structuredContent.result.capture.argsCount, 1);
     assert.equal(out.structuredContent.result.capture.hasReturnValue, true);
     assert.equal(out.structuredContent.result.capture.hasThrownValue, false);
@@ -589,6 +610,45 @@ test("probe_get_capture returns not found state when capture is missing", async 
     assert.equal(out.structuredContent.result.reason, "capture_not_found");
     assert.equal(out.structuredContent.result.reasonCode, "capture_not_found");
     assert.equal(out.structuredContent.result.nextActionCode, "request_new_capture");
+  });
+});
+
+test("probe_get_capture includes timing fields for thrown captures", async () => {
+  await withMockedFetch(async () => {
+    return jsonResponse(200, {
+      contractVersion: "0.1.0",
+      capture: {
+        captureId: "err-1",
+        methodKey: "com.example.social.post.app.service.PostService#updatePost",
+        capturedAtEpoch: 1500,
+        executionStartedAtEpoch: 1400,
+        executionEndedAtEpoch: 1500,
+        executionDurationMs: 100,
+        redactionMode: "basic",
+        args: [],
+        returnValue: null,
+        thrownValue: {
+          value: "{\"message\":\"boom\"}",
+          truncated: false,
+          originalLength: 18,
+          redacted: false,
+        },
+        truncatedAny: false,
+      },
+    });
+  }, async () => {
+    const out = await probeCaptureGet({
+      captureId: "err-1",
+      baseUrl: "http://127.0.0.1:9191",
+      capturePath: "/__probe/capture",
+    });
+    assert.equal(out.structuredContent.result.found, true);
+    assert.equal(out.structuredContent.result.capture.captureId, "err-1");
+    assert.equal(out.structuredContent.result.capture.hasReturnValue, false);
+    assert.equal(out.structuredContent.result.capture.hasThrownValue, true);
+    assert.equal(out.structuredContent.result.capture.executionStartedAtEpoch, 1400);
+    assert.equal(out.structuredContent.result.capture.executionEndedAtEpoch, 1500);
+    assert.equal(out.structuredContent.result.capture.executionDurationMs, 100);
   });
 });
 

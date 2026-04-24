@@ -8,6 +8,9 @@ public final class CapturePreviewView {
   public final String captureId;
   public final String methodKey;
   public final long capturedAtEpoch;
+  public final long executionStartedAtEpoch;
+  public final long executionEndedAtEpoch;
+  public final long executionDurationMs;
   public final String redactionMode;
   public final List<CaptureValueView> argsPreview;
   public final CaptureValueView returnPreview;
@@ -20,6 +23,9 @@ public final class CapturePreviewView {
       String captureId,
       String methodKey,
       long capturedAtEpoch,
+      long executionStartedAtEpoch,
+      long executionEndedAtEpoch,
+      long executionDurationMs,
       String redactionMode,
       List<CaptureValueView> argsPreview,
       CaptureValueView returnPreview,
@@ -31,6 +37,9 @@ public final class CapturePreviewView {
     this.captureId = captureId;
     this.methodKey = methodKey;
     this.capturedAtEpoch = capturedAtEpoch;
+    this.executionStartedAtEpoch = executionStartedAtEpoch;
+    this.executionEndedAtEpoch = executionEndedAtEpoch;
+    this.executionDurationMs = executionDurationMs;
     this.redactionMode = redactionMode;
     this.argsPreview = argsPreview;
     this.returnPreview = returnPreview;
@@ -45,6 +54,9 @@ public final class CapturePreviewView {
         null,
         null,
         0L,
+        0L,
+        0L,
+        0L,
         redactionMode,
         Collections.emptyList(),
         null,
@@ -58,6 +70,9 @@ public final class CapturePreviewView {
       String captureId,
       String methodKey,
       long capturedAtEpoch,
+      long executionStartedAtEpoch,
+      long executionEndedAtEpoch,
+      long executionDurationMs,
       String redactionMode,
       List<CaptureValueView> argsPreview,
       CaptureValueView returnPreview,
@@ -70,6 +85,9 @@ public final class CapturePreviewView {
         captureId,
         methodKey,
         capturedAtEpoch,
+        executionStartedAtEpoch,
+        executionEndedAtEpoch,
+        executionDurationMs,
         redactionMode,
         argsPreview,
         returnPreview,

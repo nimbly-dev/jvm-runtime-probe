@@ -62,7 +62,9 @@ public final class ProbeCaptureStore {
       String methodName,
       Object[] allArguments,
       Object returnValue,
-      Throwable thrown
+      Throwable thrown,
+      long executionStartedAtEpoch,
+      long executionEndedAtEpoch
   ) {
     if (!captureEnabled) return;
     if (dottedClassName == null || dottedClassName.isBlank()) return;
@@ -70,7 +72,17 @@ public final class ProbeCaptureStore {
 
     String methodKey = dottedClassName + "#" + methodName;
     String captureId = Long.toHexString(CAPTURE_SEQ.incrementAndGet());
-    long capturedAtEpoch = System.currentTimeMillis();
+    long normalizedExecutionEndedAtEpoch = executionEndedAtEpoch > 0
+        ? executionEndedAtEpoch
+        : System.currentTimeMillis();
+    long normalizedExecutionStartedAtEpoch = executionStartedAtEpoch > 0
+        ? executionStartedAtEpoch
+        : normalizedExecutionEndedAtEpoch;
+    if (normalizedExecutionEndedAtEpoch < normalizedExecutionStartedAtEpoch) {
+      normalizedExecutionEndedAtEpoch = normalizedExecutionStartedAtEpoch;
+    }
+    long executionDurationMs = normalizedExecutionEndedAtEpoch - normalizedExecutionStartedAtEpoch;
+    long capturedAtEpoch = normalizedExecutionEndedAtEpoch;
 
     List<CaptureValue> capturedArgs = CaptureValueSerializer.serializeArguments(
         allArguments,
@@ -98,6 +110,9 @@ public final class ProbeCaptureStore {
         captureId,
         methodKey,
         capturedAtEpoch,
+        normalizedExecutionStartedAtEpoch,
+        normalizedExecutionEndedAtEpoch,
+        executionDurationMs,
         capturedArgs,
         capturedReturn,
         capturedThrown,

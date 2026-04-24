@@ -6,6 +6,9 @@ public final class CaptureRecordView {
   public final String captureId;
   public final String methodKey;
   public final long capturedAtEpoch;
+  public final long executionStartedAtEpoch;
+  public final long executionEndedAtEpoch;
+  public final long executionDurationMs;
   public final String redactionMode;
   public final List<CaptureValueView> args;
   public final CaptureValueView returnValue;
@@ -17,6 +20,9 @@ public final class CaptureRecordView {
       String captureId,
       String methodKey,
       long capturedAtEpoch,
+      long executionStartedAtEpoch,
+      long executionEndedAtEpoch,
+      long executionDurationMs,
       String redactionMode,
       List<CaptureValueView> args,
       CaptureValueView returnValue,
@@ -27,6 +33,9 @@ public final class CaptureRecordView {
     this.captureId = captureId;
     this.methodKey = methodKey;
     this.capturedAtEpoch = capturedAtEpoch;
+    this.executionStartedAtEpoch = executionStartedAtEpoch;
+    this.executionEndedAtEpoch = executionEndedAtEpoch;
+    this.executionDurationMs = executionDurationMs;
     this.redactionMode = redactionMode;
     this.args = args;
     this.returnValue = returnValue;

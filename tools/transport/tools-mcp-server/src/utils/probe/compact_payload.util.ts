@@ -27,10 +27,25 @@ export function compactCapturePreview(preview: Record<string, unknown>): Record<
     typeof preview.capturedAtEpoch === "number"
       ? preview.capturedAtEpoch
       : undefined;
+  const executionStartedAtEpoch =
+    typeof preview.executionStartedAtEpoch === "number"
+      ? preview.executionStartedAtEpoch
+      : undefined;
+  const executionEndedAtEpoch =
+    typeof preview.executionEndedAtEpoch === "number"
+      ? preview.executionEndedAtEpoch
+      : undefined;
+  const executionDurationMs =
+    typeof preview.executionDurationMs === "number"
+      ? preview.executionDurationMs
+      : undefined;
   const out: Record<string, unknown> = {};
   if (typeof preview.available === "boolean") out.available = preview.available;
   if (typeof preview.captureId === "string") out.captureId = preview.captureId;
   if (typeof capturedAtEpoch === "number") out.capturedAtEpoch = capturedAtEpoch;
+  if (typeof executionStartedAtEpoch === "number") out.executionStartedAtEpoch = executionStartedAtEpoch;
+  if (typeof executionEndedAtEpoch === "number") out.executionEndedAtEpoch = executionEndedAtEpoch;
+  if (typeof executionDurationMs === "number") out.executionDurationMs = executionDurationMs;
   if (typeof preview.methodKey === "string") out.methodKey = preview.methodKey;
   if (typeof preview.redactionMode === "string") out.redactionMode = preview.redactionMode;
   if (typeof preview.truncatedAny === "boolean") out.truncatedAny = preview.truncatedAny;
@@ -90,9 +105,24 @@ export function compactCaptureRecord(capture: ProbeCaptureRecordPayload): Record
     typeof rawCapture.capturedAtEpoch === "number"
       ? rawCapture.capturedAtEpoch
       : undefined;
+  const executionStartedAtEpoch =
+    typeof rawCapture.executionStartedAtEpoch === "number"
+      ? rawCapture.executionStartedAtEpoch
+      : undefined;
+  const executionEndedAtEpoch =
+    typeof rawCapture.executionEndedAtEpoch === "number"
+      ? rawCapture.executionEndedAtEpoch
+      : undefined;
+  const executionDurationMs =
+    typeof rawCapture.executionDurationMs === "number"
+      ? rawCapture.executionDurationMs
+      : undefined;
   if (typeof capture.captureId === "string") out.captureId = capture.captureId;
   if (typeof capture.methodKey === "string") out.methodKey = capture.methodKey;
   if (typeof capturedAtEpoch === "number") out.capturedAtEpoch = capturedAtEpoch;
+  if (typeof executionStartedAtEpoch === "number") out.executionStartedAtEpoch = executionStartedAtEpoch;
+  if (typeof executionEndedAtEpoch === "number") out.executionEndedAtEpoch = executionEndedAtEpoch;
+  if (typeof executionDurationMs === "number") out.executionDurationMs = executionDurationMs;
   if (typeof capture.redactionMode === "string") out.redactionMode = capture.redactionMode;
   if (typeof capture.truncatedAny === "boolean") out.truncatedAny = capture.truncatedAny;
   const args = Array.isArray(rawCapture.args)

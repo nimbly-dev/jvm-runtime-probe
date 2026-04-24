@@ -101,6 +101,15 @@ test("java-agent IT: protected createPost route hits strict controller line", as
   assert.equal(captureStructured.result.capture.captureId, capturePreview.captureId);
   assert.equal(captureStructured.result.capture.argsCount >= 1, true);
   assert.equal(captureStructured.result.capture.hasReturnValue, true);
+  assert.equal(typeof captureStructured.result.capture.executionStartedAtEpoch, "number");
+  assert.equal(typeof captureStructured.result.capture.executionEndedAtEpoch, "number");
+  assert.equal(typeof captureStructured.result.capture.executionDurationMs, "number");
+  assert.equal(captureStructured.result.capture.executionDurationMs >= 0, true);
+  assert.equal(
+    captureStructured.result.capture.executionEndedAtEpoch -
+      captureStructured.result.capture.executionStartedAtEpoch,
+    captureStructured.result.capture.executionDurationMs,
+  );
 });
 
 test("java-agent IT: declaration-line strict key fails closed as invalid_line_target", async () => {
