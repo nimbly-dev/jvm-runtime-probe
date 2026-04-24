@@ -9,6 +9,8 @@ test("probe_recipe_create schema requires projectRootAbs", () => {
   const keys = Object.keys(RecipeGenerateInputSchema);
   assert.equal(keys.includes("projectRootAbs"), true);
   assert.equal(keys.includes("additionalSourceRoots"), true);
+  assert.equal(keys.includes("mappingsBaseUrl"), true);
+  assert.equal(keys.includes("discoveryPreference"), true);
 });
 
 test("probe_target_infer schema requires projectRootAbs", () => {
@@ -35,4 +37,26 @@ test("probe_recipe_create schema accepts regression_http_only and rejects regres
     intentMode: "regression_api_only",
   });
   assert.equal(legacy.success, false);
+});
+
+test("probe_recipe_create schema accepts runtime discovery preference values", () => {
+  const recipeSchema = z.object(RecipeGenerateInputSchema);
+  const parsed = recipeSchema.safeParse({
+    projectRootAbs: "C:\\repo\\service",
+    classHint: "com.example.CatalogService",
+    methodHint: "save",
+    intentMode: "regression_http_only",
+    discoveryPreference: "runtime_first",
+    mappingsBaseUrl: "http://127.0.0.1:8080/actuator/mappings",
+  });
+  assert.equal(parsed.success, true);
+
+  const invalid = recipeSchema.safeParse({
+    projectRootAbs: "C:\\repo\\service",
+    classHint: "com.example.CatalogService",
+    methodHint: "save",
+    intentMode: "regression_http_only",
+    discoveryPreference: "runtime_preferred",
+  });
+  assert.equal(invalid.success, false);
 });

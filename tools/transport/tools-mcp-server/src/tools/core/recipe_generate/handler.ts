@@ -104,6 +104,14 @@ export function registerRecipeCreateTool(
         classHint: typeof input.classHint === "string" ? input.classHint : undefined,
         methodHint: typeof input.methodHint === "string" ? input.methodHint : undefined,
         lineHint: typeof input.lineHint === "number" ? input.lineHint : undefined,
+        mappingsBaseUrl:
+          typeof input.mappingsBaseUrl === "string" ? input.mappingsBaseUrl : undefined,
+        discoveryPreference:
+          input.discoveryPreference === "static_only" ||
+          input.discoveryPreference === "runtime_first" ||
+          input.discoveryPreference === "runtime_only"
+            ? input.discoveryPreference
+            : undefined,
         additionalSourceRoots:
           Array.isArray(input.additionalSourceRoots) &&
           input.additionalSourceRoots.every((value) => typeof value === "string")
@@ -124,6 +132,8 @@ export function registerRecipeCreateTool(
         classHint,
         methodHint,
         lineHint,
+        mappingsBaseUrl,
+        discoveryPreference,
         additionalSourceRoots,
         apiBasePath,
         intentMode,
@@ -232,6 +242,10 @@ export function registerRecipeCreateTool(
         intentMode,
       };
       if (typeof lineHint === "number") generateArgs.lineHint = lineHint;
+      if (typeof mappingsBaseUrl === "string") generateArgs.mappingsBaseUrl = mappingsBaseUrl;
+      if (typeof discoveryPreference === "string") {
+        generateArgs.discoveryPreference = discoveryPreference;
+      }
       if (typeof apiBasePath === "string") generateArgs.apiBasePath = apiBasePath;
       if (authToken) generateArgs.authToken = authToken;
       if (authUsername) generateArgs.authUsername = authUsername;
@@ -361,6 +375,8 @@ export function registerRecipeCreateTool(
           classHint,
           methodHint,
           lineHint,
+          mappingsBaseUrl,
+          discoveryPreference,
           additionalSourceRoots:
             additionalRoots.normalizedAdditionalSourceRoots.length > 0
               ? additionalRoots.normalizedAdditionalSourceRoots

@@ -159,6 +159,8 @@ examples:
 | `projectRoot` | Absolute project root selected by orchestrator and used for scoped recipe generation. | `probe_recipe_create` | true | `"C:\\repo\\catalog-service"` |
 | `hints` | Effective input hints and actuation preferences (`classHint` must be exact FQCN). | `probe_recipe_create` | true | `{"classHint":"com.example.catalog.CatalogService","lineHint":88}` |
 | `hints.additionalSourceRoots` | Effective normalized additional source roots included in static inference scope. | `probe_recipe_create` | false | `["C:\\repo\\core-module\\src\\main\\java"]` |
+| `hints.mappingsBaseUrl` | Optional runtime mappings endpoint URL used for runtime-first discovery (for example Spring Actuator mappings endpoint). | `probe_recipe_create` | false | `"http://127.0.0.1:8080/actuator/mappings"` |
+| `hints.discoveryPreference` | Request discovery routing preference (`static_only`, `runtime_first`, `runtime_only`). | `probe_recipe_create` | false | `"runtime_first"` |
 | `hints.apiBasePath` | Optional API context/base path provided by orchestrator and applied to request candidates/trigger paths (anti-duplication). | `probe_recipe_create` | false | `"/api/v1"` |
 | `inferredTarget` | Best inferred runtime target for probe verification. | `probe_recipe_create` | false | `{"key":"com.example.CatalogService#save","line":88}` |
 | `requestCandidates` | HTTP request candidates inferred from code-based synthesizer analysis. | `probe_recipe_create` | true | `[{"method":"POST","path":"/v1/catalog"}]` |
@@ -176,6 +178,12 @@ examples:
 | `reasonCode=target_method_not_found` | Resolver matched target type but not the requested method hint. | `probe_recipe_create` | false | `"target_method_not_found"` |
 | `reasonCode=project_root_invalid` | Resolver rejected project root during AST mapping resolution. | `probe_recipe_create` | false | `"project_root_invalid"` |
 | `reasonCode=mapper_plugin_unavailable` | Java request-mapper/plugin bootstrap failed before entrypoint proof. | `probe_recipe_create` | false | `"mapper_plugin_unavailable"` |
+| `reasonCode=runtime_mappings_input_required` | Runtime mappings discovery was requested but `mappingsBaseUrl` was missing/invalid for `runtime_only` mode. | `probe_recipe_create` | false | `"runtime_mappings_input_required"` |
+| `reasonCode=runtime_mappings_unreachable` | Runtime mappings endpoint could not be reached (network/non-2xx response). | `probe_recipe_create` | false | `"runtime_mappings_unreachable"` |
+| `reasonCode=runtime_mappings_unauthorized` | Runtime mappings endpoint rejected request authorization (`401`/`403`). | `probe_recipe_create` | false | `"runtime_mappings_unauthorized"` |
+| `reasonCode=runtime_mappings_invalid_payload` | Runtime mappings endpoint returned payload that could not be parsed into deterministic mapping candidates. | `probe_recipe_create` | false | `"runtime_mappings_invalid_payload"` |
+| `reasonCode=runtime_mapping_not_found` | Runtime mappings endpoint had no deterministic route for current `classHint` + `methodHint`. | `probe_recipe_create` | false | `"runtime_mapping_not_found"` |
+| `reasonCode=runtime_mapping_ambiguous` | Runtime mappings endpoint returned multiple plausible routes for current `classHint` + `methodHint`. | `probe_recipe_create` | false | `"runtime_mapping_ambiguous"` |
 | `reasonCode=additional_source_roots_invalid` | Input validation failed because one or more `additionalSourceRoots` paths are missing or non-directory. | `probe_recipe_create` | false | `"additional_source_roots_invalid"` |
 | `reasonCode=additional_source_roots_limit_exceeded` | Input validation failed because `additionalSourceRoots` exceeded max entry count (`10`). | `probe_recipe_create` | false | `"additional_source_roots_limit_exceeded"` |
 | `nextAction` (target candidate missing) | For `reasonCode=target_candidate_missing`, guidance is refined when class inventory proves an exact class match with zero method bodies (for example inherited implementation in another module root). | `probe_recipe_create` | false | `"Matched class has no method bodies in projectRootAbs. If methods are inherited, use parent module/source roots."` |
@@ -190,6 +198,7 @@ examples:
 | `attemptedStrategies` | Ordered synthesis strategies attempted by the selected plugin. | `probe_recipe_create` | true | `["spring_annotation_mapping","spring_call_chain_resolution"]` |
 | `evidence` | Compact evidence lines used for deterministic synthesis and pushback context. | `probe_recipe_create` | true | `["request_source=spring_mvc"]` |
 | `evidence[] (mapping_source=bytecode_annotation)` | Indicates Spring request mapping was proven from compiled class annotations fallback (for example `target/classes`) when source mapping was insufficient. | `probe_recipe_create` | false | `"mapping_source=bytecode_annotation"` |
+| `evidence[] (mapping_source=runtime_actuator)` | Indicates request mapping was proven from runtime actuator mappings endpoint (`mappingsBaseUrl`) before static synthesis fallback. | `probe_recipe_create` | false | `"mapping_source=runtime_actuator"` |
 | `trigger` | Protocol-aware trigger envelope emitted by synthesis. | `probe_recipe_create` | false | `{"kind":"http","method":"POST","path":"/v1/catalog"}` |
 | `auth` | Auth inference result and next-step hints. | `probe_recipe_create` | true | `{"status":"ok","strategy":"bearer"}` |
 | `notes` | Run notes and routing/inference diagnostics. Report mode is compact/failure-focused. | `probe_recipe_create` | true | `["execution_readiness=ready"]` |

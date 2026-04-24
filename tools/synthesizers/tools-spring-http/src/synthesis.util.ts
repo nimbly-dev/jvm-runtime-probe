@@ -1,4 +1,7 @@
 import type { SynthesizerFailure } from "@/models/synthesis/synthesizer_failure.model";
+import type {
+  RuntimeMappingsResolveResult,
+} from "@/models/synthesis/runtime_mappings.model";
 import type { SynthesizerInput } from "@/models/synthesis/synthesizer_input.model";
 import type {
   JvmAstRequestMappingFailure,
@@ -6,6 +9,7 @@ import type {
 } from "@/models/synthesis/request_mapping_ast.model";
 import type { SynthesizerOutput } from "@/models/synthesis/synthesizer_output.model";
 import { resolveRequestMappingAst } from "@/lib/request_mapping_ast_resolver";
+import { resolveRequestMappingFromRuntime } from "@/lib/request_mapping_runtime_resolver";
 import { SPRING_FAILURE_CODES } from "@tools-spring-http/failure_codes.util";
 
 export type SynthesizeSpringRecipeDeps = {
@@ -17,6 +21,12 @@ export type SynthesizeSpringRecipeDeps = {
     lineHint?: number;
     inferredTargetFileAbs?: string;
   }) => Promise<JvmAstRequestMappingResult>;
+  resolveRuntimeMappingsFn?: (input: {
+    mappingsBaseUrl: string;
+    classHint: string;
+    methodHint: string;
+    authToken?: string;
+  }) => Promise<RuntimeMappingsResolveResult>;
 };
 
 function readResolverContextPathHint(
@@ -75,6 +85,84 @@ export async function synthesizeSpringRecipe(
   deps: SynthesizeSpringRecipeDeps = {},
 ): Promise<SynthesizerOutput | SynthesizerFailure> {
   const resolveRequestMappingFn = deps.resolveRequestMappingFn ?? resolveRequestMappingAst;
+  const resolveRuntimeMappingsFn =
+    deps.resolveRuntimeMappingsFn ?? resolveRequestMappingFromRuntime;
+  const runtimeDiscoveryPreference = input.discoveryPreference ?? "static_only";
+  let runtimeFailure:
+    | { reasonCode: string; failedStep: string; evidence: string[]; attemptedStrategies: string[] }
+    | undefined;
+
+  if (runtimeDiscoveryPreference === "runtime_first" || runtimeDiscoveryPreference === "runtime_only") {
+    if (!input.mappingsBaseUrl || input.mappingsBaseUrl.trim().length === 0) {
+      if (runtimeDiscoveryPreference === "runtime_only") {
+        return {
+          status: "report",
+          reasonCode: "runtime_mappings_input_required",
+          failedStep: "runtime_mapping_configuration",
+          nextAction:
+            "Provide mappingsBaseUrl (for example http://127.0.0.1:8080/actuator/mappings) and rerun probe_recipe_create.",
+          evidence: ["mappingsBaseUrl=(missing)"],
+          attemptedStrategies: ["spring_runtime_actuator_mappings"],
+          synthesizerUsed: "spring",
+        };
+      }
+    } else {
+      const runtimeResolved = await resolveRuntimeMappingsFn({
+        mappingsBaseUrl: input.mappingsBaseUrl,
+        classHint: input.classHint,
+        methodHint: input.methodHint,
+        ...(input.authToken ? { authToken: input.authToken } : {}),
+      });
+
+      if (runtimeResolved.status === "ok") {
+        return {
+          status: "recipe",
+          synthesizerUsed: "spring",
+          framework: "spring",
+          requestCandidate: runtimeResolved.requestCandidate,
+          trigger: {
+            kind: "http",
+            method: runtimeResolved.requestCandidate.method,
+            path: runtimeResolved.requestCandidate.path,
+            queryTemplate: runtimeResolved.requestCandidate.queryTemplate,
+            fullUrlHint: runtimeResolved.requestCandidate.fullUrlHint,
+            ...(runtimeResolved.requestCandidate.bodyTemplate
+              ? { bodyTemplate: runtimeResolved.requestCandidate.bodyTemplate }
+              : {}),
+            headers: {},
+            ...(runtimeResolved.requestCandidate.bodyTemplate ? { contentType: "application/json" } : {}),
+          },
+          requestSource: "spring_mvc",
+          matchedRootAbs: input.rootAbs,
+          evidence: [
+            "request_source=spring_mvc",
+            ...runtimeResolved.evidence,
+          ],
+          attemptedStrategies: runtimeResolved.attemptedStrategies,
+        };
+      }
+
+      if (runtimeDiscoveryPreference === "runtime_only") {
+        return {
+          status: "report",
+          reasonCode: runtimeResolved.reasonCode,
+          failedStep: runtimeResolved.failedStep,
+          nextAction: runtimeResolved.nextAction,
+          evidence: runtimeResolved.evidence,
+          attemptedStrategies: runtimeResolved.attemptedStrategies,
+          synthesizerUsed: "spring",
+        };
+      }
+
+      runtimeFailure = {
+        reasonCode: runtimeResolved.reasonCode,
+        failedStep: runtimeResolved.failedStep,
+        evidence: runtimeResolved.evidence,
+        attemptedStrategies: runtimeResolved.attemptedStrategies,
+      };
+    }
+  }
+
   const resolved = await resolveRequestMappingFn({
     projectRootAbs: input.rootAbs,
     ...(input.searchRootsAbs.length > 0 ? { searchRootsAbs: input.searchRootsAbs } : {}),
@@ -114,9 +202,15 @@ export async function synthesizeSpringRecipe(
       `controller_file=${resolved.matchedTypeFile}`,
       `ast_framework=${resolved.framework}`,
       ...resolved.evidence,
+      ...(runtimeFailure
+        ? [`runtime_mappings_fallback_reason=${runtimeFailure.reasonCode}`]
+        : []),
       ...(contextPathHint ? [`ast_context_path_hint=${contextPathHint}`] : []),
     ],
-    attemptedStrategies: resolved.attemptedStrategies,
+    attemptedStrategies: [
+      ...(runtimeFailure?.attemptedStrategies ?? []),
+      ...resolved.attemptedStrategies,
+    ],
   };
   return out;
 }

@@ -17,6 +17,18 @@ export const RecipeGenerateInputSchema = {
     .describe("Fully-qualified class name (FQCN), e.g. com.example.catalog.CatalogShoeSpecifications"),
   methodHint: z.string().describe("Method hint, e.g. finalPriceLte"),
   lineHint: z.number().int().positive().optional(),
+  mappingsBaseUrl: z
+    .string()
+    .optional()
+    .describe(
+      "Optional runtime mappings endpoint URL (for example http://127.0.0.1:8080/actuator/mappings). Used when discoveryPreference includes runtime mapping discovery.",
+    ),
+  discoveryPreference: z
+    .enum(["static_only", "runtime_first", "runtime_only"])
+    .optional()
+    .describe(
+      "Optional request discovery preference. static_only keeps AST/bytecode flow; runtime_first tries actuator mappings then falls back; runtime_only requires actuator mappings proof.",
+    ),
   apiBasePath: z
     .string()
     .optional()

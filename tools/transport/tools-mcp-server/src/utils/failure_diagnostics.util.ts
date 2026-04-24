@@ -32,6 +32,12 @@ const NEXT_ACTION_CODE_BY_REASON: Record<string, string> = {
   runtime_not_aligned: "align_runtime_and_artifact",
   probe_connectivity_issue: "verify_probe_connectivity",
   line_not_executed_in_window: "verify_trigger_path",
+  runtime_mappings_input_required: "provide_mappings_base_url",
+  runtime_mappings_unreachable: "verify_runtime_mappings_endpoint",
+  runtime_mappings_unauthorized: "authorize_runtime_mappings_access",
+  runtime_mappings_invalid_payload: "verify_runtime_mappings_payload",
+  runtime_mapping_not_found: "refine_runtime_mapping_hints",
+  runtime_mapping_ambiguous: "disambiguate_runtime_mapping",
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {

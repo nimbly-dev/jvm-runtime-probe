@@ -8,6 +8,8 @@ export type NormalizedRecipeGenerateInput = {
   methodHint: string;
   intentMode: IntentMode;
   lineHint?: number;
+  mappingsBaseUrl?: string;
+  discoveryPreference: "static_only" | "runtime_first" | "runtime_only";
   apiBasePath?: string;
   maxCandidates: number;
   authToken?: string;
@@ -25,6 +27,8 @@ export function normalizeRecipeGenerateInput(args: {
   classHint: string;
   methodHint: string;
   lineHint?: number;
+  mappingsBaseUrl?: string;
+  discoveryPreference?: "static_only" | "runtime_first" | "runtime_only";
   apiBasePath?: string;
   intentMode: IntentMode;
   maxCandidates?: number;
@@ -36,6 +40,7 @@ export function normalizeRecipeGenerateInput(args: {
   actuationActuatorId?: string;
 }): NormalizedRecipeGenerateInput {
   const normalizedApiBasePath = normalizeApiBasePath(args.apiBasePath);
+  const normalizedMappingsBaseUrl = normalizeMappingsBaseUrl(args.mappingsBaseUrl);
   return {
     rootAbs: args.rootAbs,
     workspaceRootAbs: args.workspaceRootAbs,
@@ -46,6 +51,8 @@ export function normalizeRecipeGenerateInput(args: {
     methodHint: args.methodHint,
     intentMode: args.intentMode,
     ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
+    ...(normalizedMappingsBaseUrl ? { mappingsBaseUrl: normalizedMappingsBaseUrl } : {}),
+    discoveryPreference: args.discoveryPreference ?? "static_only",
     ...(normalizedApiBasePath ? { apiBasePath: normalizedApiBasePath } : {}),
     maxCandidates: typeof args.maxCandidates === "number" ? Math.max(1, args.maxCandidates) : 1,
     ...(args.authToken ? { authToken: args.authToken } : {}),
@@ -57,6 +64,13 @@ export function normalizeRecipeGenerateInput(args: {
       : {}),
     ...(args.actuationActuatorId ? { actuationActuatorId: args.actuationActuatorId } : {}),
   };
+}
+
+function normalizeMappingsBaseUrl(value?: string): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  return trimmed;
 }
 
 function normalizeApiBasePath(value?: string): string | undefined {

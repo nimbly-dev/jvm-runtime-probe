@@ -210,3 +210,124 @@ test("spring synthesizer passes computed search roots into AST resolver input", 
   const actualInput = capturedInput as any;
   assert.deepEqual(actualInput.searchRootsAbs, ["C:\\repo\\service", "C:\\repo\\workspace"]);
 });
+
+test("spring synthesizer runtime_first uses actuator mappings before AST", async () => {
+  let astCalls = 0;
+  const result = await synthesizeSpringRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      searchRootsAbs: ["C:\\repo\\service"],
+      classHint: "com.example.HealthController",
+      methodHint: "health",
+      intentMode: "regression_http_only",
+      discoveryPreference: "runtime_first",
+      mappingsBaseUrl: "http://127.0.0.1:8080/actuator/mappings",
+    },
+    {
+      resolveRuntimeMappingsFn: async () => ({
+        status: "ok",
+        requestCandidate: {
+          method: "GET",
+          path: "/v2/health",
+          queryTemplate: "",
+          fullUrlHint: "/v2/health",
+          rationale: ["runtime"],
+        },
+        evidence: ["mapping_source=runtime_actuator"],
+        attemptedStrategies: ["spring_runtime_actuator_mappings"],
+      }),
+      resolveRequestMappingFn: async () => {
+        astCalls += 1;
+        throw new Error("AST resolver should not run when runtime mappings succeed");
+      },
+    },
+  );
+
+  assert.equal(astCalls, 0);
+  assert.equal(result.status, "recipe");
+  assert.equal(result.requestCandidate.path, "/v2/health");
+  assert.equal(result.evidence.includes("mapping_source=runtime_actuator"), true);
+});
+
+test("spring synthesizer runtime_first falls back to AST when runtime mappings fail", async () => {
+  const result = await synthesizeSpringRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      searchRootsAbs: ["C:\\repo\\service"],
+      classHint: "com.example.HealthController",
+      methodHint: "health",
+      intentMode: "regression_http_only",
+      discoveryPreference: "runtime_first",
+      mappingsBaseUrl: "http://127.0.0.1:8080/actuator/mappings",
+    },
+    {
+      resolveRuntimeMappingsFn: async () => ({
+        status: "report",
+        reasonCode: "runtime_mappings_unreachable",
+        failedStep: "runtime_mapping_fetch",
+        nextAction: "Fix endpoint",
+        evidence: ["httpStatus=503"],
+        attemptedStrategies: ["spring_runtime_actuator_mappings"],
+      }),
+      resolveRequestMappingFn: async () => ({
+        status: "ok",
+        contractVersion: "0.1.0",
+        framework: "spring_mvc",
+        requestSource: "spring_mvc",
+        requestCandidate: {
+          method: "GET",
+          path: "/v1/health",
+          queryTemplate: "",
+          fullUrlHint: "/v1/health",
+          rationale: ["ast"],
+        },
+        matchedTypeFile: "C:\\repo\\service\\src\\main\\java\\HealthController.java",
+        matchedRootAbs: "C:\\repo\\service",
+        evidence: ["resolvedType=com.example.HealthController"],
+        attemptedStrategies: ["java_ast_index_lookup"],
+      }),
+    },
+  );
+
+  assert.equal(result.status, "recipe");
+  assert.equal(result.requestCandidate.path, "/v1/health");
+  assert.equal(
+    result.evidence.includes("runtime_mappings_fallback_reason=runtime_mappings_unreachable"),
+    true,
+  );
+  assert.equal(result.attemptedStrategies.includes("spring_runtime_actuator_mappings"), true);
+});
+
+test("spring synthesizer runtime_only fails closed when runtime mappings are unreachable", async () => {
+  const result = await synthesizeSpringRecipe(
+    {
+      rootAbs: "C:\\repo\\service",
+      workspaceRootAbs: "C:\\repo",
+      searchRootsAbs: ["C:\\repo\\service"],
+      classHint: "com.example.HealthController",
+      methodHint: "health",
+      intentMode: "regression_http_only",
+      discoveryPreference: "runtime_only",
+      mappingsBaseUrl: "http://127.0.0.1:8080/actuator/mappings",
+    },
+    {
+      resolveRuntimeMappingsFn: async () => ({
+        status: "report",
+        reasonCode: "runtime_mappings_unreachable",
+        failedStep: "runtime_mapping_fetch",
+        nextAction: "Fix endpoint",
+        evidence: ["httpStatus=503"],
+        attemptedStrategies: ["spring_runtime_actuator_mappings"],
+      }),
+      resolveRequestMappingFn: async () => {
+        throw new Error("AST resolver should not run in runtime_only mode");
+      },
+    },
+  );
+
+  assert.equal(result.status, "report");
+  assert.equal(result.reasonCode, "runtime_mappings_unreachable");
+  assert.equal(result.failedStep, "runtime_mapping_fetch");
+});

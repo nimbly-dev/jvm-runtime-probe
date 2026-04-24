@@ -163,6 +163,8 @@ export async function generateRecipe(
     classHint: string;
     methodHint: string;
     lineHint?: number;
+    mappingsBaseUrl?: string;
+    discoveryPreference?: "static_only" | "runtime_first" | "runtime_only";
     apiBasePath?: string;
     intentMode: IntentMode;
     maxCandidates?: number;
@@ -494,6 +496,9 @@ export async function generateRecipe(
     intentMode: normalized.intentMode,
     ...(typeof normalized.lineHint === "number" ? { lineHint: normalized.lineHint } : {}),
     inferredTargetFileAbs: top.file,
+    ...(normalized.mappingsBaseUrl ? { mappingsBaseUrl: normalized.mappingsBaseUrl } : {}),
+    discoveryPreference: normalized.discoveryPreference,
+    ...(normalized.authToken ? { authToken: normalized.authToken } : {}),
   });
 
   const synthesisSuccess = synthesis.status === "recipe" ? synthesis : undefined;

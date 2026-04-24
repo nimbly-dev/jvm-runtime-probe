@@ -5,6 +5,6 @@ management:
   endpoints:
     web:
       exposure:
-        include: health
+        include: health,mappings
 server:
   port: 18083
