@@ -70,18 +70,24 @@ test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm
         authMode: { scheme: "bearer", provided: true },
         discovery: {
           attempted: true,
+          status: "resolved",
+          reasonCode: "ok",
           outcomes: [
             {
               key: "tenantId",
               source: "datasource",
               outcome: "resolved",
+              reasonCode: "ok",
               sourceRef: "public.tenants",
             },
             {
               key: "auth.bearer",
               source: "runtime_context",
               outcome: "resolved",
+              reasonCode: "ok",
+              sourceRef: "Bearer abcdefghijk",
               token: "REMOVE_ME",
+              internalDebug: "should be stripped",
             },
           ],
         },
@@ -106,8 +112,12 @@ test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm
     assert.equal(result.runId, runId);
     assert.equal(evidence.runId, runId);
     assert.equal(evidence.authMode.scheme, "bearer");
-    assert.equal(evidence.discovery.outcomes[0].sourceRef, "public.tenants");
-    assert.equal(typeof evidence.discovery.outcomes[1].token, "undefined");
+    assert.equal(evidence.discovery.outcomes[0].key, "auth.bearer");
+    assert.equal(typeof evidence.discovery.outcomes[0].token, "undefined");
+    assert.equal(typeof evidence.discovery.outcomes[0].internalDebug, "undefined");
+    assert.equal(evidence.discovery.outcomes[0].sourceRef, "[REDACTED]");
+    assert.equal(evidence.discovery.outcomes[1].key, "tenantId");
+    assert.equal(evidence.discovery.outcomes[1].sourceRef, "public.tenants");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

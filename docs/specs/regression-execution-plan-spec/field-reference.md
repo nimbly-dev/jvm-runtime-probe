@@ -72,6 +72,13 @@ Discovery failure reason codes:
 - `discovery_adapter_failure`
 - `discovery_source_unsupported`
 - `discovery_timeout`
+- `discovery_mutation_blocked`
+
+Discovery governance rules:
+
+- discovery adapters MUST operate in read-only mode
+- non-read access MUST fail closed with `discovery_mutation_blocked`
+- discovery runtime failures MUST be sanitized to deterministic reason codes
 
 ### `steps[]`
 

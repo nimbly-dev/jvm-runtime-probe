@@ -19,6 +19,7 @@ export type PreflightReasonCode =
   | "discovery_adapter_failure"
   | "discovery_source_unsupported"
   | "discovery_timeout"
+  | "discovery_mutation_blocked"
   | "invalid_execution_intent"
   | "target_missing"
   | "steps_missing"
