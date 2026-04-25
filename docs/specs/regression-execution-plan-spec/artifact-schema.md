@@ -103,6 +103,7 @@ Recommended fields:
 - `resolvedRecipe` (protocol/transport shape actually executed)
 - `authMode` (scheme + provided/redacted state only)
 - `probe` (when runtime verification enabled)
+- `discovery` (resolver outcomes per prerequisite with redacted provenance only)
 
 Rules:
 

@@ -51,6 +51,8 @@ test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm
           status: "ready",
           reasonCode: "ok",
           missing: [],
+          discoverablePending: [],
+          prerequisiteResolution: [],
           requiredUserAction: [],
         },
         startedAt: "2026-04-19T08:01:22.111Z",
@@ -66,6 +68,23 @@ test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm
           },
         ],
         authMode: { scheme: "bearer", provided: true },
+        discovery: {
+          attempted: true,
+          outcomes: [
+            {
+              key: "tenantId",
+              source: "datasource",
+              outcome: "resolved",
+              sourceRef: "public.tenants",
+            },
+            {
+              key: "auth.bearer",
+              source: "runtime_context",
+              outcome: "resolved",
+              token: "REMOVE_ME",
+            },
+          ],
+        },
       },
       now: new Date("2026-04-19T08:01:26.000Z"),
     });
@@ -87,6 +106,8 @@ test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm
     assert.equal(result.runId, runId);
     assert.equal(evidence.runId, runId);
     assert.equal(evidence.authMode.scheme, "bearer");
+    assert.equal(evidence.discovery.outcomes[0].sourceRef, "public.tenants");
+    assert.equal(typeof evidence.discovery.outcomes[1].token, "undefined");
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

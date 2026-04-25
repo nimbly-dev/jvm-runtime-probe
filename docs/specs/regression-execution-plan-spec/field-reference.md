@@ -59,6 +59,20 @@ Deterministic resolution status values:
 - `discoverable_pending`
 - `needs_user_input`
 
+Execution merge precedence:
+
+1. user-provided context
+2. discovered context
+3. non-secret default
+
+Discovery failure reason codes:
+
+- `discovery_empty_result`
+- `discovery_ambiguous_result`
+- `discovery_adapter_failure`
+- `discovery_source_unsupported`
+- `discovery_timeout`
+
 ### `steps[]`
 
 - `order` (number): strict execution order (`1..N`)
