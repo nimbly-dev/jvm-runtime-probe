@@ -78,6 +78,7 @@ Allowed `preflight.status` values:
 
 - `ready`
 - `needs_user_input`
+- `needs_discovery`
 - `stale_plan`
 - `blocked_ambiguous`
 - `blocked_invalid`

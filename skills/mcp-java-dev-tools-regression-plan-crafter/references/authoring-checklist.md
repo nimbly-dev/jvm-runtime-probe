@@ -13,7 +13,9 @@ Use this checklist before finalizing a crafted plan.
 
 1. No secrets persisted in defaults.
 2. Secret prerequisites are marked `secret=true`.
-3. No speculative placeholder values that can produce non-actionable failures.
+3. Every prerequisite has deterministic `provisioning` (`user_input` or `discoverable`).
+4. Every discoverable prerequisite defines `discoverySource`.
+5. No speculative placeholder values that can produce non-actionable failures.
 
 ## Runtime Verification
 
@@ -25,6 +27,7 @@ Use this checklist before finalizing a crafted plan.
 1. `plan.md` steps mirror `contract.json` steps.
 2. Step IDs and order match between human and machine artifacts.
 3. Expectations are measurable and deterministic.
+4. `metadata.execution.discoveryPolicy` matches prerequisite provisioning strategy.
 
 ## Fail-Closed
 

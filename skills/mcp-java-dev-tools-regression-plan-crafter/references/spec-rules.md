@@ -20,6 +20,7 @@ This file defines the normative rules used by the craft skill.
 - `execution.intent`: must be `regression`
 - `execution.verifyRuntime`: boolean
 - `execution.pinStrictProbeKey`: boolean
+- `execution.discoveryPolicy`: `disabled` | `allow_discoverable_prerequisites`
 
 When `verifyRuntime=true` and `pinStrictProbeKey=true`, every target must provide a strict probe key.
 
@@ -39,6 +40,8 @@ When `verifyRuntime=true` and `pinStrictProbeKey=true`, every target must provid
 - `key`: required
 - `required`: required
 - `secret`: required
+- `provisioning`: required (`user_input` | `discoverable`)
+- `discoverySource`: required when `provisioning=discoverable` (`datasource` | `runtime_context`)
 - `default`: optional for non-secrets only
 
 ### steps[]

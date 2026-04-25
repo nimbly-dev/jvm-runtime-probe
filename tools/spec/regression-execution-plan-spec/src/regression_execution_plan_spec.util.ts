@@ -1,6 +1,7 @@
 import type {
   BuildPreflightArgs,
   PlanPrerequisite,
+  PrerequisiteResolution,
   PlanStep,
   PreflightResult,
 } from "@tools-regression-execution-plan-spec/models/regression_execution_plan_spec.model";
@@ -25,6 +26,135 @@ function isStrictProbeKey(value: string): boolean {
   return /^[\w.$]+#[\w$]+:\d+$/.test(value.trim());
 }
 
+function hasNonBlank(value: unknown): boolean {
+  return typeof value !== "undefined" && value !== null && String(value).trim() !== "";
+}
+
+function emptyPreflightDetails() {
+  return {
+    missing: [] as string[],
+    discoverablePending: [] as string[],
+    prerequisiteResolution: [] as PrerequisiteResolution[],
+  };
+}
+
+function classifyPrerequisites(args: {
+  prerequisites: PlanPrerequisite[];
+  providedContext: Record<string, unknown>;
+  discoveryPolicy: "disabled" | "allow_discoverable_prerequisites";
+}):
+  | {
+      type: "ok";
+      resolution: PrerequisiteResolution[];
+      missing: string[];
+      discoverablePending: string[];
+    }
+  | {
+      type: "blocked_invalid";
+      reasonCode:
+        | "invalid_discoverable_prerequisite"
+        | "discoverable_prerequisite_policy_disabled"
+        | "secret_default_forbidden";
+      requiredUserAction: string[];
+      resolution: PrerequisiteResolution[];
+    } {
+  const resolution: PrerequisiteResolution[] = [];
+  const missing: string[] = [];
+  const discoverablePending: string[] = [];
+
+  for (const prerequisite of args.prerequisites) {
+    if (prerequisite.secret && typeof prerequisite.default !== "undefined") {
+      return {
+        type: "blocked_invalid",
+        reasonCode: "secret_default_forbidden",
+        requiredUserAction: [
+          `Remove default value from secret prerequisite '${prerequisite.key}'.`,
+        ],
+        resolution,
+      };
+    }
+
+    if (
+      prerequisite.provisioning === "discoverable" &&
+      (typeof prerequisite.discoverySource === "undefined" || prerequisite.discoverySource === null)
+    ) {
+      return {
+        type: "blocked_invalid",
+        reasonCode: "invalid_discoverable_prerequisite",
+        requiredUserAction: [
+          `Set discoverySource for discoverable prerequisite '${prerequisite.key}'.`,
+        ],
+        resolution,
+      };
+    }
+
+    const provided = args.providedContext[prerequisite.key];
+    if (hasNonBlank(provided)) {
+      resolution.push({
+        key: prerequisite.key,
+        required: prerequisite.required,
+        secret: prerequisite.secret,
+        provisioning: prerequisite.provisioning,
+        status: "provided",
+      });
+      continue;
+    }
+
+    if (typeof prerequisite.default !== "undefined") {
+      resolution.push({
+        key: prerequisite.key,
+        required: prerequisite.required,
+        secret: prerequisite.secret,
+        provisioning: prerequisite.provisioning,
+        status: "default_applied",
+      });
+      continue;
+    }
+
+    if (!prerequisite.required) {
+      continue;
+    }
+
+    if (prerequisite.provisioning === "discoverable") {
+      if (args.discoveryPolicy !== "allow_discoverable_prerequisites") {
+        return {
+          type: "blocked_invalid",
+          reasonCode: "discoverable_prerequisite_policy_disabled",
+          requiredUserAction: [
+            "Set metadata.execution.discoveryPolicy to allow_discoverable_prerequisites.",
+          ],
+          resolution,
+        };
+      }
+      discoverablePending.push(prerequisite.key);
+      resolution.push({
+        key: prerequisite.key,
+        required: prerequisite.required,
+        secret: prerequisite.secret,
+        provisioning: prerequisite.provisioning,
+        status: "discoverable_pending",
+      });
+      continue;
+    }
+
+    missing.push(prerequisite.key);
+    resolution.push({
+      key: prerequisite.key,
+      required: prerequisite.required,
+      secret: prerequisite.secret,
+      provisioning: prerequisite.provisioning,
+      status: "needs_user_input",
+    });
+  }
+
+  return {
+    type: "ok",
+    resolution,
+    missing,
+    discoverablePending,
+  };
+}
+
 export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult {
   const { metadata, contract, providedContext, targetCandidateCount } = args;
 
@@ -32,7 +162,7 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
     return {
       status: "blocked_invalid",
       reasonCode: "invalid_execution_intent",
-      missing: [],
+      ...emptyPreflightDetails(),
       requiredUserAction: ["Set metadata.execution.intent to 'regression'."],
     };
   }
@@ -40,7 +170,7 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
     return {
       status: "blocked_invalid",
       reasonCode: "target_missing",
-      missing: [],
+      ...emptyPreflightDetails(),
       requiredUserAction: ["Add at least one target in contract.targets."],
     };
   }
@@ -48,7 +178,7 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
     return {
       status: "blocked_invalid",
       reasonCode: "steps_missing",
-      missing: [],
+      ...emptyPreflightDetails(),
       requiredUserAction: ["Add at least one step in contract.steps."],
     };
   }
@@ -58,7 +188,7 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
     return {
       status: "blocked_invalid",
       reasonCode: "step_order_duplicate",
-      missing: [],
+      ...emptyPreflightDetails(),
       requiredUserAction: ["Ensure each step.order value is unique."],
     };
   }
@@ -66,13 +196,13 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
   const sorted = [...stepOrders].sort((a, b) => a - b);
   for (let i = 0; i < sorted.length; i += 1) {
     if (sorted[i] !== i + 1) {
-      return {
-        status: "blocked_invalid",
-        reasonCode: "step_order_non_sequential",
-        missing: [],
-        requiredUserAction: ["Ensure steps are sequentially numbered from 1..N."],
-      };
-    }
+        return {
+          status: "blocked_invalid",
+          reasonCode: "step_order_non_sequential",
+          ...emptyPreflightDetails(),
+          requiredUserAction: ["Ensure steps are sequentially numbered from 1..N."],
+        };
+      }
   }
 
   for (const step of contract.steps) {
@@ -80,7 +210,7 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
       return {
         status: "blocked_invalid",
         reasonCode: "transport_protocol_mismatch",
-        missing: [],
+        ...emptyPreflightDetails(),
         requiredUserAction: [
           `Add transport.${step.protocol} for step '${step.id}' or correct step.protocol.`,
         ],
@@ -92,7 +222,7 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
     return {
       status: "blocked_ambiguous",
       reasonCode: "target_ambiguous",
-      missing: [],
+      ...emptyPreflightDetails(),
       requiredUserAction: ["Narrow selectors (for example sourceRoot/signature) to one target."],
     };
   }
@@ -104,30 +234,65 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
         return {
           status: "stale_plan",
           reasonCode: "strict_probe_key_invalid",
-          missing: [],
+          ...emptyPreflightDetails(),
           requiredUserAction: ["Update runtimeVerification.strictProbeKey to Class#method:line."],
         };
       }
     }
   }
 
-  const missing = contract.prerequisites
-    .filter((p) => p.required)
-    .filter((p) => {
-      const provided = providedContext[p.key];
-      if (typeof provided !== "undefined" && provided !== null && String(provided).trim() !== "") {
-        return false;
-      }
-      return typeof p.default === "undefined";
-    })
-    .map((p) => p.key);
+  const prerequisiteClassification = classifyPrerequisites({
+    prerequisites: contract.prerequisites,
+    providedContext,
+    discoveryPolicy: metadata.execution.discoveryPolicy,
+  });
+
+  if (prerequisiteClassification.type === "blocked_invalid") {
+    return {
+      status: "blocked_invalid",
+      reasonCode: prerequisiteClassification.reasonCode,
+      missing: [],
+      discoverablePending: [],
+      prerequisiteResolution: prerequisiteClassification.resolution,
+      requiredUserAction: prerequisiteClassification.requiredUserAction,
+    };
+  }
+
+  const { missing, discoverablePending, resolution } = prerequisiteClassification;
+
+  if (missing.length > 0 && discoverablePending.length > 0) {
+    return {
+      status: "needs_user_input",
+      reasonCode: "missing_prerequisites_mixed",
+      missing,
+      discoverablePending,
+      prerequisiteResolution: resolution,
+      requiredUserAction: [
+        ...missing.map((field) => `Provide ${field}`),
+        `Run discovery resolver for: ${discoverablePending.join(", ")}`,
+      ],
+    };
+  }
 
   if (missing.length > 0) {
     return {
       status: "needs_user_input",
-      reasonCode: "missing_prerequisites",
+      reasonCode: "missing_prerequisites_user_input",
       missing,
+      discoverablePending,
+      prerequisiteResolution: resolution,
       requiredUserAction: missing.map((field) => `Provide ${field}`),
+    };
+  }
+
+  if (discoverablePending.length > 0) {
+    return {
+      status: "needs_discovery",
+      reasonCode: "missing_prerequisites_discoverable",
+      missing,
+      discoverablePending,
+      prerequisiteResolution: resolution,
+      requiredUserAction: [`Run discovery resolver for: ${discoverablePending.join(", ")}`],
     };
   }
 
@@ -135,6 +300,8 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
     status: "ready",
     reasonCode: "ok",
     missing: [],
+    discoverablePending: [],
+    prerequisiteResolution: resolution,
     requiredUserAction: [],
   };
 }
@@ -146,7 +313,7 @@ export function resolvePrerequisiteContext(
   const resolved: Record<string, unknown> = {};
   for (const prerequisite of prerequisites) {
     const provided = providedContext[prerequisite.key];
-    if (typeof provided !== "undefined" && provided !== null && String(provided).trim() !== "") {
+    if (hasNonBlank(provided)) {
       resolved[prerequisite.key] = provided;
       continue;
     }

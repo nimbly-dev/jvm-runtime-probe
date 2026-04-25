@@ -14,6 +14,7 @@ function baseMetadata() {
       intent: "regression",
       verifyRuntime: true,
       pinStrictProbeKey: false,
+      discoveryPolicy: "allow_discoverable_prerequisites",
     },
   };
 }
@@ -30,8 +31,15 @@ function baseContract() {
       },
     ],
     prerequisites: [
-      { key: "tenantId", required: true, secret: false, default: "tenant-social-001" },
-      { key: "auth.bearer", required: true, secret: true },
+      {
+        key: "tenantId",
+        required: true,
+        secret: false,
+        provisioning: "discoverable",
+        discoverySource: "datasource",
+        default: "tenant-social-001",
+      },
+      { key: "auth.bearer", required: true, secret: true, provisioning: "user_input" },
     ],
     steps: [
       {

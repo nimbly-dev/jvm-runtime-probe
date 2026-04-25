@@ -16,6 +16,7 @@ function baseMetadata(overrides = {}) {
       intent: "regression",
       verifyRuntime: true,
       pinStrictProbeKey: false,
+      discoveryPolicy: "allow_discoverable_prerequisites",
       ...overrides,
     },
   };
@@ -35,8 +36,14 @@ function baseContract(overrides = {}) {
       },
     ],
     prerequisites: [
-      { key: "tenantId", required: true, secret: false, default: "tenant-social-001" },
-      { key: "auth.bearer", required: true, secret: true },
+      {
+        key: "tenantId",
+        required: true,
+        secret: false,
+        provisioning: "user_input",
+        default: "tenant-social-001",
+      },
+      { key: "auth.bearer", required: true, secret: true, provisioning: "user_input" },
     ],
     steps: [
       {
@@ -70,13 +77,14 @@ test("preflight ready when prerequisites are satisfied by defaults and runtime i
   assert.equal(result.status, "ready");
   assert.equal(result.reasonCode, "ok");
   assert.deepEqual(result.missing, []);
+  assert.deepEqual(result.discoverablePending, []);
 });
 
 test("preflight needs_user_input when required prerequisite has no value and no default", () => {
   const contract = baseContract({
     prerequisites: [
-      { key: "tenantId", required: true, secret: false },
-      { key: "auth.bearer", required: true, secret: true },
+      { key: "tenantId", required: true, secret: false, provisioning: "user_input" },
+      { key: "auth.bearer", required: true, secret: true, provisioning: "user_input" },
     ],
   });
   const result = buildReplayPreflight({
@@ -86,8 +94,131 @@ test("preflight needs_user_input when required prerequisite has no value and no 
     targetCandidateCount: 1,
   });
   assert.equal(result.status, "needs_user_input");
-  assert.equal(result.reasonCode, "missing_prerequisites");
+  assert.equal(result.reasonCode, "missing_prerequisites_user_input");
   assert.deepEqual(result.missing, ["tenantId", "auth.bearer"]);
+});
+
+test("preflight blocks when secret prerequisite persists a default value", () => {
+  const contract = baseContract({
+    prerequisites: [
+      {
+        key: "tenantId",
+        required: true,
+        secret: false,
+        provisioning: "discoverable",
+        discoverySource: "datasource",
+      },
+      { key: "auth.bearer", required: true, secret: true, provisioning: "user_input", default: "masked" },
+    ],
+  });
+  const result = buildReplayPreflight({
+    metadata: baseMetadata(),
+    contract,
+    providedContext: {},
+    targetCandidateCount: 1,
+  });
+
+  assert.equal(result.status, "blocked_invalid");
+  assert.equal(result.reasonCode, "secret_default_forbidden");
+});
+
+test("preflight blocks when discoverable prerequisites are unresolved and policy is disabled", () => {
+  const contract = baseContract({
+    prerequisites: [
+      {
+        key: "tenantId",
+        required: true,
+        secret: false,
+        provisioning: "discoverable",
+        discoverySource: "datasource",
+      },
+      { key: "auth.bearer", required: true, secret: true, provisioning: "user_input" },
+    ],
+  });
+  const result = buildReplayPreflight({
+    metadata: baseMetadata({ discoveryPolicy: "disabled" }),
+    contract,
+    providedContext: { "auth.bearer": "ok" },
+    targetCandidateCount: 1,
+  });
+
+  assert.equal(result.status, "blocked_invalid");
+  assert.equal(result.reasonCode, "discoverable_prerequisite_policy_disabled");
+});
+
+test("preflight needs_discovery when discoverable prerequisites are unresolved and policy is enabled", () => {
+  const contract = baseContract({
+    prerequisites: [
+      {
+        key: "tenantId",
+        required: true,
+        secret: false,
+        provisioning: "discoverable",
+        discoverySource: "datasource",
+      },
+      { key: "auth.bearer", required: true, secret: true, provisioning: "user_input" },
+    ],
+  });
+  const result = buildReplayPreflight({
+    metadata: baseMetadata(),
+    contract,
+    providedContext: { "auth.bearer": "ok" },
+    targetCandidateCount: 1,
+  });
+
+  assert.equal(result.status, "needs_discovery");
+  assert.equal(result.reasonCode, "missing_prerequisites_discoverable");
+  assert.deepEqual(result.discoverablePending, ["tenantId"]);
+  assert.deepEqual(result.missing, []);
+});
+
+test("preflight blocks when discoverable prerequisite omits discoverySource", () => {
+  const contract = baseContract({
+    prerequisites: [
+      {
+        key: "tenantId",
+        required: true,
+        secret: false,
+        provisioning: "discoverable",
+      },
+      { key: "auth.bearer", required: true, secret: true, provisioning: "user_input" },
+    ],
+  });
+  const result = buildReplayPreflight({
+    metadata: baseMetadata(),
+    contract,
+    providedContext: { "auth.bearer": "ok" },
+    targetCandidateCount: 1,
+  });
+
+  assert.equal(result.status, "blocked_invalid");
+  assert.equal(result.reasonCode, "invalid_discoverable_prerequisite");
+});
+
+test("preflight returns mixed reason code when user input and discovery are both unresolved", () => {
+  const contract = baseContract({
+    prerequisites: [
+      {
+        key: "tenantId",
+        required: true,
+        secret: false,
+        provisioning: "discoverable",
+        discoverySource: "datasource",
+      },
+      { key: "auth.bearer", required: true, secret: true, provisioning: "user_input" },
+    ],
+  });
+  const result = buildReplayPreflight({
+    metadata: baseMetadata(),
+    contract,
+    providedContext: {},
+    targetCandidateCount: 1,
+  });
+
+  assert.equal(result.status, "needs_user_input");
+  assert.equal(result.reasonCode, "missing_prerequisites_mixed");
+  assert.deepEqual(result.missing, ["auth.bearer"]);
+  assert.deepEqual(result.discoverablePending, ["tenantId"]);
 });
 
 test("preflight blocked_invalid when transport protocol key does not match step protocol", () => {
@@ -152,9 +283,22 @@ test("preflight stale_plan when pinStrictProbeKey is enabled but strict key is i
 test("resolvePrerequisiteContext prefers provided values and falls back to defaults", () => {
   const resolved = resolvePrerequisiteContext(
     [
-      { key: "tenantId", required: true, secret: false, default: "tenant-social-001" },
-      { key: "region", required: true, secret: false, default: "ap-southeast-1" },
-      { key: "auth.bearer", required: true, secret: true },
+      {
+        key: "tenantId",
+        required: true,
+        secret: false,
+        provisioning: "user_input",
+        default: "tenant-social-001",
+      },
+      {
+        key: "region",
+        required: true,
+        secret: false,
+        provisioning: "discoverable",
+        discoverySource: "runtime_context",
+        default: "ap-southeast-1",
+      },
+      { key: "auth.bearer", required: true, secret: true, provisioning: "user_input" },
     ],
     { tenantId: "tenant-override", "auth.bearer": "runtime-token" },
   );
