@@ -75,7 +75,12 @@ test("resolveDiscoverablePrerequisites resolves discoverable context with dataso
     contract: baseContract(),
     providedContext: { "auth.bearer": "runtime-token" },
     adapters: {
-      datasource: async () => ({ outcome: "resolved", value: "tenant-social-001", sourceRef: "table:tenants" }),
+      datasource: async () => ({
+        accessMode: "read",
+        outcome: "resolved",
+        value: "tenant-social-001",
+        sourceRef: "table:tenants",
+      }),
     },
   });
   assert.equal(result.status, "resolved");
@@ -89,7 +94,7 @@ test("resolveDiscoverablePrerequisites blocks with policy-disabled reason", asyn
     contract: baseContract(),
     providedContext: { "auth.bearer": "runtime-token" },
     adapters: {
-      datasource: async () => ({ outcome: "resolved", value: "tenant-social-001" }),
+      datasource: async () => ({ accessMode: "read", outcome: "resolved", value: "tenant-social-001" }),
     },
   });
   assert.equal(result.status, "blocked");
@@ -102,7 +107,7 @@ test("resolveDiscoverablePrerequisites blocks on ambiguous datasource result", a
     contract: baseContract(),
     providedContext: { "auth.bearer": "runtime-token" },
     adapters: {
-      datasource: async () => ({ outcome: "unresolved_ambiguous", candidateCount: 3 }),
+      datasource: async () => ({ accessMode: "read", outcome: "unresolved_ambiguous", candidateCount: 3 }),
     },
   });
   assert.equal(result.status, "blocked");
@@ -115,7 +120,7 @@ test("resolveDiscoverablePrerequisites blocks on empty datasource result", async
     contract: baseContract(),
     providedContext: { "auth.bearer": "runtime-token" },
     adapters: {
-      datasource: async () => ({ outcome: "unresolved_empty", candidateCount: 0 }),
+      datasource: async () => ({ accessMode: "read", outcome: "unresolved_empty", candidateCount: 0 }),
     },
   });
   assert.equal(result.status, "blocked");
@@ -154,7 +159,7 @@ test("resolveDiscoverablePrerequisites blocks on timeout", async () => {
     adapters: {
       datasource: async () => {
         await new Promise((resolve) => setTimeout(resolve, 200));
-        return { outcome: "resolved", value: "tenant-social-001" };
+        return { accessMode: "read", outcome: "resolved", value: "tenant-social-001" };
       },
     },
   });
@@ -184,7 +189,7 @@ test("buildReplayPreflightWithDiscovery merges discovered context and becomes re
     providedContext: { "auth.bearer": "runtime-token" },
     targetCandidateCount: 1,
     adapters: {
-      datasource: async () => ({ outcome: "resolved", value: "tenant-social-001" }),
+      datasource: async () => ({ accessMode: "read", outcome: "resolved", value: "tenant-social-001" }),
     },
   });
   assert.equal(result.preflight.status, "ready");
@@ -198,7 +203,7 @@ test("buildReplayPreflightWithDiscovery enforces precedence user > discovered > 
     providedContext: { "auth.bearer": "runtime-token", tenantId: "tenant-manual-007" },
     targetCandidateCount: 1,
     adapters: {
-      datasource: async () => ({ outcome: "resolved", value: "tenant-social-001" }),
+      datasource: async () => ({ accessMode: "read", outcome: "resolved", value: "tenant-social-001" }),
     },
   });
   assert.equal(result.preflight.status, "ready");
@@ -212,9 +217,26 @@ test("buildReplayPreflightWithDiscovery returns blocked_ambiguous preflight on a
     providedContext: { "auth.bearer": "runtime-token" },
     targetCandidateCount: 1,
     adapters: {
-      datasource: async () => ({ outcome: "unresolved_ambiguous", candidateCount: 2 }),
+      datasource: async () => ({ accessMode: "read", outcome: "unresolved_ambiguous", candidateCount: 2 }),
     },
   });
   assert.equal(result.preflight.status, "blocked_ambiguous");
   assert.equal(result.preflight.reasonCode, "discovery_ambiguous_result");
+});
+
+test("resolveDiscoverablePrerequisites blocks when adapter attempts write/mutation mode", async () => {
+  const result = await resolveDiscoverablePrerequisites({
+    metadata: baseMetadata(),
+    contract: baseContract(),
+    providedContext: { "auth.bearer": "runtime-token" },
+    adapters: {
+      datasource: async () => ({
+        accessMode: "write",
+        outcome: "resolved",
+        value: "tenant-social-001",
+      }),
+    },
+  });
+  assert.equal(result.status, "blocked");
+  assert.equal(result.reasonCode, "discovery_mutation_blocked");
 });

@@ -15,7 +15,8 @@ export type DiscoveryOutcome =
   | "blocked_policy"
   | "blocked_runtime_error"
   | "blocked_source_unsupported"
-  | "blocked_timeout";
+  | "blocked_timeout"
+  | "blocked_mutation";
 
 export type DiscoveryReasonCode =
   | "ok"
@@ -24,7 +25,8 @@ export type DiscoveryReasonCode =
   | "discovery_ambiguous_result"
   | "discovery_adapter_failure"
   | "discovery_source_unsupported"
-  | "discovery_timeout";
+  | "discovery_timeout"
+  | "discovery_mutation_blocked";
 
 export type DiscoverablePrerequisite = PlanPrerequisite & {
   provisioning: "discoverable";
@@ -41,17 +43,20 @@ export type DiscoveryAdapterInput = {
 
 export type DiscoveryAdapterResult =
   | {
+      accessMode: "read" | "write";
       outcome: "resolved";
       value: unknown;
       candidateCount?: number;
       sourceRef?: string;
     }
   | {
+      accessMode: "read" | "write";
       outcome: "unresolved_empty";
       candidateCount?: number;
       sourceRef?: string;
     }
   | {
+      accessMode: "read" | "write";
       outcome: "unresolved_ambiguous";
       candidateCount: number;
       sourceRef?: string;
@@ -117,6 +122,9 @@ function requiredUserActionForRecord(record: {
   if (record.outcome === "blocked_timeout") {
     return `Retry discovery for ${record.key} (${record.source}) with a larger timeout or narrower selector.`;
   }
+  if (record.outcome === "blocked_mutation") {
+    return `Discovery adapter for ${record.source} attempted non-read access for ${record.key}; enforce read-only mode.`;
+  }
   if (record.outcome === "blocked_source_unsupported") {
     return `Configure discovery adapter for ${record.source} and rerun.`;
   }
@@ -139,6 +147,7 @@ function reasonCodeForOutcome(outcome: DiscoveryOutcome): DiscoveryReasonCode {
   if (outcome === "blocked_runtime_error") return "discovery_adapter_failure";
   if (outcome === "blocked_source_unsupported") return "discovery_source_unsupported";
   if (outcome === "blocked_timeout") return "discovery_timeout";
+  if (outcome === "blocked_mutation") return "discovery_mutation_blocked";
   return "ok";
 }
 
@@ -149,6 +158,7 @@ function statusForOutcome(outcome: DiscoveryOutcome): PreflightStatus {
   if (outcome === "blocked_runtime_error") return "blocked_invalid";
   if (outcome === "blocked_source_unsupported") return "blocked_invalid";
   if (outcome === "blocked_timeout") return "blocked_invalid";
+  if (outcome === "blocked_mutation") return "blocked_invalid";
   return "ready";
 }
 
@@ -276,7 +286,10 @@ export async function resolveDiscoverablePrerequisites(
     if (adapterResult) {
       sourceRef = adapterResult.sourceRef;
       candidateCount = adapterResult.candidateCount;
-      if (adapterResult.outcome === "resolved") {
+      if (adapterResult.accessMode !== "read") {
+        outcome = "blocked_mutation";
+        reasonCode = reasonCodeForOutcome(outcome);
+      } else if (adapterResult.outcome === "resolved") {
         discoveredContext[prerequisite.key] = adapterResult.value;
       } else if (adapterResult.outcome === "unresolved_empty") {
         outcome = "unresolved_empty";

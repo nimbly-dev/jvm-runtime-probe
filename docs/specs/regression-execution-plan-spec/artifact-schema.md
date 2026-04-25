@@ -104,6 +104,8 @@ Recommended fields:
 - `authMode` (scheme + provided/redacted state only)
 - `probe` (when runtime verification enabled)
 - `discovery` (resolver outcomes per prerequisite with redacted provenance only)
+  - deterministic fields per outcome: `key`, `source`, `outcome`, `reasonCode`
+  - optional: `candidateCount`, `sourceRef` (must be sanitized)
 
 Rules:
 
@@ -119,6 +121,7 @@ Rules:
 - bearer tokens, passwords, API keys, and secret headers MUST NOT be written
 - if needed, persist secret presence only (`provided=true/false`)
 - examples and real writers MUST follow same redaction policy
+- secret-like string values MUST be redacted even when key names are not secret
 
 ## Write Order
 
