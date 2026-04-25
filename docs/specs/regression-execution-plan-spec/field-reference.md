@@ -24,6 +24,7 @@ Required fields:
 - `execution.intent` (string): execution intent. Current value: `regression`
 - `execution.verifyRuntime` (boolean): whether runtime probe verification is required
 - `execution.pinStrictProbeKey` (boolean): whether strict probe key must be explicitly pinned
+- `execution.discoveryPolicy` (string): prerequisite discovery policy (`disabled` or `allow_discoverable_prerequisites`)
 
 Notes:
 
@@ -47,7 +48,16 @@ Notes:
 - `key` (string): context key required by one or more steps
 - `required` (boolean)
 - `secret` (boolean)
+- `provisioning` (string): `user_input` or `discoverable`
+- `discoverySource` (string, required for `provisioning=discoverable`): `datasource` or `runtime_context`
 - `default` (string/number/boolean/object, optional): default value used only when runtime input is absent; do not use for secrets
+
+Deterministic resolution status values:
+
+- `provided`
+- `default_applied`
+- `discoverable_pending`
+- `needs_user_input`
 
 ### `steps[]`
 

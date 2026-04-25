@@ -3,6 +3,7 @@
   "execution": {
     "intent": "regression",
     "verifyRuntime": true,
-    "pinStrictProbeKey": false
+    "pinStrictProbeKey": false,
+    "discoveryPolicy": "allow_discoverable_prerequisites"
   }
 }

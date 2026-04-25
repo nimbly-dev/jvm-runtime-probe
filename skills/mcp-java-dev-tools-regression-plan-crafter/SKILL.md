@@ -87,7 +87,9 @@ For each context key:
 1. `key`
 2. `required`
 3. `secret`
-4. optional `default` (non-secret only)
+4. `provisioning` (`user_input` | `discoverable`)
+5. `discoverySource` when `provisioning=discoverable` (`datasource` | `runtime_context`)
+6. optional `default` (non-secret only)
 
 Use prerequisites for reusable runtime inputs (for example `tenantId`, `region`, `auth.bearer`).
 
@@ -176,6 +178,7 @@ Stop and return deterministic blocked guidance when:
 5. pinned strict probe key is required but invalid/missing
 6. user asks to persist secrets as defaults
 7. base path/prefix is not proven but required to produce executable route steps
+8. discoverable prerequisite is missing `discoverySource`
 
 ## Base Path Policy (No Assumptions)
 

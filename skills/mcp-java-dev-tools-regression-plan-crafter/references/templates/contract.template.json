@@ -15,12 +15,15 @@
       "key": "tenantId",
       "required": true,
       "secret": false,
+      "provisioning": "discoverable",
+      "discoverySource": "datasource",
       "default": "tenant-default"
     },
     {
       "key": "auth.bearer",
       "required": true,
-      "secret": true
+      "secret": true,
+      "provisioning": "user_input"
     }
   ],
   "steps": [
