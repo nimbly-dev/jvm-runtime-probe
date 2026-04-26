@@ -14,7 +14,7 @@
   "probe": {
     "enabled": true,
     "mode": "auto",
-    "status": "verified"
+    "status": "verified_line_hit"
   }
 }
 

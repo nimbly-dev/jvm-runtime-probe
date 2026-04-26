@@ -18,7 +18,7 @@
       "com.example.social.post.app.controller.PostController#createPost:118",
       "com.example.social.post.app.controller.PostController#updatePost:154"
     ],
-    "status": "verified"
+    "status": "verified_line_hit"
   }
 }
 

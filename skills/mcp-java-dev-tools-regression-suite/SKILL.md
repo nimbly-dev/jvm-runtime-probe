@@ -5,7 +5,7 @@ description: "Run MCP-first HTTP regression suites across controller, service, o
 
 # MCP JVM Regression Suite
 
-Use this workflow for regression runs at controller scope, service scope, or whole API scope.
+Use this workflow to execute crafted regression plans at controller scope, service scope, or whole API scope.
 
 ## Scope Modes
 
@@ -15,16 +15,14 @@ Use this workflow for regression runs at controller scope, service scope, or who
 
 ## Using Crafted Plans
 
-If a persisted regression plan is requested, this skill consumes and executes it.
-
 1. Plan authoring/refinement must be done first with:
    - `mcp-java-dev-tools-regression-plan-crafter`
-2. This skill executes/replays the crafted plan using existing MCP flow (no new MCP tool).
+2. Execute/replay the crafted plan using existing MCP flow (no new MCP tool).
 3. If the plan is missing deterministic selectors or required context, fail closed and report exact missing fields.
 4. Persist run artifacts automatically after each suite execution under:
-   - `.mcpjvm/runs/<run_id>/context.resolved.json`
-   - `.mcpjvm/runs/<run_id>/execution.result.json`
-   - `.mcpjvm/runs/<run_id>/evidence.json`
+   - `.mcpjvm/regression/<plan>/runs/<run_id>/context.resolved.json`
+   - `.mcpjvm/regression/<plan>/runs/<run_id>/execution.result.json`
+   - `.mcpjvm/regression/<plan>/runs/<run_id>/evidence.json`
 
 ## MCP-First Requirement
 
@@ -44,6 +42,18 @@ At run start, discover and persist once:
 3. Optional `apiBasePath`.
 4. Auth requirement/token only if needed.
 5. Validate probe base with `probe_check` before endpoint loop.
+
+## Discovery-First Orchestration
+
+Before requesting manual runtime inputs for discoverable prerequisites, execute this deterministic order:
+
+1. Build initial preflight from plan + provided inputs.
+2. If preflight contains discoverable pending prerequisites, execute discovery resolver first.
+3. Merge discovered context with precedence:
+   - user-provided > discovered > non-secret defaults
+4. Re-run preflight.
+5. Only if still unresolved, ask user for remaining required user-input fields.
+6. Do not prompt for discoverable fields before discovery attempt.
 
 ## Probe Policy
 
@@ -121,6 +131,10 @@ Always include:
 2. `Routing Outcome`
 3. `Endpoint Results` (method/path/http code)
 4. `Probe Coverage` (which endpoints were probe-verified vs HTTP-only)
+   - use canonical coverage enums:
+   - `verified_line_hit`
+   - `http_only_unverified_line`
+   - `unknown` (only when deterministic mapping is unavailable)
 5. `Probe Verification`
 6. `Run Timing`:
    - `runStartEpoch` (Unix epoch in milliseconds)
@@ -142,31 +156,3 @@ When writing `Repro Steps`, prioritize human actions over MCP internals:
 3. Keep steps directly runnable by a developer with curl/Postman/browser.
 4. Do not list MCP tool calls as the primary repro path.
 5. If needed, add a separate optional section named `Toolchain Steps` for MCP diagnostics.
-
-## Repro Steps Template (Per Recipe)
-
-Use this exact structure per recipe/endpoint when reporting execution movement:
-
-Recipe `<short-name-or-index>`
-
-1. Execute controller with this request:
-   - Method: `<HTTP_METHOD>`
-   - URL: `<BASE_URL><PATH>`
-   - Path Params: `<none | key=value, ...>`
-   - Query Params: `<none | key=value, ...>`
-   - Headers: `<none required | header list>`
-   - Body: `<none | JSON payload>`
-
-2. Execution reaches method:
-   - `<FQCN#controllerMethod>`
-
-3. Execution reaches method:
-   - `<FQCN#downstreamMethod>`
-
-4. Encounter this line:
-   - `<FQCN#method:line>`
-   - Branch/Condition: `<condition text>`
-   - Probe Verification: `<hit=true|false, inline=true|false, lineValidation=...>`
-
-When multiple endpoints are tested, create separate recipe blocks and repeat steps 1-4 inside each block.
-

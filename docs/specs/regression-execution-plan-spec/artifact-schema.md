@@ -3,7 +3,7 @@
 This document is normative for run artifacts written under:
 
 ```text
-.mcpjvm/runs/<run_id>/
+.mcpjvm/regression/<plan>/runs/<run_id>/
 ```
 
 Terms:

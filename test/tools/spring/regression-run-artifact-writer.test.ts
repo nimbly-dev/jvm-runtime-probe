@@ -20,12 +20,12 @@ function readJson(filePath: string) {
 
 test("buildRunArtifactDirAbs fails closed for invalid run id", () => {
   assert.throws(
-    () => buildRunArtifactDirAbs(process.cwd(), "2026/04/19-01"),
+    () => buildRunArtifactDirAbs(process.cwd(), "post-lifecycle", "2026/04/19-01"),
     /run_id_invalid/,
   );
 });
 
-test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm/runs/<run_id>", async () => {
+test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm/regression/<plan>/runs/<run_id>", async () => {
   const root = createTestTempDir("run-artifacts");
   try {
     const runId = "2026-04-19T08-01-22Z_01";
@@ -103,7 +103,10 @@ test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm
     const result = readJson(written.executionResultPathAbs);
     const evidence = readJson(written.evidencePathAbs);
 
-    assert.equal(written.runDirAbs, path.join(root, ".mcpjvm", "runs", runId));
+    assert.equal(
+      written.runDirAbs,
+      path.join(root, ".mcpjvm", "regression", "gateway-course-review-aggregate-smoke", "runs", runId),
+    );
     assert.equal(context.resolvedAt, "2026-04-19T08:01:26.000Z");
     assert.equal(context.tenantId, "tenant-social-001");
     assert.equal(typeof context["auth.bearer"], "undefined");
@@ -118,6 +121,40 @@ test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm
     assert.equal(evidence.discovery.outcomes[0].sourceRef, "[REDACTED]");
     assert.equal(evidence.discovery.outcomes[1].key, "tenantId");
     assert.equal(evidence.discovery.outcomes[1].sourceRef, "public.tenants");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("writeRegressionRunArtifacts fails closed when planRef.name is missing", async () => {
+  const root = createTestTempDir("run-artifacts-missing-plan");
+  try {
+    await assert.rejects(
+      () =>
+        writeRegressionRunArtifacts({
+          workspaceRootAbs: root,
+          runId: "2026-04-19T08-01-22Z_01",
+          resolvedContext: {},
+          executionResult: {
+            status: "blocked",
+            preflight: {
+              status: "blocked_invalid",
+              reasonCode: "target_missing",
+              missing: [],
+              discoverablePending: [],
+              prerequisiteResolution: [],
+              requiredUserAction: [],
+            },
+            startedAt: null,
+            endedAt: null,
+            steps: [],
+          },
+          evidence: {
+            targetResolution: [],
+          },
+        }),
+      /plan_name_missing/,
+    );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

@@ -24,7 +24,7 @@ Produce a deterministic, fail-closed plan package:
 2. `.mcpjvm/regression/<regression_name>/contract.json`
 3. `.mcpjvm/regression/<regression_name>/plan.md`
 
-Do not hand-author `.mcpjvm/runs/<run_id>/...` artifacts in this skill. Those are machine-generated during execution.
+Do not hand-author `.mcpjvm/regression/<plan>/runs/<run_id>/...` artifacts in this skill. Those are machine-generated during execution.
 
 ## Portable Source of Truth
 
@@ -202,4 +202,4 @@ When crafting or updating plans, output:
 
 1. Do not create new MCP tools.
 2. Do not execute regression runs from this skill.
-3. Do not write `.mcpjvm/runs/<run_id>` artifacts manually.
+3. Do not write `.mcpjvm/regression/<plan>/runs/<run_id>` artifacts manually.

@@ -58,6 +58,7 @@ This installs the default skill set:
 - `mcp-java-dev-tools-line-probe-run`
 - `mcp-java-dev-tools-regression-suite`
 - `mcp-java-dev-tools-regression-plan-crafter`
+- `mcp-java-dev-tools-regression-result`
 - `mcp-java-dev-tools-issue-report`
 
 To update installed skills, run installer again with:
@@ -209,6 +210,7 @@ These paths are fixed and cannot be overridden.
 | `mcp-java-dev-tools-line-probe-run` | Line-level probe execution |
 | `mcp-java-dev-tools-regression-suite` | Regression check orchestration |
 | `mcp-java-dev-tools-regression-plan-crafter` | Craft and refine deterministic persisted regression plan specs (`metadata.json`, `contract.json`, `plan.md`) |
+| `mcp-java-dev-tools-regression-result` | Artifact-derived result rendering with extensible display templates (default endpoint table) |
 | `mcp-java-dev-tools-issue-report` | Sanitized issue reporting from session, runtime, and probe evidence |
 
 ---

@@ -100,20 +100,35 @@ async function writeJsonFile(filePathAbs: string, payload: Record<string, unknow
   await fs.writeFile(filePathAbs, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
-export function buildRunArtifactDirAbs(workspaceRootAbs: string, runId: string): string {
+function normalizePlanName(planName: string): string {
+  const normalized = planName.trim();
+  if (!normalized) {
+    throw new Error("plan_name_missing");
+  }
+  if (!/^[A-Za-z0-9._-]+$/.test(normalized)) {
+    throw new Error("plan_name_invalid");
+  }
+  return normalized;
+}
+
+export function buildRunArtifactDirAbs(workspaceRootAbs: string, planName: string, runId: string): string {
   if (!workspaceRootAbs || workspaceRootAbs.trim() === "") {
     throw new Error("workspace_root_missing");
   }
+  const safePlanName = normalizePlanName(planName);
   if (!RUN_ID_PATTERN.test(runId)) {
     throw new Error("run_id_invalid");
   }
-  return path.join(workspaceRootAbs, ".mcpjvm", "runs", runId);
+  return path.join(workspaceRootAbs, ".mcpjvm", "regression", safePlanName, "runs", runId);
 }
 
 export async function writeRegressionRunArtifacts(
   args: WriteRegressionRunArtifactsInput,
 ): Promise<RegressionRunArtifactsWriteResult> {
-  const runDirAbs = buildRunArtifactDirAbs(args.workspaceRootAbs, args.runId);
+  if (!args.planRef?.name) {
+    throw new Error("plan_name_missing");
+  }
+  const runDirAbs = buildRunArtifactDirAbs(args.workspaceRootAbs, args.planRef.name, args.runId);
   await fs.mkdir(runDirAbs, { recursive: true });
 
   const explicitSecretPaths = new Set(args.secretContextKeys ?? []);

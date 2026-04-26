@@ -15,7 +15,7 @@ Each regression plan lives under:
 | `metadata.json` | Plan-level execution settings |
 | `contract.json` | Authoritative machine contract |
 | `plan.md` | Human-readable execution plan |
-| `.mcpjvm/runs/<run_id>/...` | Immutable outputs for each run (global run history) |
+| `runs/<run_id>/...` | Immutable outputs for each run (plan-local run history) |
 | `artifact-schema.md` | Normative run artifact contract (`MUST/SHOULD/MAY`) |
 
 
@@ -56,8 +56,28 @@ Plans use a fixed vocabulary to keep steps unambiguous and machine-parseable.
 ## Execution Order
 
 Steps are numbered `1..N` and executed strictly in listed order. The orchestrator does not reorder steps implicitly — what you write is what runs.
-Run artifacts are persisted globally under:
+Run artifacts are persisted under the plan package:
 
 ```text
-.mcpjvm/runs/<run_id>/
+.mcpjvm/regression/<regression_name>/runs/<run_id>/
 ```
+
+## Artifact-Derived Results Summary
+
+Regression results summaries SHOULD be rendered from persisted artifacts, not transient logs.
+
+Required tabular columns:
+
+- `Endpoint`
+- `Status`
+- `HTTP Code`
+- `Duration (ms)`
+- `Probe Coverage`
+
+`Probe Coverage` enum values:
+
+- `verified_line_hit` (strict line key confirmed)
+- `http_only_unverified_line` (HTTP-level validation only)
+- `unknown` (coverage state not deterministically available)
+
+`Memory (bytes)` MUST be included only when memory metrics are explicitly contract-defined.

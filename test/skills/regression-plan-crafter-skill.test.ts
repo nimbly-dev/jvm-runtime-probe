@@ -94,15 +94,16 @@ test("crafted template marks secret prerequisites without persisted defaults", (
   assert.deepEqual(secretKeysWithDefaults, []);
 });
 
-test("regression suite skill consumes crafted plans and delegates authoring to crafter skill", () => {
-  const skillPath = path.join(
-    process.cwd(),
-    "skills",
-    "mcp-java-dev-tools-regression-suite",
-    "SKILL.md",
-  );
-  const text = readUtf8(skillPath);
-  assert.match(text, /Using Crafted Plans/);
-  assert.match(text, /mcp-java-dev-tools-regression-plan-crafter/);
-  assert.match(text, /\.mcpjvm\/runs\/<run_id>/);
+test("regression suite skill remains execution-focused and result skill is available separately", () => {
+  const suitePath = path.join(process.cwd(), "skills", "mcp-java-dev-tools-regression-suite", "SKILL.md");
+  const resultPath = path.join(process.cwd(), "skills", "mcp-java-dev-tools-regression-result", "SKILL.md");
+
+  const suiteText = readUtf8(suitePath);
+  const resultText = readUtf8(resultPath);
+
+  assert.match(suiteText, /Using Crafted Plans/);
+  assert.match(suiteText, /\.mcpjvm\/regression\/<plan>\/runs\/<run_id>/);
+  assert.match(suiteText, /Discovery-First Orchestration/);
+  assert.match(resultText, /default template: `endpoint_table_result`/);
+  assert.match(resultText, /references\/templates\/index\.md/);
 });

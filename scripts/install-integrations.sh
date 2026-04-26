@@ -42,6 +42,7 @@ SKILL_NAMES_DEFAULT=(
   "mcp-java-dev-tools-line-probe-run"
   "mcp-java-dev-tools-regression-suite"
   "mcp-java-dev-tools-regression-plan-crafter"
+  "mcp-java-dev-tools-regression-result"
   "mcp-java-dev-tools-issue-report"
 )
 SKILL_NAMES=("${SKILL_NAMES_DEFAULT[@]}")
