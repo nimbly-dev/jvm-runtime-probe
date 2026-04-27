@@ -94,7 +94,8 @@ For contributors improving how people understand, adopt, and use the project. Th
 - [README.md](./README.md)
 - [docs](./docs)
 - [skills](./skills)
-- [scripts/install-integrations.sh](./scripts/install-integrations.sh)
+- [scripts/install.sh](./scripts/install.sh)
+- [scripts/update.sh](./scripts/update.sh)
 - [.github](./.github)
 
 **Design rules:**

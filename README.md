@@ -48,10 +48,10 @@ This produces two artifacts:
 
 ### Installer
 
-The installer currently supports Codex and Kiro.
+Installer flow is split into install and update scripts (Codex and Kiro skills).
 
 ```bash
-./scripts/install-integrations.sh
+./scripts/install.sh
 ```
 
 This installs the default skill set:
@@ -61,11 +61,31 @@ This installs the default skill set:
 - `mcp-java-dev-tools-regression-result`
 - `mcp-java-dev-tools-issue-report`
 
-To update installed skills, run installer again with:
+To update/overwrite existing installed skills (and add missing new skills):
 
 ```bash
-./scripts/install-integrations.sh --update-skill-if-exists
+./scripts/update.sh
 ```
+
+Both scripts:
+- run `npm run build:compile`
+- run `mvn -f java-agent/pom.xml package`
+- sync shipped skills into the target client skill directory
+- do not install MCP config entries
+
+### Spring Integration Launcher
+
+Use the helper launcher to run a Spring app with auto-inferred Java agent include scope and probe port:
+
+```bash
+./spring-integration/run-spring-app-with-mcp.sh
+```
+
+Behavior:
+- prompts for Spring project absolute path, app port (default `8080`), optional JDWP port, and Java 21 compatibility
+- infers include package from `src/main/java`
+- assigns probe port starting at `9173` and increments if occupied
+- opens a new Git Bash window and starts the Spring app with `JAVA_TOOL_OPTIONS` including `-javaagent`
 
 ### Manual Setup
 
