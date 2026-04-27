@@ -21,7 +21,8 @@
     "format": "prettier --write \"server.ts\" \"tools/**/*.ts\" \"test/**/*.ts\" \"docs/**/*.md\" \"README.md\"",
     "format:check": "prettier --check \"server.ts\" \"tools/**/*.ts\" \"test/**/*.ts\" \"docs/**/*.md\" \"README.md\"",
     "deadcode:check": "ts-prune -p tsconfig.json",
-    "install:integrations:sh": "bash ./scripts/install-integrations.sh"
+    "install:integrations:sh": "bash ./scripts/install.sh",
+    "update:integrations:sh": "bash ./scripts/update.sh"
   },
   "repository": {
     "type": "git",
