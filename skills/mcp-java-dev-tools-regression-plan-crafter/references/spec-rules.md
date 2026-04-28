@@ -53,9 +53,23 @@ When `verifyRuntime=true` and `pinStrictProbeKey=true`, every target must provid
 - `transport`: required; must contain key that exactly matches `protocol`
 - `extract`: optional
 
-### expectations[]
+### steps[].expect[]
 
-- deterministic assertions such as `outcome_status`, `http_status`, `probe_hit`
+- every step must include one or more deterministic expectations
+- required fields per expectation:
+  - `id`
+  - `actualPath`
+  - `operator`
+  - `expected` (required for all operators except `field_exists`)
+- supported operators:
+  - `field_equals`
+  - `field_exists`
+  - `field_matches_regex`
+  - `numeric_gte`
+  - `numeric_lte`
+  - `contains`
+  - `probe_line_hit`
+  - `outcome_status`
 
 ## plan.md (required)
 

@@ -65,6 +65,20 @@
           "from": "response.body.id",
           "as": "postId"
         }
+      ],
+      "expect": [
+        {
+          "id": "create_post_http_status",
+          "actualPath": "transport.status_code",
+          "operator": "field_equals",
+          "expected": 201
+        },
+        {
+          "id": "create_post_probe_hit",
+          "actualPath": "runtime.probe.hit",
+          "operator": "probe_line_hit",
+          "expected": true
+        }
       ]
     },
     {
@@ -87,33 +101,21 @@
             "title": "Hello World! (Updated)"
           }
         }
-      }
-    }
-  ],
-  "expectations": [
-    {
-      "stepOrder": 1,
-      "type": "http_status",
-      "equals": 201
-    },
-    {
-      "stepOrder": 2,
-      "type": "http_status",
-      "equals": 200
-    },
-    {
-      "stepOrder": 1,
-      "type": "probe_hit",
-      "min": 1
-    },
-    {
-      "stepOrder": 2,
-      "type": "probe_hit",
-      "min": 1
-    },
-    {
-      "type": "outcome_status",
-      "equals": "pass"
+      },
+      "expect": [
+        {
+          "id": "update_post_http_status",
+          "actualPath": "transport.status_code",
+          "operator": "field_equals",
+          "expected": 200
+        },
+        {
+          "id": "update_post_probe_hit",
+          "actualPath": "runtime.probe.hit",
+          "operator": "probe_line_hit",
+          "expected": true
+        }
+      ]
     }
   ]
 }

@@ -12,7 +12,35 @@ export type RegressionRunExecutionResult = {
   preflight: PreflightResult;
   startedAt: string | null;
   endedAt: string | null;
-  steps: Array<Record<string, unknown>>;
+  steps: RegressionRunStepResult[];
+};
+
+export type RegressionRunStepResultStatus =
+  | "pass"
+  | "fail_assertion"
+  | "fail_http"
+  | "blocked_dependency"
+  | "blocked_runtime";
+
+export type RegressionRunAssertionStatus = "pass" | "fail" | "blocked_invalid";
+
+export type RegressionRunAssertionResult = {
+  id: string;
+  operator: string;
+  actualPath: string;
+  required: boolean;
+  status: RegressionRunAssertionStatus;
+  reasonCode: string;
+  actual?: unknown;
+  expected?: unknown;
+  message?: string;
+};
+
+export type RegressionRunStepResult = Record<string, unknown> & {
+  order: number;
+  id: string;
+  status: RegressionRunStepResultStatus;
+  assertions?: RegressionRunAssertionResult[];
 };
 
 export type DiscoveryEvidenceOutcome = {
