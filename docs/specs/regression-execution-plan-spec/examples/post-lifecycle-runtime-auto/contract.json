@@ -59,6 +59,14 @@
           "from": "response.body.id",
           "as": "postId"
         }
+      ],
+      "expect": [
+        {
+          "id": "create_post_http_status",
+          "actualPath": "transport.status_code",
+          "operator": "field_equals",
+          "expected": 201
+        }
       ]
     },
     {
@@ -77,23 +85,15 @@
           "headers": {},
           "body": {}
         }
-      }
-    }
-  ],
-  "expectations": [
-    {
-      "stepOrder": 1,
-      "type": "http_status",
-      "equals": 201
-    },
-    {
-      "stepOrder": 2,
-      "type": "http_status",
-      "equals": 204
-    },
-    {
-      "type": "outcome_status",
-      "equals": "pass"
+      },
+      "expect": [
+        {
+          "id": "delete_post_http_status",
+          "actualPath": "transport.status_code",
+          "operator": "field_equals",
+          "expected": 204
+        }
+      ]
     }
   ]
 }

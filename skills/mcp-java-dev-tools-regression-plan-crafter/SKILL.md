@@ -54,7 +54,7 @@ If user input conflicts with these rules, fail closed and request clarification.
 2. Collect target and scope
 3. Define prerequisites
 4. Define ordered steps
-5. Define expectations
+5. Define step expectations
 6. Generate `plan.md` with deterministic verbs
 7. Validate consistency and fail closed on ambiguity
 
@@ -106,15 +106,28 @@ For every executable step:
 
 Keep steps natural and dependency-aware (for example create before update/delete).
 
-### 4) Define expectations
+### 4) Define step expectations
 
-Add deterministic assertions under `expectations[]`, for example:
+Add deterministic assertions under `steps[].expect[]` for every step.
 
-1. `outcome_status`
-2. `http_status`
-3. `probe_hit`
+Required expectation fields:
 
-Use specific assertion fields (`equals`, `min`, `matches`) as needed.
+1. `id`
+2. `actualPath`
+3. `operator`
+4. `expected` (when required by operator)
+5. optional `required` (`true` by default)
+
+Supported operators:
+
+1. `field_equals`
+2. `field_exists`
+3. `field_matches_regex`
+4. `numeric_gte`
+5. `numeric_lte`
+6. `contains`
+7. `probe_line_hit`
+8. `outcome_status`
 
 ### 5) Generate `plan.md`
 

@@ -99,11 +99,25 @@ Validation rule:
 - `extract[].from`: output path to read from current step result
 - `extract[].as`: context key to store for subsequent steps
 
-### `expectations[]`
+### `steps[].expect[]`
 
-- `stepOrder` (number, optional): scoped assertion for a specific step
-- `type` (string): assertion type (for example `http_status`, `probe_hit`, `outcome_status`)
-- assertion fields such as `equals`, `min`, `matches` depending on `type`
+- `id` (string): stable assertion id within the step
+- `actualPath` (string): deterministic dot-path read from step result payload
+- `operator` (string): generic assertion operator
+- `expected` (any, optional): required for all operators except `field_exists`
+- `required` (boolean, optional): defaults to `true`
+- `message` (string, optional): human guidance context
+
+Supported operators:
+
+- `field_equals`
+- `field_exists`
+- `field_matches_regex`
+- `numeric_gte`
+- `numeric_lte`
+- `contains`
+- `probe_line_hit`
+- `outcome_status`
 
 ## `plan.md`
 

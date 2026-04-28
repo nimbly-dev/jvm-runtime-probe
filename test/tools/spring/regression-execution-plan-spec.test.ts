@@ -58,11 +58,18 @@ function baseContract(overrides = {}) {
             query: { tenantId: "${tenantId}" },
             body: { title: "Hello World!" },
           },
-        },
-        extract: [{ from: "response.body.id", as: "postId" }],
       },
-    ],
-    expectations: [{ type: "outcome_status", equals: "pass" }],
+      extract: [{ from: "response.body.id", as: "postId" }],
+      expect: [
+        {
+          id: "step_outcome_pass",
+          actualPath: "status",
+          operator: "outcome_status",
+          expected: "pass",
+        },
+      ],
+    },
+  ],
     ...overrides,
   };
 }
@@ -246,6 +253,48 @@ test("preflight blocked_invalid when transport protocol key does not match step 
   });
   assert.equal(result.status, "blocked_invalid");
   assert.equal(result.reasonCode, "transport_protocol_mismatch");
+});
+
+test("preflight blocked_invalid when step does not define expect[]", () => {
+  const contract = baseContract({
+    steps: [
+      {
+        order: 1,
+        id: "create_post",
+        targetRef: 0,
+        protocol: "http",
+        transport: {
+          http: {
+            method: "POST",
+            pathTemplate: "/api/v1/posts",
+          },
+        },
+      },
+    ],
+  });
+  const result = buildReplayPreflight({
+    metadata: baseMetadata(),
+    contract,
+    providedContext: { "auth.bearer": "ok" },
+    targetCandidateCount: 1,
+  });
+  assert.equal(result.status, "blocked_invalid");
+  assert.equal(result.reasonCode, "step_expectations_missing");
+});
+
+test("preflight blocked_invalid when legacy top-level expectations[] is provided", () => {
+  const contract = {
+    ...baseContract(),
+    expectations: [{ type: "outcome_status", equals: "pass" }],
+  };
+  const result = buildReplayPreflight({
+    metadata: baseMetadata(),
+    contract,
+    providedContext: { "auth.bearer": "ok" },
+    targetCandidateCount: 1,
+  });
+  assert.equal(result.status, "blocked_invalid");
+  assert.equal(result.reasonCode, "top_level_expectations_unsupported");
 });
 
 test("preflight blocked_ambiguous when multiple target candidates remain", () => {

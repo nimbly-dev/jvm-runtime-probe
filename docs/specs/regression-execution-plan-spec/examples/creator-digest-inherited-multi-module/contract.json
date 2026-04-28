@@ -49,7 +49,15 @@
           "headers": {},
           "body": {}
         }
-      }
+      },
+      "expect": [
+        {
+          "id": "get_creator_digest_http_status",
+          "actualPath": "transport.status_code",
+          "operator": "field_equals",
+          "expected": 200
+        }
+      ]
     },
     {
       "order": 2,
@@ -70,23 +78,15 @@
             "summary": "patched summary"
           }
         }
-      }
-    }
-  ],
-  "expectations": [
-    {
-      "stepOrder": 1,
-      "type": "http_status",
-      "equals": 200
-    },
-    {
-      "stepOrder": 2,
-      "type": "http_status",
-      "equals": 404
-    },
-    {
-      "type": "outcome_status",
-      "equals": "pass"
+      },
+      "expect": [
+        {
+          "id": "patch_missing_digest_http_status",
+          "actualPath": "transport.status_code",
+          "operator": "field_equals",
+          "expected": 404
+        }
+      ]
     }
   ]
 }

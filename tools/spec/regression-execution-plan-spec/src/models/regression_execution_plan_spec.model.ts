@@ -29,7 +29,10 @@ export type PreflightReasonCode =
   | "target_ambiguous"
   | "strict_probe_key_invalid"
   | "invalid_discoverable_prerequisite"
-  | "secret_default_forbidden";
+  | "secret_default_forbidden"
+  | "step_expectations_missing"
+  | "step_expectation_invalid"
+  | "top_level_expectations_unsupported";
 
 export type PrerequisiteProvisioning = "user_input" | "discoverable";
 
@@ -99,13 +102,32 @@ export type PlanStep = {
   protocol: string;
   transport: Record<string, unknown>;
   extract?: Array<{ from: string; as: string }>;
+  expect: PlanStepExpectation[];
+};
+
+export type PlanStepExpectationOperator =
+  | "field_equals"
+  | "field_exists"
+  | "field_matches_regex"
+  | "numeric_gte"
+  | "numeric_lte"
+  | "contains"
+  | "probe_line_hit"
+  | "outcome_status";
+
+export type PlanStepExpectation = {
+  id: string;
+  actualPath: string;
+  operator: PlanStepExpectationOperator;
+  expected?: unknown;
+  required?: boolean;
+  message?: string;
 };
 
 export type PlanContract = {
   targets: PlanTarget[];
   prerequisites: PlanPrerequisite[];
   steps: PlanStep[];
-  expectations: Array<Record<string, unknown>>;
 };
 
 export type BuildPreflightArgs = {

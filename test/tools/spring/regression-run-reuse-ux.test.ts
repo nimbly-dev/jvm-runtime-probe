@@ -53,9 +53,16 @@ function baseContract() {
             pathTemplate: "/api/v1/posts",
           },
         },
+        expect: [
+          {
+            id: "step_outcome_pass",
+            actualPath: "status",
+            operator: "outcome_status",
+            expected: "pass",
+          },
+        ],
       },
     ],
-    expectations: [{ type: "outcome_status", equals: "pass" }],
   };
 }
 

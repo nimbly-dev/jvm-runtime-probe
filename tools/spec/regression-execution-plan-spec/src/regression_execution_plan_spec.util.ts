@@ -1,5 +1,6 @@
 import type {
   BuildPreflightArgs,
+  PlanStepExpectation,
   PlanPrerequisite,
   PrerequisiteResolution,
   PlanStep,
@@ -30,12 +31,116 @@ function hasNonBlank(value: unknown): boolean {
   return typeof value !== "undefined" && value !== null && String(value).trim() !== "";
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 function emptyPreflightDetails() {
   return {
     missing: [] as string[],
     discoverablePending: [] as string[],
     prerequisiteResolution: [] as PrerequisiteResolution[],
   };
+}
+
+function isExpectationOperator(value: string): boolean {
+  return (
+    value === "field_equals" ||
+    value === "field_exists" ||
+    value === "field_matches_regex" ||
+    value === "numeric_gte" ||
+    value === "numeric_lte" ||
+    value === "contains" ||
+    value === "probe_line_hit" ||
+    value === "outcome_status"
+  );
+}
+
+function expectationNeedsExpected(operator: string): boolean {
+  return (
+    operator === "field_equals" ||
+    operator === "field_matches_regex" ||
+    operator === "numeric_gte" ||
+    operator === "numeric_lte" ||
+    operator === "contains" ||
+    operator === "probe_line_hit" ||
+    operator === "outcome_status"
+  );
+}
+
+function validateStepExpectations(
+  steps: PlanStep[],
+):
+  | {
+      ok: true;
+    }
+  | {
+      ok: false;
+      reasonCode: "step_expectations_missing" | "step_expectation_invalid";
+      requiredUserAction: string[];
+    } {
+  for (const step of steps) {
+    if (!Array.isArray(step.expect) || step.expect.length === 0) {
+      return {
+        ok: false,
+        reasonCode: "step_expectations_missing",
+        requiredUserAction: [
+          `Add deterministic steps[].expect[] entries for step '${step.id}'.`,
+        ],
+      };
+    }
+
+    for (const raw of step.expect) {
+      const expectation = raw as PlanStepExpectation;
+      if (!isRecord(expectation)) {
+        return {
+          ok: false,
+          reasonCode: "step_expectation_invalid",
+          requiredUserAction: [`Ensure all expectations for step '${step.id}' are objects.`],
+        };
+      }
+
+      if (!hasNonBlank(expectation.id)) {
+        return {
+          ok: false,
+          reasonCode: "step_expectation_invalid",
+          requiredUserAction: [`Set non-empty expectation id for step '${step.id}'.`],
+        };
+      }
+      if (!hasNonBlank(expectation.actualPath)) {
+        return {
+          ok: false,
+          reasonCode: "step_expectation_invalid",
+          requiredUserAction: [
+            `Set non-empty expectation actualPath for step '${step.id}' (id='${expectation.id}').`,
+          ],
+        };
+      }
+      if (!hasNonBlank(expectation.operator) || !isExpectationOperator(expectation.operator)) {
+        return {
+          ok: false,
+          reasonCode: "step_expectation_invalid",
+          requiredUserAction: [
+            `Set supported expectation operator for step '${step.id}' (id='${expectation.id}').`,
+          ],
+        };
+      }
+      if (
+        expectationNeedsExpected(expectation.operator) &&
+        typeof expectation.expected === "undefined"
+      ) {
+        return {
+          ok: false,
+          reasonCode: "step_expectation_invalid",
+          requiredUserAction: [
+            `Set expectation expected value for step '${step.id}' (id='${expectation.id}', operator='${expectation.operator}').`,
+          ],
+        };
+      }
+    }
+  }
+
+  return { ok: true };
 }
 
 function classifyPrerequisites(args: {
@@ -157,6 +262,18 @@ function classifyPrerequisites(args: {
 
 export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult {
   const { metadata, contract, providedContext, targetCandidateCount } = args;
+  const legacyExpectations = (contract as Record<string, unknown>).expectations;
+
+  if (Array.isArray(legacyExpectations) && legacyExpectations.length > 0) {
+    return {
+      status: "blocked_invalid",
+      reasonCode: "top_level_expectations_unsupported",
+      ...emptyPreflightDetails(),
+      requiredUserAction: [
+        "Move contract.expectations[] into step-scoped steps[].expect[] entries.",
+      ],
+    };
+  }
 
   if (metadata.execution.intent !== "regression") {
     return {
@@ -216,6 +333,16 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
         ],
       };
     }
+  }
+
+  const stepExpectValidation = validateStepExpectations(contract.steps);
+  if (!stepExpectValidation.ok) {
+    return {
+      status: "blocked_invalid",
+      reasonCode: stepExpectValidation.reasonCode,
+      ...emptyPreflightDetails(),
+      requiredUserAction: stepExpectValidation.requiredUserAction,
+    };
   }
 
   if (targetCandidateCount > 1) {

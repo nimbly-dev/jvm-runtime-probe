@@ -43,19 +43,15 @@
           "from": "result.score",
           "as": "newProfileScore"
         }
+      ],
+      "expect": [
+        {
+          "id": "score_numeric",
+          "actualPath": "result.score",
+          "operator": "field_matches_regex",
+          "expected": "^[0-9]+$"
+        }
       ]
-    }
-  ],
-  "expectations": [
-    {
-      "stepOrder": 1,
-      "type": "matches",
-      "path": "result.score",
-      "pattern": "^[0-9]+$"
-    },
-    {
-      "type": "outcome_status",
-      "equals": "pass"
     }
   ]
 }

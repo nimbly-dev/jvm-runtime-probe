@@ -52,14 +52,15 @@
           "from": "response.body.id",
           "as": "exampleId"
         }
+      ],
+      "expect": [
+        {
+          "id": "create_entity_outcome",
+          "actualPath": "status",
+          "operator": "outcome_status",
+          "expected": "pass"
+        }
       ]
-    }
-  ],
-  "expectations": [
-    {
-      "stepOrder": 1,
-      "type": "outcome_status",
-      "equals": "pass"
     }
   ]
 }
