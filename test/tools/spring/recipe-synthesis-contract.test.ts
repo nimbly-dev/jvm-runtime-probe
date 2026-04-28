@@ -18,7 +18,7 @@ test("recipe domain emits fail-closed synthesis diagnostics", async () => {
       workspaceRootAbs: "C:\\repo",
       classHint: "CatalogService",
       methodHint: "finalPriceLte",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -65,7 +65,7 @@ test("recipe domain preserves resolver-specific synthesis reason codes", async (
       workspaceRootAbs: "C:\\repo",
       classHint: "CatalogService",
       methodHint: "finalPriceLte",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -107,3 +107,4 @@ test("recipe domain preserves resolver-specific synthesis reason codes", async (
     "java_ast_framework_resolution",
   ]);
 });
+

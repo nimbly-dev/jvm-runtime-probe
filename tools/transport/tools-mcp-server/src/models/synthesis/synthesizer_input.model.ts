@@ -1,5 +1,5 @@
 export type SynthesizerIntentMode =
-  | "regression_http_only"
+  | "regression"
   | "single_line_probe"
   | "regression_plus_line_probe";
 
@@ -16,3 +16,4 @@ export type SynthesizerInput = {
   discoveryPreference?: "static_only" | "runtime_first" | "runtime_only";
   authToken?: string;
 };
+

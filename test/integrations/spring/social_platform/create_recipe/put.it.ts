@@ -34,7 +34,7 @@ test("create_recipe PUT: updatePost recipe is synthesized and executable", async
       projectRootAbs: path.join(socialPlatformRootAbs, "post-service", "post-app"),
       classHint: postControllerFqcn,
       methodHint: "updatePost",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
       authToken: "alice-token",
     },
   })) as any;
@@ -58,3 +58,4 @@ test("create_recipe PUT: updatePost recipe is synthesized and executable", async
   });
   assert.equal(response.status, 200);
 });
+

@@ -75,7 +75,7 @@ test("create_recipe REPORT: multi-module duplicate target fails closed as target
       projectRootAbs: socialPlatformRootAbs,
       classHint: postControllerFqcn,
       methodHint: "listPosts",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
   })) as any;
 
@@ -89,3 +89,4 @@ test("create_recipe REPORT: multi-module duplicate target fails closed as target
     true,
   );
 });
+

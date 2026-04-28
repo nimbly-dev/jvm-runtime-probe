@@ -167,7 +167,7 @@ examples:
 | `inferredTarget` | Best inferred runtime target for probe verification. | `probe_recipe_create` | false | `{"key":"com.example.CatalogService#save","line":88}` |
 | `requestCandidates` | HTTP request candidates inferred from code-based synthesizer analysis. | `probe_recipe_create` | true | `[{"method":"POST","path":"/v1/catalog"}]` |
 | `executionPlan` | Step plan emitted for execution/verification tooling. Report mode emits compact action-code steps. | `probe_recipe_create` | true | `{"selectedMode":"single_line_probe"}` |
-| `executionPlan.routingReason` | Routing reason code for selected mode (`single_line_probe`, `regression_http_only_no_probe`, etc). | `probe_recipe_create` | true | `"regression_http_only_no_probe"` |
+| `executionPlan.routingReason` | Routing reason code for selected mode (`regression_no_probe`, `single_line_probe`, etc). | `probe_recipe_create` | true | `"regression_no_probe"` |
 | `executionPlan.steps[].actionCode` | Compact step action code in report mode (no verbose instruction strings). | `probe_recipe_create` | false | `"request_candidate_missing"` |
 | `resultType` | Output category (`recipe` or `report`). | `probe_recipe_create` | true | `"recipe"` |
 | `status` | Recipe generation status for orchestration decisions (`*_ready` or fail-closed report status). | `probe_recipe_create` | true | `"single_line_probe_ready"` |
@@ -192,7 +192,7 @@ examples:
 | `failedStep` | Specific synthesis stage that failed proof. | `probe_recipe_create` | false | `"spring_entrypoint_resolution"` |
 | `reasonCode` (execution input gating) | When `status=execution_input_required`, reason maps to the first unresolved category (`auth_input_required`, `request_confirmation_required`, `actuation_input_required`, `line_target_required_for_probe_mode`, `request_candidate_missing`). | `probe_recipe_create` | false | `"request_confirmation_required"` |
 | `failedStep` (execution input gating) | Stage marker paired with execution-input reason (`auth_resolution`, `request_confirmation`, `actuation_resolution`, `intent_routing`, `request_synthesis`). | `probe_recipe_create` | false | `"request_confirmation"` |
-| `selectedMode` | Final routed intent mode. | `probe_recipe_create` | true | `"single_line_probe"` |
+| `selectedMode` | Final routed internal execution mode mapped from user-facing `intentMode` (`line_probe` or `regression`). | `probe_recipe_create` | true | `"single_line_probe"` |
 | `executionReadiness` | Execution gate (`ready` or `needs_user_input`). | `probe_recipe_create` | true | `"ready"` |
 | `missingInputs` | Missing runtime/auth inputs blocking execution. | `probe_recipe_create` | true | `[]` |
 | `synthesizerUsed` | Internal synthesizer plugin selected for request synthesis. | `probe_recipe_create` | false | `"spring"` |
@@ -310,5 +310,6 @@ These fields are emitted by orchestration summaries in skill-guided runs when pr
 | `validationResults` | Per-candidate validation outcomes (probe/API/line alignment checks). | `mcp-java-dev-tools-line-probe-run (summary), mcp-java-dev-tools-regression-suite (summary)` | true | `[{"probeReachable":true,"apiReachable":false}]` |
 | `nextAction` | Action required from the user to proceed after pushback. | `mcp-java-dev-tools-line-probe-run (summary), mcp-java-dev-tools-regression-suite (summary)` | true | `"Provide a unique runtime/service selector or stop conflicting services."` |
 | `reproSteps` | Ordered executable reproduction steps emitted for both success and pushback outputs. | `mcp-java-dev-tools-line-probe-run (summary), mcp-java-dev-tools-regression-suite (summary)` | true | `["1. Validate projectRootAbs", "2. Call probe_recipe_create", "3. Resolve runtime route"]` |
+
 
 

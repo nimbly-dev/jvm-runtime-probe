@@ -2,7 +2,7 @@ import type { AuthResolution } from "@/models/auth_resolution.model";
 import type { RecipeCandidate, RecipeExecutionPlan } from "@tools-core/recipe_types.util";
 
 export function buildRunNotes(args: {
-  selectedMode: "regression_http_only" | "single_line_probe" | "regression_plus_line_probe";
+  selectedMode: "regression" | "single_line_probe" | "regression_plus_line_probe";
   lineHint?: number;
   inferredLine?: number;
   bestRequest?: RecipeCandidate;
@@ -15,7 +15,7 @@ export function buildRunNotes(args: {
   if (!args.bestRequest) {
     notes.push("No controller call mapping found in the selected module roots.");
   }
-  if (args.selectedMode === "regression_http_only") {
+  if (args.selectedMode === "regression") {
     notes.push("Probe tools are disabled for this route.");
   } else {
     notes.push("Probe verification requires strict line key Class#method:line.");
@@ -51,3 +51,4 @@ export function buildRunNotes(args: {
   notes.push(`execution_readiness=${args.readiness}`);
   return notes;
 }
+

@@ -19,11 +19,11 @@ const requestCandidate = {
   rationale: ["test candidate"],
 };
 
-test("regression_http_only plan does not include probe calls", () => {
+test("regression plan does not include probe calls", () => {
   const plan = buildRecipeExecutionPlan({
     decision: {
-      requestedMode: "regression_http_only",
-      selectedMode: "regression_http_only",
+      requestedMode: "regression",
+      selectedMode: "regression",
       lineTargetProvided: false,
       probeIntentRequested: false,
       routingReason: "regression only",
@@ -32,7 +32,7 @@ test("regression_http_only plan does not include probe calls", () => {
     auth,
   });
 
-  assert.equal(plan.selectedMode, "regression_http_only");
+  assert.equal(plan.selectedMode, "regression");
   assert.equal(plan.steps.length, 2);
   const instructions = plan.steps.map((s: any) => s.instruction).join(" ");
   assert.equal(instructions.includes("probe_"), false);
@@ -163,4 +163,5 @@ test("single_line_probe actuated mode adds enable and disable cleanup calls", ()
     },
   });
 });
+
 

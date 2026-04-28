@@ -1,6 +1,6 @@
 import type { AuthResolution } from "@/models/auth_resolution.model";
 import type { SynthesisHttpTrigger } from "@/models/synthesis/synthesizer_output.model";
-import { type IntentMode, type RecipeStatus } from "@tools-core/recipe_constants.util";
+import { type RecipeStatus } from "@tools-core/recipe_constants.util";
 import { buildExecutionReadiness } from "@tools-core/execution_readiness.util";
 import { buildRecipeExecutionPlan } from "@tools-core/recipe_execution_plan.util";
 import { buildRoutingContext, resolveSelectedMode } from "@tools-core/recipe_intent_routing.util";
@@ -166,7 +166,7 @@ export async function generateRecipe(
     mappingsBaseUrl?: string;
     discoveryPreference?: "static_only" | "runtime_first" | "runtime_only";
     apiBasePath?: string;
-    intentMode: IntentMode;
+    intentMode: "line_probe" | "regression";
     maxCandidates?: number;
     authToken?: string;
     authUsername?: string;
@@ -493,7 +493,7 @@ export async function generateRecipe(
     searchRootsAbs,
     classHint: normalized.classHint,
     methodHint: normalized.methodHint,
-    intentMode: normalized.intentMode,
+    intentMode: routingDecision.selectedMode,
     ...(typeof normalized.lineHint === "number" ? { lineHint: normalized.lineHint } : {}),
     inferredTargetFileAbs: top.file,
     ...(normalized.mappingsBaseUrl ? { mappingsBaseUrl: normalized.mappingsBaseUrl } : {}),

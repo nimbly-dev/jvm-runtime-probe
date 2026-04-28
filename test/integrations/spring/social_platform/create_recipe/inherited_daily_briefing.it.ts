@@ -36,12 +36,12 @@ test("create_recipe IT: inherited Spring mapping supports constants and array-ba
       projectRootAbs: path.join(socialPlatformRootAbs, "post-service", "post-app"),
       classHint: dailyBriefingControllerFqcn,
       methodHint: "summary",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
   })) as any;
 
   assert.equal(recipe.structuredContent.resultType, "recipe");
-  assert.equal(recipe.structuredContent.status, "regression_http_only_ready");
+  assert.equal(recipe.structuredContent.status, "regression_ready");
   assert.equal(recipe.structuredContent.requestCandidates[0].method, "GET");
   assert.equal(
     recipe.structuredContent.requestCandidates[0].path,
@@ -56,3 +56,5 @@ test("create_recipe IT: inherited Spring mapping supports constants and array-ba
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "summary-page-9");
 });
+
+

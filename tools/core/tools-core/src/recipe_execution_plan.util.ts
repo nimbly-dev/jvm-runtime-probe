@@ -329,7 +329,7 @@ export function buildRecipeExecutionPlan(args: {
   const actuationEnabled = args.actuationEnabled === true;
   const actuationConfigured = actuationEnabled && typeof args.actuationReturnBoolean === "boolean";
 
-  if (args.decision.selectedMode === "regression_http_only") {
+  if (args.decision.selectedMode === "regression") {
     return {
       selectedMode: args.decision.selectedMode,
       routingReason: args.decision.routingReason,
@@ -399,3 +399,4 @@ export function buildRecipeExecutionPlan(args: {
     }),
   };
 }
+

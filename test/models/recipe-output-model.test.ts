@@ -18,7 +18,7 @@ test("recipe template model always reports selected mode", () => {
         },
       ],
       executionPlan: {
-        selectedMode: "regression_http_only",
+        selectedMode: "regression",
         routingReason: "regression checks",
         steps: [
           {
@@ -29,8 +29,8 @@ test("recipe template model always reports selected mode", () => {
         ],
       },
       resultType: "recipe",
-      status: "regression_http_only_ready",
-      selectedMode: "regression_http_only",
+      status: "regression_ready",
+      selectedMode: "regression",
       lineTargetProvided: false,
       probeIntentRequested: false,
       inferenceDiagnostics: {
@@ -48,7 +48,8 @@ test("recipe template model always reports selected mode", () => {
     },
   });
 
-  assert.equal(model["recipe.mode"], "regression_http_only");
-  assert.match(model["recipe.steps"], /Selected mode: regression_http_only/);
-  assert.equal(model["run.notes"].includes("selected_mode=regression_http_only"), true);
+  assert.equal(model["recipe.mode"], "regression");
+  assert.match(model["recipe.steps"], /Selected mode: regression/);
+  assert.equal(model["run.notes"].includes("selected_mode=regression"), true);
 });
+

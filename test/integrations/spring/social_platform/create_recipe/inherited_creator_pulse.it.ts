@@ -36,12 +36,12 @@ test("create_recipe IT: inherited Spring mapping resolves parent API imported vi
       projectRootAbs: path.join(socialPlatformRootAbs, "post-service", "post-app"),
       classHint: creatorPulseControllerFqcn,
       methodHint: "pulse",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
   })) as any;
 
   assert.equal(recipe.structuredContent.resultType, "recipe");
-  assert.equal(recipe.structuredContent.status, "regression_http_only_ready");
+  assert.equal(recipe.structuredContent.status, "regression_ready");
   assert.equal(recipe.structuredContent.requestCandidates[0].method, "GET");
   assert.equal(recipe.structuredContent.requestCandidates[0].path, "/api/v3/creator/pulse");
 
@@ -49,3 +49,5 @@ test("create_recipe IT: inherited Spring mapping resolves parent API imported vi
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "ok");
 });
+
+

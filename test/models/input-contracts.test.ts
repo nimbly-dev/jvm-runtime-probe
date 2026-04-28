@@ -19,7 +19,7 @@ test("probe_target_infer schema requires projectRootAbs", () => {
   assert.equal(keys.includes("additionalSourceRoots"), true);
 });
 
-test("probe_recipe_create schema accepts regression_http_only and rejects regression_api_only", () => {
+test("probe_recipe_create schema accepts line_probe/regression and rejects legacy internal modes", () => {
   const recipeSchema = z.object(RecipeGenerateInputSchema);
   const baseInput = {
     projectRootAbs: "C:\\repo\\service",
@@ -28,13 +28,20 @@ test("probe_recipe_create schema accepts regression_http_only and rejects regres
   };
   const parsed = recipeSchema.safeParse({
     ...baseInput,
-    intentMode: "regression_http_only",
+    intentMode: "regression",
   });
   assert.equal(parsed.success, true);
+  const parsedLineProbe = recipeSchema.safeParse({
+    ...baseInput,
+    intentMode: "line_probe",
+  });
+  assert.equal(parsedLineProbe.success, true);
 
   const legacy = recipeSchema.safeParse({
-    ...baseInput,
-    intentMode: "regression_api_only",
+    projectRootAbs: "C:\\repo\\service",
+    classHint: "com.example.CatalogService",
+    methodHint: "save",
+    intentMode: "regression_plus_line_probe",
   });
   assert.equal(legacy.success, false);
 });
@@ -45,7 +52,7 @@ test("probe_recipe_create schema accepts runtime discovery preference values", (
     projectRootAbs: "C:\\repo\\service",
     classHint: "com.example.CatalogService",
     methodHint: "save",
-    intentMode: "regression_http_only",
+    intentMode: "regression",
     discoveryPreference: "runtime_first",
     mappingsBaseUrl: "http://127.0.0.1:8080/actuator/mappings",
   });
@@ -55,7 +62,7 @@ test("probe_recipe_create schema accepts runtime discovery preference values", (
     projectRootAbs: "C:\\repo\\service",
     classHint: "com.example.CatalogService",
     methodHint: "save",
-    intentMode: "regression_http_only",
+    intentMode: "regression",
     discoveryPreference: "runtime_preferred",
   });
   assert.equal(invalid.success, false);

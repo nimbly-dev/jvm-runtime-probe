@@ -6,50 +6,41 @@ const {
   resolveSelectedMode,
 } = require("@tools-core/recipe_intent_routing.util");
 
-test("regression_http_only keeps regression mode and disables probe tools", () => {
-  const decision = resolveSelectedMode(buildRoutingContext({ intentMode: "regression_http_only" }));
-  assert.equal(decision.selectedMode, "regression_http_only");
+test("regression intent maps to regression", () => {
+  const decision = resolveSelectedMode(buildRoutingContext({ intentMode: "regression" }));
+  assert.equal(decision.selectedMode, "regression");
   assert.equal(decision.probeIntentRequested, false);
   assert.equal(decision.lineTargetProvided, false);
 });
 
-test("single_line_probe with explicit line keeps probe mode", () => {
+test("line_probe intent with explicit line maps to single_line_probe", () => {
   const decision = resolveSelectedMode(
-    buildRoutingContext({ intentMode: "single_line_probe", lineHint: 77 }),
+    buildRoutingContext({ intentMode: "line_probe", lineHint: 77 }),
   );
   assert.equal(decision.selectedMode, "single_line_probe");
   assert.equal(decision.probeIntentRequested, true);
   assert.equal(decision.lineTargetProvided, true);
 });
 
-test("combined mode with explicit line keeps combined route", () => {
+test("line_probe intent without line target keeps probe intent enabled for fail-closed handling", () => {
   const decision = resolveSelectedMode(
-    buildRoutingContext({ intentMode: "regression_plus_line_probe", lineHint: 12 }),
+    buildRoutingContext({ intentMode: "line_probe" }),
   );
-  assert.equal(decision.selectedMode, "regression_plus_line_probe");
-  assert.equal(decision.probeIntentRequested, true);
-  assert.equal(decision.lineTargetProvided, true);
-});
-
-test("probe-only intent without line target stays in probe mode for fail-closed handling", () => {
-  const decision = resolveSelectedMode(buildRoutingContext({ intentMode: "single_line_probe" }));
   assert.equal(decision.selectedMode, "single_line_probe");
   assert.equal(decision.probeIntentRequested, true);
   assert.equal(decision.lineTargetProvided, false);
 });
 
-test("combined intent without line target stays in combined mode for fail-closed handling", () => {
-  const decision = resolveSelectedMode(
-    buildRoutingContext({ intentMode: "regression_plus_line_probe" }),
-  );
-  assert.equal(decision.selectedMode, "regression_plus_line_probe");
-  assert.equal(decision.probeIntentRequested, true);
-  assert.equal(decision.lineTargetProvided, false);
+test("regression intent remains probe-disabled even with lineHint", () => {
+  const decision = resolveSelectedMode(buildRoutingContext({ intentMode: "regression", lineHint: 21 }));
+  assert.equal(decision.selectedMode, "regression");
+  assert.equal(decision.probeIntentRequested, false);
+  assert.equal(decision.lineTargetProvided, true);
 });
 
 test("routing decision parity is unchanged when diagnostics fields are present", () => {
   const baselineContext = buildRoutingContext({
-    intentMode: "regression_plus_line_probe",
+    intentMode: "line_probe",
     lineHint: 42,
   });
   const baselineDecision = resolveSelectedMode(baselineContext);
@@ -64,3 +55,4 @@ test("routing decision parity is unchanged when diagnostics fields are present",
 
   assert.deepEqual(augmentedDecision, baselineDecision);
 });
+

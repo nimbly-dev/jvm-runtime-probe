@@ -179,10 +179,10 @@ test("mcp IT: happy-path covers regression, probe status, capture, class invento
     projectRootAbs: postAppProjectRootAbs,
     classHint: postControllerFqcn,
     methodHint: "listPosts",
-    intentMode: "regression_http_only",
+    intentMode: "regression",
   });
   assert.equal(publicRecipe.structuredContent.resultType, "recipe");
-  assert.equal(publicRecipe.structuredContent.status, "regression_http_only_ready");
+  assert.equal(publicRecipe.structuredContent.status, "regression_ready");
   assert.equal(publicRecipe.structuredContent.requestCandidates[0].method, "GET");
   assert.equal(publicRecipe.structuredContent.requestCandidates[0].path, "/api/v1/posts");
 
@@ -238,11 +238,11 @@ test("mcp IT: happy-path covers regression, probe status, capture, class invento
     classHint: postControllerFqcn,
     methodHint: "updatePost",
     lineHint: candidate.line,
-    intentMode: "regression_plus_line_probe",
+    intentMode: "line_probe",
     authToken: "alice-token",
   });
   assert.equal(recipe.structuredContent.resultType, "recipe");
-  assert.equal(recipe.structuredContent.status, "regression_plus_line_probe_ready");
+  assert.equal(recipe.structuredContent.status, "single_line_probe_ready");
   assert.equal(recipe.structuredContent.synthesizerUsed, "spring");
   assert.equal(recipe.structuredContent.auth.status, "not_required");
   assert.equal(recipe.structuredContent.requestCandidates[0].method, "PUT");
@@ -338,11 +338,11 @@ test("mcp IT: protected createPost requires bearer auth and executes with run-as
     projectRootAbs: postAppProjectRootAbs,
     classHint: postControllerFqcn,
     methodHint: "createPost",
-    intentMode: "regression_http_only",
+    intentMode: "regression",
     authToken: "alice-token",
   });
   assert.equal(recipe.structuredContent.resultType, "recipe");
-  assert.equal(recipe.structuredContent.status, "regression_http_only_ready");
+  assert.equal(recipe.structuredContent.status, "regression_ready");
   assert.equal(recipe.structuredContent.requestCandidates[0].method, "POST");
   assert.equal(recipe.structuredContent.requestCandidates[0].path, "/api/v1/posts");
 
@@ -522,7 +522,7 @@ test("mcp IT: fail-closed paths cover invalid project roots, bad recipe hints, i
     projectRootAbs: postAppProjectRootAbs,
     classHint: "PostController",
     methodHint: "updatePost",
-    intentMode: "regression_http_only",
+    intentMode: "regression",
   });
   assert.equal(invalidRecipe.structuredContent.status, "class_hint_not_fqcn");
   assert.equal(invalidRecipe.structuredContent.reasonCode, "class_hint_not_fqcn");
@@ -588,11 +588,11 @@ test("mcp IT: inherited controller methods across Spring mappings resolve determ
       projectRootAbs: postAppProjectRootAbs,
       classHint: inheritedControllerFqcn,
       methodHint,
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     });
 
     assert.equal(result.structuredContent.resultType, "recipe");
-    assert.equal(result.structuredContent.status, "regression_http_only_ready");
+    assert.equal(result.structuredContent.status, "regression_ready");
     assert.equal(result.structuredContent.requestCandidates.length > 0, true);
     assert.equal(
       result.structuredContent.requestCandidates[0].method,
@@ -604,4 +604,6 @@ test("mcp IT: inherited controller methods across Spring mappings resolve determ
     );
   }
 });
+
+
 

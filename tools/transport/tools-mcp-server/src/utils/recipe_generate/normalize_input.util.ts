@@ -1,12 +1,10 @@
-import type { IntentMode } from "@tools-core/recipe_constants.util";
-
 export type NormalizedRecipeGenerateInput = {
   rootAbs: string;
   workspaceRootAbs: string;
   additionalSourceRootsAbs?: string[];
   classHint: string;
   methodHint: string;
-  intentMode: IntentMode;
+  intentMode: "line_probe" | "regression";
   lineHint?: number;
   mappingsBaseUrl?: string;
   discoveryPreference: "static_only" | "runtime_first" | "runtime_only";
@@ -30,7 +28,7 @@ export function normalizeRecipeGenerateInput(args: {
   mappingsBaseUrl?: string;
   discoveryPreference?: "static_only" | "runtime_first" | "runtime_only";
   apiBasePath?: string;
-  intentMode: IntentMode;
+  intentMode: "line_probe" | "regression";
   maxCandidates?: number;
   authToken?: string;
   authUsername?: string;

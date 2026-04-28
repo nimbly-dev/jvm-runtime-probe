@@ -11,7 +11,7 @@ test("spring synthesizer maps AST resolver success into a request recipe", async
       searchRootsAbs: ["C:\\repo\\service"],
       classHint: "HealthController",
       methodHint: "health",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
       inferredTargetFileAbs: "C:\\repo\\service\\src\\main\\java\\HealthController.java",
     },
     {
@@ -57,7 +57,7 @@ test("spring synthesizer consumes optional resolver extensions without changing 
       searchRootsAbs: ["C:\\repo\\service"],
       classHint: "HealthController",
       methodHint: "health",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       resolveRequestMappingFn: async () => ({
@@ -98,7 +98,7 @@ test("spring synthesizer surfaces AST resolver bootstrap failures distinctly", a
       searchRootsAbs: ["C:\\repo\\service"],
       classHint: "HealthController",
       methodHint: "health",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       resolveRequestMappingFn: async () => ({
@@ -126,7 +126,7 @@ test("spring synthesizer preserves resolver-specific target ambiguity failures",
       searchRootsAbs: ["C:\\repo\\service"],
       classHint: "CatalogController",
       methodHint: "getCatalog",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       resolveRequestMappingFn: async () => ({
@@ -220,7 +220,7 @@ test("spring synthesizer runtime_first uses actuator mappings before AST", async
       searchRootsAbs: ["C:\\repo\\service"],
       classHint: "com.example.HealthController",
       methodHint: "health",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
       discoveryPreference: "runtime_first",
       mappingsBaseUrl: "http://127.0.0.1:8080/actuator/mappings",
     },
@@ -258,7 +258,7 @@ test("spring synthesizer runtime_first falls back to AST when runtime mappings f
       searchRootsAbs: ["C:\\repo\\service"],
       classHint: "com.example.HealthController",
       methodHint: "health",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
       discoveryPreference: "runtime_first",
       mappingsBaseUrl: "http://127.0.0.1:8080/actuator/mappings",
     },
@@ -308,7 +308,7 @@ test("spring synthesizer runtime_only fails closed when runtime mappings are unr
       searchRootsAbs: ["C:\\repo\\service"],
       classHint: "com.example.HealthController",
       methodHint: "health",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
       discoveryPreference: "runtime_only",
       mappingsBaseUrl: "http://127.0.0.1:8080/actuator/mappings",
     },
@@ -331,3 +331,4 @@ test("spring synthesizer runtime_only fails closed when runtime mappings are unr
   assert.equal(result.reasonCode, "runtime_mappings_unreachable");
   assert.equal(result.failedStep, "runtime_mapping_fetch");
 });
+

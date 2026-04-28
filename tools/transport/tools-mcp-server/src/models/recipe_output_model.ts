@@ -123,7 +123,7 @@ export function buildRecipeTemplateModel(args: {
   const planMode = generated.executionPlan.selectedMode;
   const planReason = generated.executionPlan.routingReason;
   const successCriterion =
-    generated.selectedMode === "regression_http_only"
+    generated.selectedMode === "regression"
       ? "api_regression_only"
       : typeof lineHint === "number"
         ? "line_hit (probe key Class#method:line; breakpoint optional)"
@@ -181,3 +181,4 @@ export function buildRecipeTemplateModel(args: {
         .join(" | ") || "-",
   };
 }
+

@@ -34,15 +34,17 @@ test("create_recipe GET: listPosts recipe is synthesized and executable", async 
       projectRootAbs: path.join(socialPlatformRootAbs, "post-service", "post-app"),
       classHint: postControllerFqcn,
       methodHint: "listPosts",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
   })) as any;
 
   assert.equal(recipe.structuredContent.resultType, "recipe");
-  assert.equal(recipe.structuredContent.status, "regression_http_only_ready");
+  assert.equal(recipe.structuredContent.status, "regression_ready");
   assert.equal(recipe.structuredContent.requestCandidates[0].method, "GET");
   assert.equal(recipe.structuredContent.requestCandidates[0].path, "/api/v1/posts");
 
   const response = await fetch(`${runtime.apiBaseUrl}/api/v1/posts?page=0&size=2`);
   assert.equal(response.status, 200);
 });
+
+

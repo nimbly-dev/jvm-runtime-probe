@@ -36,12 +36,12 @@ test("create_recipe IT: route synthesis avoids legacy-default segment when concr
       projectRootAbs: path.join(socialPlatformRootAbs, "post-service", "post-app"),
       classHint: featureFlagsControllerFqcn,
       methodHint: "featureFlags",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
   })) as any;
 
   assert.equal(recipe.structuredContent.resultType, "recipe");
-  assert.equal(recipe.structuredContent.status, "regression_http_only_ready");
+  assert.equal(recipe.structuredContent.status, "regression_ready");
   assert.equal(recipe.structuredContent.requestCandidates[0].method, "GET");
   assert.equal(recipe.structuredContent.requestCandidates[0].path, "/api/v9/feature-flags");
   assert.ok(
@@ -53,3 +53,5 @@ test("create_recipe IT: route synthesis avoids legacy-default segment when concr
   assert.equal(response.status, 200);
   assert.equal(await response.text(), "feature-flags-ok");
 });
+
+

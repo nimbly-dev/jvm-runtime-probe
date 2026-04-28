@@ -45,7 +45,7 @@ function toActionCode(step: { title: string }): string {
 }
 
 function compactRoutingReason(selectedMode: string): string {
-  if (selectedMode === "regression_http_only") return "regression_http_only_no_probe";
+  if (selectedMode === "regression") return "regression_no_probe";
   if (selectedMode === "single_line_probe") return "single_line_probe";
   if (selectedMode === "regression_plus_line_probe") return "regression_plus_line_probe";
   return "mode_selected";
@@ -500,3 +500,4 @@ export function registerRecipeCreateTool(
     },
   );
 }
+

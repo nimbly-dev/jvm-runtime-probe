@@ -15,7 +15,7 @@ function sampleInput() {
     searchRootsAbs: ["C:\\repo\\service"],
     classHint: "HealthController",
     methodHint: "health",
-    intentMode: "regression_http_only",
+    intentMode: "regression",
   };
 }
 
@@ -195,3 +195,4 @@ test("default registry fails closed when external plugin is API-incompatible", a
     assert.ok(result.evidence.some((v: string) => v.includes("plugin_incompatible")));
   });
 });
+

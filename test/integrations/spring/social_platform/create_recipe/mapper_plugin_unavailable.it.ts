@@ -39,7 +39,7 @@ test("create_recipe REPORT: preserves mapper_plugin_unavailable from AST resolve
       projectRootAbs: path.join(socialPlatformRootAbs, "post-service", "post-app"),
       classHint: postControllerFqcn,
       methodHint: "listPosts",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
   })) as any;
 
@@ -57,3 +57,4 @@ test("create_recipe REPORT: preserves mapper_plugin_unavailable from AST resolve
     "service_loader_plugin_discovery",
   ]);
 });
+

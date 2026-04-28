@@ -50,7 +50,7 @@ test("create_recipe IT: uses built-in fallback template profile when no project 
       projectRootAbs: postAppProjectRootAbs,
       classHint: postControllerFqcn,
       methodHint: "updatePost",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
       authToken: "alice-token",
     },
   })) as any;
@@ -80,7 +80,7 @@ test("create_recipe IT: applies project fixture profile overrides for determinis
       projectRootAbs: postAppProjectRootAbs,
       classHint: postControllerFqcn,
       methodHint: "updatePost",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
       authToken: "alice-token",
     },
   })) as any;
@@ -96,3 +96,4 @@ test("create_recipe IT: applies project fixture profile overrides for determinis
     true,
   );
 });
+

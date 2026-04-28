@@ -1,7 +1,7 @@
 import type { IntentMode } from "@tools-core/recipe_constants.util";
 
 export type RoutingContext = {
-  requestedIntentMode: IntentMode;
+  intentMode: "line_probe" | "regression";
   lineHint?: number;
 };
 
@@ -14,11 +14,11 @@ export type RoutingDecision = {
 };
 
 export function buildRoutingContext(args: {
-  intentMode: IntentMode;
+  intentMode: "line_probe" | "regression";
   lineHint?: number;
 }): RoutingContext {
   return {
-    requestedIntentMode: args.intentMode,
+    intentMode: args.intentMode,
     ...(typeof args.lineHint === "number" ? { lineHint: args.lineHint } : {}),
   };
 }
@@ -33,18 +33,19 @@ export function requiresLineTarget(mode: IntentMode): boolean {
 
 export function resolveSelectedMode(ctx: RoutingContext): RoutingDecision {
   const lineTargetProvided = hasExplicitLineTarget(ctx);
-  const probeIntentRequested = requiresLineTarget(ctx.requestedIntentMode);
+  const selectedMode: IntentMode =
+    ctx.intentMode === "line_probe" ? "single_line_probe" : "regression";
+  const probeIntentRequested = requiresLineTarget(selectedMode);
 
   return {
-    requestedMode: ctx.requestedIntentMode,
-    selectedMode: ctx.requestedIntentMode,
+    requestedMode: selectedMode,
+    selectedMode,
     lineTargetProvided,
     probeIntentRequested,
     routingReason:
-      ctx.requestedIntentMode === "regression_http_only"
-        ? "Regression API checks requested without probe verification."
-        : ctx.requestedIntentMode === "single_line_probe"
-          ? "Line probe verification requested with explicit line target."
-          : "Combined API regression and line probe verification requested with explicit line target.",
+      ctx.intentMode === "line_probe"
+        ? "Line probe requested with strict line verification semantics."
+        : "Regression API checks requested without strict line probe requirement.",
   };
 }
+

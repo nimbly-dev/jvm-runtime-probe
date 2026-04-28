@@ -59,7 +59,7 @@ async function createRecipe(args: { classHint: string; methodHint: string }) {
       additionalSourceRoots: bytecodeOnlyRootAbs ? [bytecodeOnlyRootAbs] : [],
       classHint: args.classHint,
       methodHint: args.methodHint,
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
   })) as any;
 }
@@ -71,7 +71,7 @@ test("create_recipe IT: bytecode annotation fallback resolves interface mapping 
   });
 
   assert.equal(recipe.structuredContent.resultType, "recipe");
-  assert.equal(recipe.structuredContent.status, "regression_http_only_ready");
+  assert.equal(recipe.structuredContent.status, "regression_ready");
   assert.equal(recipe.structuredContent.requestCandidates[0].method, "GET");
   assert.equal(recipe.structuredContent.requestCandidates[0].path, "/api/v3/creator/pulse");
 
@@ -86,10 +86,12 @@ test("create_recipe IT: bytecode annotation fallback resolves interface->abstrac
   });
 
   assert.equal(recipe.structuredContent.resultType, "recipe");
-  assert.equal(recipe.structuredContent.status, "regression_http_only_ready");
+  assert.equal(recipe.structuredContent.status, "regression_ready");
   assert.equal(recipe.structuredContent.requestCandidates[0].method, "GET");
   assert.equal(recipe.structuredContent.requestCandidates[0].path, "/api/v4/creator/digest");
 
   assert.equal(recipe.structuredContent.attemptedStrategies.includes(bytecodeFallbackStrategy), true);
   assert.equal(recipe.structuredContent.evidence.includes(bytecodeMappingEvidence), true);
 });
+
+

@@ -40,7 +40,7 @@ async function createRecipe(args: {
       projectRootAbs: postAppProjectRootAbs,
       classHint: args.classHint,
       methodHint: args.methodHint,
-      intentMode: "regression_http_only",
+      intentMode: "regression",
       discoveryPreference: args.discoveryPreference,
       ...(args.mappingsBaseUrl ? { mappingsBaseUrl: args.mappingsBaseUrl } : {}),
     },
@@ -58,7 +58,7 @@ test("create_recipe IT: runtime_first resolves request candidate from actuator m
   });
 
   assert.equal(recipe.structuredContent.resultType, "recipe");
-  assert.equal(recipe.structuredContent.status, "regression_http_only_ready");
+  assert.equal(recipe.structuredContent.status, "regression_ready");
   assert.equal(recipe.structuredContent.requestCandidates[0].method, "GET");
   assert.equal(recipe.structuredContent.requestCandidates[0].path, "/api/v1/posts");
   assert.equal(recipe.structuredContent.evidence.includes("mapping_source=runtime_actuator"), true);
@@ -79,7 +79,7 @@ test("create_recipe IT: runtime_first falls back to static synthesis when runtim
   });
 
   assert.equal(recipe.structuredContent.resultType, "recipe");
-  assert.equal(recipe.structuredContent.status, "regression_http_only_ready");
+  assert.equal(recipe.structuredContent.status, "regression_ready");
   assert.equal(recipe.structuredContent.requestCandidates[0].method, "GET");
   assert.equal(recipe.structuredContent.requestCandidates[0].path, "/api/v1/posts");
   assert.equal(
@@ -103,3 +103,5 @@ test("create_recipe IT: runtime_only fails closed when runtime mappings endpoint
   assert.equal(recipe.structuredContent.nextActionCode, "verify_runtime_mappings_endpoint");
   assert.equal(recipe.structuredContent.failedStep, "runtime_mapping_fetch");
 });
+
+

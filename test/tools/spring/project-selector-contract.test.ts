@@ -75,7 +75,7 @@ test("probe_recipe_create fails closed when additionalSourceRoots contains an in
     projectRootAbs: path.resolve(__dirname, "..", ".."),
     classHint: "com.example.CatalogService",
     methodHint: "save",
-    intentMode: "regression_http_only",
+    intentMode: "regression",
     additionalSourceRoots: ["C:\\definitely\\missing\\source-root"],
   });
 
@@ -120,7 +120,7 @@ test("probe_recipe_create requires explicit projectRootAbs", async () => {
   const out = await handler({
     classHint: "CatalogService",
     methodHint: "save",
-    intentMode: "regression_http_only",
+    intentMode: "regression",
   });
 
   assert.equal(out.structuredContent.status, "project_selector_required");
@@ -160,7 +160,7 @@ test("probe_recipe_create fails closed when classHint is not an FQCN", async () 
     projectRootAbs: path.resolve(__dirname, "..", ".."),
     classHint: "CatalogService",
     methodHint: "save",
-    intentMode: "regression_http_only",
+    intentMode: "regression",
   });
 
   assert.equal(out.structuredContent.status, "class_hint_not_fqcn");
@@ -185,8 +185,8 @@ test("probe_recipe_create passes configured workspace root into generateRecipe",
       return {
         requestCandidates: [],
         executionPlan: {
-          selectedMode: "regression_http_only",
-          routingReason: "regression_http_only_no_probe",
+          selectedMode: "regression",
+          routingReason: "regression_no_probe",
           steps: [],
           probeCallPlan: {
             total: 0,
@@ -202,7 +202,7 @@ test("probe_recipe_create passes configured workspace root into generateRecipe",
         },
         resultType: "report",
         status: "api_request_not_inferred",
-        selectedMode: "regression_http_only",
+        selectedMode: "regression",
         lineTargetProvided: false,
         probeIntentRequested: false,
         executionReadiness: "needs_user_input",
@@ -237,7 +237,7 @@ test("probe_recipe_create passes configured workspace root into generateRecipe",
         projectRootAbs: dir,
         classHint: "com.example.CatalogController",
         methodHint: "listCatalogShoes",
-        intentMode: "regression_http_only",
+        intentMode: "regression",
       });
     } finally {
       recipeGenerateDomain.generateRecipe = originalGenerateRecipe;
@@ -332,7 +332,7 @@ test("probe_recipe_create fails closed when strict runtime line is unresolved", 
           classHint: "com.example.CatalogController",
           methodHint: "save",
           lineHint: 50,
-          intentMode: "single_line_probe",
+          intentMode: "line_probe",
         });
         assert.equal(out.structuredContent.resultType, "report");
         assert.equal(out.structuredContent.status, "target_not_inferred");
@@ -524,3 +524,5 @@ test("probe_target_infer class_methods returns unresolved line selection when no
     });
   });
 });
+
+

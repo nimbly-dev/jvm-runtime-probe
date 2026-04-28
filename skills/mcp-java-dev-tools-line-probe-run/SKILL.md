@@ -34,7 +34,7 @@ Use this workflow only for strict one-line verification runs.
    - auth requirement/token only if needed.
 1. Validate probe connectivity first with `probe_check` on the selected probe base URL.
 2. Call `project_context_validate` with orchestrator-selected `projectRootAbs`.
-3. Call `probe_recipe_create` with probe intent, strict line target context, and exact FQCN in `classHint`.
+3. Call `probe_recipe_create` with intentMode=line_probe, strict line target context, and exact FQCN in `classHint`.
 4. Provide `apiBasePath` when runtime is deployed with a context path (for example `/api/v1`).
 5. Ask for context path at most once per run; reuse the same `apiBasePath` for subsequent attempts in that run.
 6. Runtime synthesis scope is runtime-only (`src/main/java` + generated-main roots); test sources are excluded.
@@ -165,4 +165,5 @@ Recipe `<short-name-or-index>`
    - Probe Verification: `<hit=true|false, inline=true|false, lineValidation=...>`
 
 For multi-request runs, create separate recipe blocks and repeat steps 1-4 inside each block.
+
 

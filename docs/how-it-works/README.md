@@ -21,7 +21,7 @@ Make sure these preconditions are met before running any workflow:
 - `projectRootAbs`
 - Exact FQCN in `classHint`
 - Exact `methodHint`
-- `lineHint` for probe-intent modes (`single_line_probe`, `regression_plus_line_probe`)
+- `lineHint` when `intentMode=line_probe` (strict probe verification mode)
 - Auth when the endpoint requires it
 
 **Helpful to provide explicitly:**
@@ -64,7 +64,7 @@ Return the exact request plan and probe verification steps.
 
 1. The orchestrator resolves the project root and passes `projectRootAbs`
 2. `project_context_validate` optionally validates the scoped project context for that root
-3. `probe_recipe_create` is called with `projectRootAbs`, `intentMode=single_line_probe`, exact FQCN in `classHint`, method/line hints, optional `apiBasePath`, and auth context
+3. `probe_recipe_create` is called with `projectRootAbs`, `intentMode=line_probe`, exact FQCN in `classHint`, method/line hints, optional `apiBasePath`, and auth context
 4. The tool performs code-based route inference through synthesizer plugins backed by the generic JVM AST request-mapping resolver, returning `executionReadiness`, `requestCandidates`, `inferredTarget`, and `selectedMode`
 5. Framework adapters resolve annotation semantics (for example Spring `@RequestParam`, `@PathVariable`, `@RequestBody`) into normalized parameter metadata before HTTP materialization
 6. Generic HTTP transport materializes path/query/body templates from normalized parameters and applies optional project fixture profile overrides from `.mcp-java-dev-tools/request-template.properties`

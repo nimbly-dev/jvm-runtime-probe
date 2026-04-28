@@ -64,7 +64,7 @@ Before requesting manual runtime inputs for discoverable prerequisites, execute 
 ## Recipe Synthesis Policy
 
 1. Treat `probe_recipe_create` as deterministic and fail-closed.
-2. Use `intentMode=regression_http_only` for HTTP regression runs without strict line verification.
+2. Use `intentMode=regression` for HTTP regression runs without strict line verification.
 3. For `probe_recipe_create`, pass controller/service class as exact FQCN in `classHint`.
 4. Runtime synthesis scope is runtime-only (`src/main/java` + generated-main roots); test sources are excluded.
 5. Pass `apiBasePath` when runtime uses a context path (for example `/api/v1`).
@@ -156,3 +156,4 @@ When writing `Repro Steps`, prioritize human actions over MCP internals:
 3. Keep steps directly runnable by a developer with curl/Postman/browser.
 4. Do not list MCP tool calls as the primary repro path.
 5. If needed, add a separate optional section named `Toolchain Steps` for MCP diagnostics.
+

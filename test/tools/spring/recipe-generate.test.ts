@@ -11,14 +11,14 @@ const okAuth = {
   notes: [],
 };
 
-test("fails closed when target is not inferred in regression_http_only mode", async () => {
+test("fails closed when target is not inferred in regression mode", async () => {
   const result = await generateRecipe(
     {
       rootAbs: "C:\\repo\\service",
       workspaceRootAbs: "C:\\repo",
       classHint: "PostController",
       methodHint: "updatePost",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -73,7 +73,7 @@ test("promotes exact zero-method class match into synthesis fallback for inherit
       workspaceRootAbs: "C:\\repo",
       classHint: "com.example.web.AppController",
       methodHint: "listApps",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -129,7 +129,7 @@ test("keeps generic target_not_inferred guidance when class inventory has no exa
       workspaceRootAbs: "C:\\repo",
       classHint: "com.example.web.AppController",
       methodHint: "listApps",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -169,7 +169,7 @@ test("keeps generic target_not_inferred guidance when class inventory has multip
       workspaceRootAbs: "C:\\repo",
       classHint: "com.example.web.AppController",
       methodHint: "listApps",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -222,7 +222,7 @@ test("fails closed when multiple module candidates remain target-ambiguous", asy
       workspaceRootAbs: "C:\\repo",
       classHint: "com.example.social.post.app.controller.PostController",
       methodHint: "listPosts",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -287,7 +287,7 @@ test("keeps target_not_inferred for probe mode when strict line target is unavai
       classHint: "PostController",
       methodHint: "updatePost",
       lineHint: 88,
-      intentMode: "single_line_probe",
+      intentMode: "line_probe",
     },
     {
       inferTargetsFn: async () => ({
@@ -338,7 +338,7 @@ test("reports request_inference failure when target is inferred but request cand
       workspaceRootAbs: "C:\\repo",
       classHint: "PostController",
       methodHint: "updatePost",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -385,7 +385,7 @@ test("does not claim missing authToken in report mode when caller already provid
       workspaceRootAbs: "C:\\repo",
       classHint: "PostController",
       methodHint: "updatePost",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
       authToken: "provided-token",
     },
     {
@@ -436,7 +436,7 @@ test("reports auth_resolution when request exists but auth input is still requir
       workspaceRootAbs: "C:\\repo",
       classHint: "PostController",
       methodHint: "updatePost",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -501,7 +501,7 @@ test("reports request_confirmation_required when unresolved confirmation blocks 
       workspaceRootAbs: "C:\\repo",
       classHint: "CatalogController",
       methodHint: "listCatalogShoes",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -561,7 +561,7 @@ test("keeps deterministic spring request ready even when informational confirmat
       workspaceRootAbs: "C:\\repo",
       classHint: "CatalogController",
       methodHint: "listCatalogShoes",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -608,7 +608,7 @@ test("keeps deterministic spring request ready even when informational confirmat
   );
 
   assert.equal(result.resultType, "recipe");
-  assert.equal(result.status, "regression_http_only_ready");
+  assert.equal(result.status, "regression_ready");
   assert.equal(result.executionReadiness, "ready");
 });
 
@@ -620,7 +620,7 @@ test("applies apiBasePath prefix to synthesized request candidate and trigger", 
       classHint: "CatalogController",
       methodHint: "listCatalogShoes",
       apiBasePath: "/api/v1",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -680,7 +680,7 @@ test("does not double-prefix apiBasePath when synthesized path already includes 
       classHint: "CatalogController",
       methodHint: "listCatalogShoes",
       apiBasePath: "/api/v1",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -737,7 +737,7 @@ test("emits non-blocking context path hint when apiBasePath is not provided", as
       workspaceRootAbs: "C:\\repo",
       classHint: "CatalogController",
       methodHint: "listCatalogShoes",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async () => ({
@@ -799,7 +799,7 @@ test("passes additionalSourceRootsAbs into target inference for deterministic cr
       additionalSourceRootsAbs: ["C:\\repo\\core\\src\\main\\java"],
       classHint: "CatalogController",
       methodHint: "listCatalogShoes",
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async (args: any) => {
@@ -836,7 +836,7 @@ test("requests at least two target candidates so ambiguity can be fail-closed", 
       classHint: "CatalogController",
       methodHint: "listCatalogShoes",
       maxCandidates: 1,
-      intentMode: "regression_http_only",
+      intentMode: "regression",
     },
     {
       inferTargetsFn: async (args: any) => {
@@ -863,5 +863,7 @@ test("requests at least two target candidates so ambiguity can be fail-closed", 
   assert.equal(result.status, "target_not_inferred");
   assert.equal(seenMaxCandidates, 2);
 });
+
+
 
 
