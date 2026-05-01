@@ -4,7 +4,7 @@
 [![npm](https://img.shields.io/badge/npm-11.6.2-CB3837?logo=npm&logoColor=white)](https://www.npmjs.com/)
 [![JDK](https://img.shields.io/badge/JDK-17%2B-007396?logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Java Agent Target](https://img.shields.io/badge/Java%20Agent%20Target-17-ED8B00?logo=openjdk&logoColor=white)](https://maven.apache.org/)
-[![package](https://img.shields.io/badge/package-mcp--java--dev--tools%400.1.4-0A66C2)](https://github.com/nimbly-dev/mcp-java-dev-tools)
+[![package](https://img.shields.io/badge/package-mcp--java--dev--tools%400.1.5-0A66C2)](https://github.com/nimbly-dev/mcp-java-dev-tools)
 [![MCP Badge](https://lobehub.com/badge/mcp/nimbly-dev-mcp-java-dev-tools?style=flat)](https://lobehub.com/mcp/nimbly-dev-mcp-java-dev-tools)
 
 **MCP Java Dev Tools** bridges agentic coding tools and live Java runtime behavior through a lightweight sidecar agent.
@@ -60,6 +60,7 @@ This installs the default skill set:
 - `mcp-java-dev-tools-regression-plan-crafter`
 - `mcp-java-dev-tools-regression-result`
 - `mcp-java-dev-tools-issue-report`
+- `mcp-java-dev-tools-probe-registry-manager`
 
 To update/overwrite existing installed skills (and add missing new skills):
 
@@ -71,7 +72,19 @@ Both scripts:
 - run `npm run build:compile`
 - run `mvn -f java-agent/pom.xml package`
 - sync shipped skills into the target client skill directory
-- do not install MCP config entries
+- by default prompt for a first workspace and generate MCP env config block output (Codex/Kiro specific)
+
+Default MCP registry env input can be skipped:
+
+```bash
+./scripts/install.sh --client codex --no-configure-mcp-env
+```
+
+MCP env input captures:
+- `MCP_PROBE_BASE_URL` (default `http://127.0.0.1:9193`)
+- `MCP_WORKSPACE_ROOT` (required)
+- `MCP_PROBE_CONFIG_FILE` (defaults to `<workspace>/.mcpjvm/probe-config.json`)
+- `MCP_PROBE_PROFILE` (default `dev`)
 
 ### Spring Integration Launcher
 
@@ -96,7 +109,7 @@ The target JVM must run on **Java 17 or newer**. If you're on Java 21, see [Java
 Add the following as a JVM argument when launching your application, replacing `{desktopName}`:
 
 ```text
--javaagent:C:\Users\{desktopName}\repository\mcp-java-dev-tools\java-agent\core\core-probe\target\mcp-java-dev-tools-agent-0.1.4.jar=host=0.0.0.0;port=9191;exclude=com.nimbly.mcpjavadevtools.agent.**,**.config.**,**Test
+-javaagent:C:\Users\{desktopName}\repository\mcp-java-dev-tools\java-agent\core\core-probe\target\mcp-java-dev-tools-agent-0.1.5.jar=host=0.0.0.0;port=9191;exclude=com.nimbly.mcpjavadevtools.agent.**,**.config.**,**Test
 ```
 
 > **Tip:** The `include` filter is optional. If omitted, the agent infers an include scope from startup command metadata (`sun.java.command`), usually the startup class package (for example `com.acme.app.**`). Set `include` explicitly when inference is ambiguous or too broad. `MCP_WORKSPACE_ROOT` does not control Java instrumentation scope.
@@ -187,6 +200,7 @@ Default is `false`.
 | Variable | Purpose |
 |---|---|
 | `MCP_PROBE_BASE_URL` | URL of the running probe agent |
+| `MCP_PROBE_CONFIG_FILE` | Path to probe registry JSON for multi-probe mode |
 
 #### Optional
 
@@ -208,6 +222,11 @@ Default is `false`.
 |---|---|---|
 | `MCP_WORKSPACE_ROOT` / `--workspace-root` | MCP server | Path resolution for project validation and synthesis search roots |
 | `MCP_PROBE_BASE_URL` / `--probe-base-url` | MCP server | Default probe endpoint for tool calls |
+| `MCP_PROBE_CONFIG_FILE` | MCP server | Multi-probe registry file with workspaces/profiles/probes |
+| `MCP_PROBE_PROFILE` | MCP server | Explicit profile override when registry mode is enabled |
+
+If `MCP_PROBE_CONFIG_FILE` is not set, MCP will auto-discover only:
+1. `.mcpjvm/probe-config.json`
 | `include` / `exclude` in `-javaagent:...` (or `mcp.probe.include` / `MCP_PROBE_INCLUDE`) | Java agent | Which classes are instrumented at runtime |
 | `MCP_PROBE_INCLUDE_EXECUTION_PATHS` | MCP server | Whether `executionPaths` arrays are included in returned probe payloads |
 
@@ -259,3 +278,11 @@ Start there before opening a large pull request or changing public tool contract
 | `probe_reset` | |
 | `probe_wait_for_hit` | |
 | `probe_enable` | |
+| `probe_registry_list` | |
+| `probe_registry_reload` | |
+
+Probe registry runtime behavior:
+- Registry config is loaded on startup.
+- When `MCP_PROBE_CONFIG_FILE` (or workspace `.mcpjvm/probe-config.json`) is active, file edits are auto-reloaded with debounce.
+- `probe_registry_reload` remains available as deterministic manual refresh/fallback.
+

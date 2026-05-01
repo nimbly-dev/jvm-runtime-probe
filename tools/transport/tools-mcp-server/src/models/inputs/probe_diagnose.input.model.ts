@@ -5,6 +5,11 @@ export const ProbeDiagnoseInputSchema = {
     .string()
     .optional()
     .describe("Override probe base URL (default from MCP_PROBE_BASE_URL)."),
+  probeId: z
+    .string()
+    .min(1)
+    .optional()
+    .describe("Optional named probe selector. If provided, takes precedence over baseUrl."),
   http: z
     .object({
       headers: z

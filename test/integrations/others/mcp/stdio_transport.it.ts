@@ -155,6 +155,12 @@ test("mcp IT: stdio transport keeps stdout protocol-only and writes diagnostics 
     const toolsListResponse = parsedLines.find((message) => message.id === 2);
     assert.ok(toolsListResponse);
     assert.equal(Array.isArray(toolsListResponse.result?.tools), true);
+    const tools = (toolsListResponse.result?.tools ?? []) as Array<{ name?: string }>;
+    const toolNames = new Set(
+      tools.map((tool) => tool.name).filter((name): name is string => typeof name === "string"),
+    );
+    assert.equal(toolNames.has("probe_registry_list"), true);
+    assert.equal(toolNames.has("probe_registry_reload"), true);
 
     const joinedStdout = stdoutChunks.join("");
     const joinedStderr = stderrChunks.join("");

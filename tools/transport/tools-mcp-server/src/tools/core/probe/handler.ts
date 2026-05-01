@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { createProbeDomain } from "@/tools/core/probe/domain";
 import { PROBE_TOOLS } from "@/tools/core/probe/contract";
+import type { ProbeRegistry } from "@/config/probe-registry";
 
 export type ProbeHandlerConfig = {
   probeBaseUrl: string;
@@ -12,6 +13,7 @@ export type ProbeHandlerConfig = {
   probeWaitMaxRetries: number;
   probeWaitUnreachableRetryEnabled: boolean;
   probeWaitUnreachableMaxRetries: number;
+  getProbeRegistry?: () => ProbeRegistry | undefined;
 };
 
 export function registerProbeTools(server: McpServer, cfg: ProbeHandlerConfig): void {

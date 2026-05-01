@@ -7,6 +7,7 @@ DEFAULT_SKILLS=(
   "mcp-java-dev-tools-regression-plan-crafter"
   "mcp-java-dev-tools-regression-result"
   "mcp-java-dev-tools-issue-report"
+  "mcp-java-dev-tools-probe-registry-manager"
 )
 RETIRED_SKILL_NAME="mcp-java-dev-tools-repro-orchestration"
 MANAGED_SKILL_PREFIX="mcp-java-dev-tools-"
@@ -22,6 +23,12 @@ SKILL_NAMES=("${DEFAULT_SKILLS[@]}")
 SKILL_NAME_OVERRIDE=0
 RUN_BUILD_COMPILE=1
 RUN_BUILD_JAVA=1
+CONFIGURE_MCP_ENV=1
+MCP_SERVER_NAME="mcp-java-dev-tools"
+MCP_WORKSPACE_ROOT_INPUT=""
+MCP_PROBE_CONFIG_FILE_INPUT=""
+MCP_PROBE_PROFILE_INPUT="dev"
+MCP_PROBE_BASE_URL_INPUT="http://127.0.0.1:9193"
 
 usage_common() {
   cat <<'EOF'
@@ -32,6 +39,13 @@ Options:
   --kiro-skills-dir <absPath> Override Kiro skills directory (default: ~/.kiro/skills)
   --no-build-compile          Skip `npm run build:compile`
   --no-build-java             Skip `mvn -f java-agent/pom.xml package`
+  --configure-mcp-env         Prompt/collect MCP probe-registry env values and print config block (default: enabled)
+  --no-configure-mcp-env      Skip MCP env input/output block generation
+  --mcp-server-name <name>    MCP server entry name for generated config block (default: mcp-java-dev-tools)
+  --workspace-root <absPath>  Workspace root for MCP_WORKSPACE_ROOT (used with --configure-mcp-env)
+  --probe-config-file <path>  Probe config path for MCP_PROBE_CONFIG_FILE (used with --configure-mcp-env)
+  --probe-profile <name>      Probe profile for MCP_PROBE_PROFILE (default: dev)
+  --probe-base-url <url>      Default probe base URL for MCP_PROBE_BASE_URL (default: http://127.0.0.1:9193)
   --help                      Show help
 EOF
 }
@@ -94,6 +108,13 @@ parse_common_args() {
       --kiro-skills-dir) KIRO_SKILLS_DIR="$(expand_home "${2:-}")"; shift 2 ;;
       --no-build-compile) RUN_BUILD_COMPILE=0; shift ;;
       --no-build-java) RUN_BUILD_JAVA=0; shift ;;
+      --configure-mcp-env) CONFIGURE_MCP_ENV=1; shift ;;
+      --no-configure-mcp-env) CONFIGURE_MCP_ENV=0; shift ;;
+      --mcp-server-name) MCP_SERVER_NAME="${2:-}"; shift 2 ;;
+      --workspace-root) MCP_WORKSPACE_ROOT_INPUT="$(expand_home "${2:-}")"; shift 2 ;;
+      --probe-config-file) MCP_PROBE_CONFIG_FILE_INPUT="$(expand_home "${2:-}")"; shift 2 ;;
+      --probe-profile) MCP_PROBE_PROFILE_INPUT="${2:-}"; shift 2 ;;
+      --probe-base-url) MCP_PROBE_BASE_URL_INPUT="${2:-}"; shift 2 ;;
       --help|-h) return 99 ;;
       *)
         echo "Unknown argument: $1" >&2
@@ -119,6 +140,17 @@ validate_common_config() {
   if [[ "${#SKILL_NAMES[@]}" -eq 0 ]]; then
     echo "No skills selected. Provide --skill-name <name> or omit --skill-name for defaults." >&2
     exit 1
+  fi
+
+  if [[ "$CONFIGURE_MCP_ENV" -eq 1 ]]; then
+    if [[ -z "$MCP_SERVER_NAME" ]]; then
+      echo "--mcp-server-name must be non-empty when --configure-mcp-env is enabled." >&2
+      exit 1
+    fi
+    if [[ -z "$MCP_PROBE_BASE_URL_INPUT" ]]; then
+      echo "--probe-base-url must be non-empty when --configure-mcp-env is enabled." >&2
+      exit 1
+    fi
   fi
 }
 
@@ -226,7 +258,11 @@ run_skill_sync() {
   validate_common_config
 
   echo "$mode_label started (client=$CLIENT)"
-  echo "- Note: this flow syncs skills only. MCP config installation is not performed."
+  if [[ "$CONFIGURE_MCP_ENV" -eq 1 ]]; then
+    echo "- Note: this flow syncs skills and generates MCP env config blocks."
+  else
+    echo "- Note: this flow syncs skills only. MCP config installation is not performed."
+  fi
 
   run_build_compile
   run_build_java
@@ -238,6 +274,11 @@ run_skill_sync() {
       KIRO_SKILLS_DIR="$(detect_kiro_skills_dir)"
     fi
     sync_client_skills "$KIRO_SKILLS_DIR" "Kiro"
+  fi
+
+  if [[ "$CONFIGURE_MCP_ENV" -eq 1 ]]; then
+    prompt_mcp_env_if_missing
+    print_mcp_env_block
   fi
 
   echo "$mode_label completed."
@@ -288,6 +329,124 @@ prompt_yes_no_default_no() {
     fi
     echo "Please answer y or n."
   done
+}
+
+prompt_mcp_env_if_missing() {
+  local input=""
+
+  if [[ -z "$MCP_WORKSPACE_ROOT_INPUT" ]]; then
+    read -r -p "MCP workspace root (absolute path): " input
+    MCP_WORKSPACE_ROOT_INPUT="$(expand_home "$input")"
+  fi
+  if [[ -z "$MCP_WORKSPACE_ROOT_INPUT" ]]; then
+    echo "MCP workspace root is required when --configure-mcp-env is enabled." >&2
+    exit 1
+  fi
+
+  if [[ -z "$MCP_PROBE_CONFIG_FILE_INPUT" ]]; then
+    local default_probe_cfg="$MCP_WORKSPACE_ROOT_INPUT/.mcpjvm/probe-config.json"
+    read -r -p "MCP probe config file [${default_probe_cfg}]: " input
+    if [[ -z "$input" ]]; then
+      MCP_PROBE_CONFIG_FILE_INPUT="$default_probe_cfg"
+    else
+      MCP_PROBE_CONFIG_FILE_INPUT="$(expand_home "$input")"
+    fi
+  fi
+  if [[ -z "$MCP_PROBE_CONFIG_FILE_INPUT" ]]; then
+    echo "MCP probe config file is required when --configure-mcp-env is enabled." >&2
+    exit 1
+  fi
+
+  if [[ -z "$MCP_PROBE_PROFILE_INPUT" ]]; then
+    read -r -p "MCP probe profile [dev]: " input
+    if [[ -z "$input" ]]; then
+      MCP_PROBE_PROFILE_INPUT="dev"
+    else
+      MCP_PROBE_PROFILE_INPUT="$input"
+    fi
+  fi
+
+  if [[ -z "$MCP_PROBE_BASE_URL_INPUT" ]]; then
+    read -r -p "MCP probe base URL [http://127.0.0.1:9193]: " input
+    if [[ -z "$input" ]]; then
+      MCP_PROBE_BASE_URL_INPUT="http://127.0.0.1:9193"
+    else
+      MCP_PROBE_BASE_URL_INPUT="$input"
+    fi
+  fi
+}
+
+print_mcp_env_block() {
+  local toml_base_url toml_workspace toml_cfg toml_profile
+  local json_base_url json_workspace json_cfg json_profile
+
+  toml_base_url="$(escape_toml_basic_string "$MCP_PROBE_BASE_URL_INPUT")"
+  toml_workspace="$(escape_toml_basic_string "$MCP_WORKSPACE_ROOT_INPUT")"
+  toml_cfg="$(escape_toml_basic_string "$MCP_PROBE_CONFIG_FILE_INPUT")"
+  toml_profile="$(escape_toml_basic_string "$MCP_PROBE_PROFILE_INPUT")"
+
+  json_base_url="$(escape_json_string "$MCP_PROBE_BASE_URL_INPUT")"
+  json_workspace="$(escape_json_string "$MCP_WORKSPACE_ROOT_INPUT")"
+  json_cfg="$(escape_json_string "$MCP_PROBE_CONFIG_FILE_INPUT")"
+  json_profile="$(escape_json_string "$MCP_PROBE_PROFILE_INPUT")"
+
+  if [[ "$CLIENT" == "codex" ]]; then
+    cat <<EOF
+
+MCP registry env input captured.
+Add or merge this block into your Codex MCP config (~/.codex/config.toml):
+
+[mcp_servers.${MCP_SERVER_NAME}.env]
+MCP_PROBE_BASE_URL = "${toml_base_url}"
+MCP_WORKSPACE_ROOT = "${toml_workspace}"
+MCP_PROBE_CONFIG_FILE = "${toml_cfg}"
+MCP_PROBE_PROFILE = "${toml_profile}"
+
+Then restart Codex/MCP session and run:
+1. probe_registry_reload
+2. probe_registry_list
+EOF
+    return
+  fi
+
+  cat <<EOF
+
+MCP registry env input captured.
+Add or merge this block into your Kiro MCP settings:
+
+{
+  "mcpServers": {
+    "${MCP_SERVER_NAME}": {
+      "command": "node",
+      "args": ["C:\\\\path\\\\to\\\\mcp-jvm-debugger\\\\dist\\\\server.js"],
+      "env": {
+        "MCP_PROBE_BASE_URL": "${json_base_url}",
+        "MCP_WORKSPACE_ROOT": "${json_workspace}",
+        "MCP_PROBE_CONFIG_FILE": "${json_cfg}",
+        "MCP_PROBE_PROFILE": "${json_profile}"
+      }
+    }
+  }
+}
+
+Then restart Kiro MCP session and run:
+1. probe_registry_reload
+2. probe_registry_list
+EOF
+}
+
+escape_toml_basic_string() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '%s' "$s"
+}
+
+escape_json_string() {
+  local s="$1"
+  s="${s//\\/\\\\}"
+  s="${s//\"/\\\"}"
+  printf '%s' "$s"
 }
 
 prompt_delete_stale_managed_skills() {
