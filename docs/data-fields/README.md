@@ -115,6 +115,7 @@ examples:
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
+| `probeId` (input) | Optional named probe selector resolved from active probe registry; takes precedence over `baseUrl` when both are supplied. | `probe_check` | false | `"order-service"` |
 | `config` | Effective diagnose call configuration. | `probe_check` | true | `{"baseUrl":"http://127.0.0.1:9191"}` |
 | `config.authConfigured` | Whether `probe_check.http.headers` were provided and applied. | `probe_check` | true | `true` |
 | `config.authHeaderNames` | Header names applied to probe reset/status calls (values intentionally omitted). | `probe_check` | true | `["Authorization"]` |
@@ -228,6 +229,7 @@ examples:
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
+| `probeId` (input) | Optional named probe selector resolved from active probe registry; takes precedence over `baseUrl` when both are supplied. | `probe_get_status` | false | `"order-service"` |
 | `request` | Status request details (canonical `key`, URL, timeout; `resolvedKey` appears only when canonicalization differs). | `probe_get_status` | true | `{"key":"com.example.Catalog#save:88"}` |
 | `response` | Compact normalized status payload (`status` + essential `json` fields). | `probe_get_status` | true | `{"status":200,"json":{"hitCount":1}}` |
 | `response.json.contractVersion` | Probe contract marker. | `probe_get_status` | false | `"0.1.0"` |
@@ -257,6 +259,7 @@ examples:
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
+| `probeId` (input) | Optional named probe selector resolved from active probe registry; takes precedence over `baseUrl` when both are supplied. | `probe_get_capture` | false | `"order-service"` |
 | `request` | Capture fetch request details. | `probe_get_capture` | true | `{"captureId":"abc123","url":"http://127.0.0.1:9191/__probe/capture?captureId=abc123"}` |
 | `response` | Compact capture fetch response metadata (`status` only). | `probe_get_capture` | true | `{"status":200}` |
 | `result.found` | Whether capture payload exists and was returned. | `probe_get_capture` | true | `true` |
@@ -273,6 +276,7 @@ examples:
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
+| `probeId` (input) | Optional named probe selector resolved from active probe registry; takes precedence over `baseUrl` when both are supplied. | `probe_reset` | false | `"order-service"` |
 | `request` | Reset selector request details (canonical `key`; optional `resolvedKey` only when transformed from input). | `probe_reset` | true | `{"key":"com.example.Catalog#save:88"}` |
 | `response` | Compact reset response metadata (`status`, plus selector/reason metadata in batch mode). | `probe_reset` | true | `{"status":200}` |
 | `result` | Guidance block when line target is invalid. | `probe_reset` | false | `{"reason":"invalid_line_target"}` |
@@ -285,6 +289,7 @@ examples:
 
 | fieldName | fieldDesc | toolUsedBy | required | exampleValue |
 | --- | --- | --- | --- | --- |
+| `probeId` (input) | Optional named probe selector resolved from active probe registry; takes precedence over `baseUrl` when both are supplied. | `probe_wait_for_hit` | false | `"order-service"` |
 | `request` | Polling request and retry configuration (`key` canonical; optional `resolvedKey` only when transformed from input). | `probe_wait_for_hit` | true | `{"key":"com.example.Catalog#save:88","maxRetries":1}` |
 | `request.waitStartEpoch` | Unix-epoch millisecond timestamp when current wait attempt started. | `probe_wait_for_hit` | false | `1773318672847` |
 | `request.triggerWindowStartEpoch` | Reset-aware Unix-epoch start used for strict inline classification. | `probe_wait_for_hit` | false | `1773318658526` |
@@ -310,6 +315,34 @@ These fields are emitted by orchestration summaries in skill-guided runs when pr
 | `validationResults` | Per-candidate validation outcomes (probe/API/line alignment checks). | `mcp-java-dev-tools-line-probe-run (summary), mcp-java-dev-tools-regression-suite (summary)` | true | `[{"probeReachable":true,"apiReachable":false}]` |
 | `nextAction` | Action required from the user to proceed after pushback. | `mcp-java-dev-tools-line-probe-run (summary), mcp-java-dev-tools-regression-suite (summary)` | true | `"Provide a unique runtime/service selector or stop conflicting services."` |
 | `reproSteps` | Ordered executable reproduction steps emitted for both success and pushback outputs. | `mcp-java-dev-tools-line-probe-run (summary), mcp-java-dev-tools-regression-suite (summary)` | true | `["1. Validate projectRootAbs", "2. Call probe_recipe_create", "3. Resolve runtime route"]` |
+
+## probe_registry_list
+
+| fieldName | fieldDesc | toolUsedBy | required | exampleValue |
+| --- | --- | --- | --- | --- |
+| `resultType` | Output discriminator for probe registry operations. | `probe_registry_list` | true | `"probe_registry"` |
+| `status` | Registry status (`ok` or `not_configured`). | `probe_registry_list` | true | `"ok"` |
+| `activeProfile` | Active resolved profile name. | `probe_registry_list` | false | `"dev"` |
+| `profileSource` | Profile resolution source (`env`, `workspace`, `default`). | `probe_registry_list` | false | `"workspace"` |
+| `defaultProbeId` | Default probe id for the active profile. | `probe_registry_list` | false | `"order-service"` |
+| `probeCount` | Count of registered probes in the active profile. | `probe_registry_list` | false | `3` |
+| `lastReloadAt` | ISO timestamp of the most recent registry reload attempt (manual or auto-watch). | `probe_registry_list` | false | `"2026-05-01T14:20:55.000Z"` |
+| `lastReloadStatus` | Last reload outcome (`ok` or `error`). | `probe_registry_list` | false | `"ok"` |
+| `lastReloadError` | Last reload error message when `lastReloadStatus=error`. | `probe_registry_list` | false | `"Unexpected token..."` |
+| `probes` | Registered probe descriptors (`id`, `baseUrl`, selectors, runtime metadata). | `probe_registry_list` | false | `[{"id":"order-service","baseUrl":"http://127.0.0.1:9190"}]` |
+
+## probe_registry_reload
+
+| fieldName | fieldDesc | toolUsedBy | required | exampleValue |
+| --- | --- | --- | --- | --- |
+| `resultType` | Output discriminator for probe registry operations. | `probe_registry_reload` | true | `"probe_registry"` |
+| `status` | Reload status (`reloaded` or `not_configured`). | `probe_registry_reload` | true | `"reloaded"` |
+| `activeProfile` | Active resolved profile name after reload. | `probe_registry_reload` | false | `"dev"` |
+| `profileSource` | Profile resolution source after reload (`env`, `workspace`, `default`). | `probe_registry_reload` | false | `"workspace"` |
+| `defaultProbeId` | Default probe id for the reloaded profile. | `probe_registry_reload` | false | `"order-service"` |
+| `lastReloadAt` | ISO timestamp of the reload attempt. | `probe_registry_reload` | false | `"2026-05-01T14:20:55.000Z"` |
+| `lastReloadStatus` | Reload outcome (`ok` or `error`). | `probe_registry_reload` | false | `"ok"` |
+| `lastReloadError` | Reload error message when status is `error`. | `probe_registry_reload` | false | `"Unexpected token..."` |
 
 
 

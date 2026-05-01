@@ -1,8 +1,10 @@
 import * as path from "node:path";
+import * as fs from "node:fs";
 
 import { CliArgs } from "@/config/cli-args";
 import { CONFIG_DEFAULTS } from "@/config/defaults";
 import { MCP_ENV, type McpEnvVar } from "@/config/env-vars";
+import { loadProbeRegistry, type ProbeRegistry } from "@/config/probe-registry";
 
 export type ServerConfig = {
   workspaceRootAbs: string;
@@ -15,6 +17,7 @@ export type ServerConfig = {
   probeWaitMaxRetries: number;
   probeWaitUnreachableRetryEnabled: boolean;
   probeWaitUnreachableMaxRetries: number;
+  probeRegistry?: ProbeRegistry;
 };
 
 export class ServerConfigLoader {
@@ -40,7 +43,22 @@ export class ServerConfigLoader {
           ? "session"
           : "cwd";
 
-    const probeBaseUrl = this.args.get("--probe-base-url") ?? this.env(MCP_ENV.PROBE_BASE_URL);
+    const probeBaseUrlArg = this.args.get("--probe-base-url") ?? this.env(MCP_ENV.PROBE_BASE_URL);
+    const probeConfigFile =
+      this.env(MCP_ENV.PROBE_CONFIG_FILE) ??
+      this.detectWorkspaceProbeConfigFile(path.resolve(workspaceRoot));
+    const probeProfileOverride = this.env(MCP_ENV.PROBE_PROFILE);
+
+    const probeRegistry =
+      typeof probeConfigFile === "string" && probeConfigFile.trim().length > 0
+        ? loadProbeRegistry({
+            filePath: probeConfigFile.trim(),
+            workspaceRootAbs: path.resolve(workspaceRoot),
+            ...(typeof probeProfileOverride === "string" && probeProfileOverride.trim().length > 0
+              ? { profileOverride: probeProfileOverride.trim() }
+              : {}),
+          })
+        : undefined;
 
     const probeStatusPath = CONFIG_DEFAULTS.PROBE_STATUS_PATH;
     const probeResetPath = CONFIG_DEFAULTS.PROBE_RESET_PATH;
@@ -69,8 +87,9 @@ export class ServerConfigLoader {
       CONFIG_DEFAULTS.PROBE_WAIT_UNREACHABLE_MAX_RETRIES_MAX,
     );
 
+    const probeBaseUrl = probeBaseUrlArg ?? this.registryDefaultBaseUrl(probeRegistry);
     const missing: string[] = [];
-    if (!probeBaseUrl) missing.push(MCP_ENV.PROBE_BASE_URL);
+    if (!probeBaseUrl) missing.push(`${MCP_ENV.PROBE_BASE_URL} or ${MCP_ENV.PROBE_CONFIG_FILE}`);
     if (missing.length > 0) {
       throw new Error(
         `Missing required MCP config: ${missing.join(", ")}. ` +
@@ -92,6 +111,7 @@ export class ServerConfigLoader {
       probeWaitMaxRetries,
       probeWaitUnreachableRetryEnabled,
       probeWaitUnreachableMaxRetries,
+      ...(probeRegistry ? { probeRegistry } : {}),
     };
   }
 
@@ -148,6 +168,18 @@ export class ServerConfigLoader {
           "If unknown, ask the user which service probe port is currently mapped.",
       );
     }
+  }
+
+  private registryDefaultBaseUrl(registry?: ProbeRegistry): string | undefined {
+    if (!registry) return undefined;
+    const defaultProbe = registry.probesById.get(registry.defaultProbeId);
+    return defaultProbe?.baseUrl;
+  }
+
+  private detectWorkspaceProbeConfigFile(workspaceRootAbs: string): string | undefined {
+    const candidate = path.join(workspaceRootAbs, ".mcpjvm", "probe-config.json");
+    if (fs.existsSync(candidate)) return candidate;
+    return undefined;
   }
 }
 

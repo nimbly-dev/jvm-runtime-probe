@@ -7,6 +7,7 @@ const {
   probeWaitHit,
   probeCaptureGet,
   probeActuate,
+  createProbeDomain,
 } = require("@/tools/core/probe/domain");
 const { LAST_RESET_EPOCH_BY_KEY } = require("@/utils/probe/constants.util");
 
@@ -819,6 +820,38 @@ test("probe_reset rejects conflicting or missing selectors", async () => {
     }),
     /does not allow lineHint with keys\[\] or className/i,
   );
+});
+
+test("probe domain fails closed for unknown probeId", async () => {
+  const domain = createProbeDomain({
+    probeBaseUrl: "http://127.0.0.1:9190",
+    probeStatusPath: "/__probe/status",
+    probeResetPath: "/__probe/reset",
+    probeActuatePath: "/__probe/actuate",
+    probeCapturePath: "/__probe/capture",
+    probeWaitMaxRetries: 1,
+    probeWaitUnreachableRetryEnabled: false,
+    probeWaitUnreachableMaxRetries: 1,
+    getProbeRegistry: () => ({
+      configFileAbs: "C:\\probe-config.json",
+      activeProfile: "dev",
+      profileSource: "env",
+      defaultProbeId: "order-service",
+      probesById: new Map([
+        [
+          "order-service",
+          { id: "order-service", baseUrl: "http://127.0.0.1:9190", include: [], exclude: [] },
+        ],
+      ]),
+    }),
+  });
+  const out = await domain.getStatus({
+    probeId: "missing-service",
+    key: "com.example.social.post.app.controller.PostController#updatePost:122",
+  });
+  assert.equal(out.structuredContent.status, "probe_selection_failed");
+  assert.equal(out.structuredContent.reasonCode, "probe_id_unknown");
+  assert.equal(out.structuredContent.nextActionCode, "select_registered_probe_id");
 });
 
 

@@ -1,8 +1,10 @@
 import { probeActuate as probeActuateUtil } from "@/utils/probe/probe_actuate.util";
 import { probeCaptureGet as probeCaptureGetUtil } from "@/utils/probe/probe_capture_get.util";
 import { probeReset as probeResetUtil } from "@/utils/probe/probe_reset.util";
+import { resolveProbeBaseUrl } from "@/utils/probe/probe_route_resolver.util";
 import { probeStatus as probeStatusUtil } from "@/utils/probe/probe_status.util";
 import { probeWaitHit as probeWaitHitUtil } from "@/utils/probe/probe_wait_hit.util";
+import type { ProbeRegistry } from "@/config/probe-registry";
 
 export type ProbeDomainConfig = {
   probeBaseUrl: string;
@@ -13,10 +15,12 @@ export type ProbeDomainConfig = {
   probeWaitMaxRetries: number;
   probeWaitUnreachableRetryEnabled: boolean;
   probeWaitUnreachableMaxRetries: number;
+  getProbeRegistry?: () => ProbeRegistry | undefined;
 };
 
 export type ProbeEnableInput = {
   baseUrl?: string | undefined;
+  probeId?: string | undefined;
   action: "arm" | "disarm";
   sessionId: string;
   actuatorId?: string | undefined;
@@ -29,6 +33,7 @@ export type ProbeEnableInput = {
 export type ProbeGetCaptureInput = {
   captureId: string;
   baseUrl?: string | undefined;
+  probeId?: string | undefined;
   timeoutMs?: number | undefined;
 };
 
@@ -37,6 +42,7 @@ export type ProbeGetStatusInput = {
   keys?: string[] | undefined;
   lineHint?: number | undefined;
   baseUrl?: string | undefined;
+  probeId?: string | undefined;
   timeoutMs?: number | undefined;
 };
 
@@ -46,6 +52,7 @@ export type ProbeResetInput = {
   className?: string | undefined;
   lineHint?: number | undefined;
   baseUrl?: string | undefined;
+  probeId?: string | undefined;
   timeoutMs?: number | undefined;
 };
 
@@ -53,6 +60,7 @@ export type ProbeWaitForHitInput = {
   key: string;
   lineHint?: number | undefined;
   baseUrl?: string | undefined;
+  probeId?: string | undefined;
   timeoutMs?: number | undefined;
   pollIntervalMs?: number | undefined;
   maxRetries?: number | undefined;
@@ -61,8 +69,16 @@ export type ProbeWaitForHitInput = {
 export function createProbeDomain(cfg: ProbeDomainConfig) {
   return {
     enable: async (input: ProbeEnableInput) => {
+      const base = resolveProbeBaseUrl({
+        toolName: "probe_enable",
+        defaultBaseUrl: cfg.probeBaseUrl,
+        ...(typeof input.probeId === "string" ? { probeId: input.probeId } : {}),
+        ...(typeof input.baseUrl === "string" ? { baseUrl: input.baseUrl } : {}),
+        ...(cfg.getProbeRegistry?.() ? { probeRegistry: cfg.getProbeRegistry?.() } : {}),
+      });
+      if (!base.ok) return base.response;
       const args: Parameters<typeof probeActuateUtil>[0] = {
-        baseUrl: input.baseUrl ?? cfg.probeBaseUrl,
+        baseUrl: base.baseUrl,
         actuatePath: cfg.probeActuatePath,
         action: input.action,
         sessionId: input.sessionId,
@@ -75,17 +91,33 @@ export function createProbeDomain(cfg: ProbeDomainConfig) {
       return await probeActuateUtil(args);
     },
     getCapture: async (input: ProbeGetCaptureInput) => {
+      const base = resolveProbeBaseUrl({
+        toolName: "probe_get_capture",
+        defaultBaseUrl: cfg.probeBaseUrl,
+        ...(typeof input.probeId === "string" ? { probeId: input.probeId } : {}),
+        ...(typeof input.baseUrl === "string" ? { baseUrl: input.baseUrl } : {}),
+        ...(cfg.getProbeRegistry?.() ? { probeRegistry: cfg.getProbeRegistry?.() } : {}),
+      });
+      if (!base.ok) return base.response;
       const args: Parameters<typeof probeCaptureGetUtil>[0] = {
         captureId: input.captureId,
-        baseUrl: input.baseUrl ?? cfg.probeBaseUrl,
+        baseUrl: base.baseUrl,
         capturePath: cfg.probeCapturePath,
       };
       if (typeof input.timeoutMs === "number") args.timeoutMs = input.timeoutMs;
       return await probeCaptureGetUtil(args);
     },
     getStatus: async (input: ProbeGetStatusInput) => {
+      const base = resolveProbeBaseUrl({
+        toolName: "probe_get_status",
+        defaultBaseUrl: cfg.probeBaseUrl,
+        ...(typeof input.probeId === "string" ? { probeId: input.probeId } : {}),
+        ...(typeof input.baseUrl === "string" ? { baseUrl: input.baseUrl } : {}),
+        ...(cfg.getProbeRegistry?.() ? { probeRegistry: cfg.getProbeRegistry?.() } : {}),
+      });
+      if (!base.ok) return base.response;
       const args: Parameters<typeof probeStatusUtil>[0] = {
-        baseUrl: input.baseUrl ?? cfg.probeBaseUrl,
+        baseUrl: base.baseUrl,
         statusPath: cfg.probeStatusPath,
       };
       if (typeof input.key === "string") args.key = input.key;
@@ -95,8 +127,16 @@ export function createProbeDomain(cfg: ProbeDomainConfig) {
       return await probeStatusUtil(args);
     },
     reset: async (input: ProbeResetInput) => {
+      const base = resolveProbeBaseUrl({
+        toolName: "probe_reset",
+        defaultBaseUrl: cfg.probeBaseUrl,
+        ...(typeof input.probeId === "string" ? { probeId: input.probeId } : {}),
+        ...(typeof input.baseUrl === "string" ? { baseUrl: input.baseUrl } : {}),
+        ...(cfg.getProbeRegistry?.() ? { probeRegistry: cfg.getProbeRegistry?.() } : {}),
+      });
+      if (!base.ok) return base.response;
       const args: Parameters<typeof probeResetUtil>[0] = {
-        baseUrl: input.baseUrl ?? cfg.probeBaseUrl,
+        baseUrl: base.baseUrl,
         resetPath: cfg.probeResetPath,
       };
       if (typeof input.key === "string") args.key = input.key;
@@ -107,9 +147,17 @@ export function createProbeDomain(cfg: ProbeDomainConfig) {
       return await probeResetUtil(args);
     },
     waitForHit: async (input: ProbeWaitForHitInput) => {
+      const base = resolveProbeBaseUrl({
+        toolName: "probe_wait_for_hit",
+        defaultBaseUrl: cfg.probeBaseUrl,
+        ...(typeof input.probeId === "string" ? { probeId: input.probeId } : {}),
+        ...(typeof input.baseUrl === "string" ? { baseUrl: input.baseUrl } : {}),
+        ...(cfg.getProbeRegistry?.() ? { probeRegistry: cfg.getProbeRegistry?.() } : {}),
+      });
+      if (!base.ok) return base.response;
       const args: Parameters<typeof probeWaitHitUtil>[0] = {
         key: input.key,
-        baseUrl: input.baseUrl ?? cfg.probeBaseUrl,
+        baseUrl: base.baseUrl,
         statusPath: cfg.probeStatusPath,
       };
       if (typeof input.lineHint === "number") args.lineHint = input.lineHint;

@@ -60,6 +60,7 @@ This installs the default skill set:
 - `mcp-java-dev-tools-regression-plan-crafter`
 - `mcp-java-dev-tools-regression-result`
 - `mcp-java-dev-tools-issue-report`
+- `mcp-java-dev-tools-probe-registry-manager`
 
 To update/overwrite existing installed skills (and add missing new skills):
 
@@ -71,7 +72,19 @@ Both scripts:
 - run `npm run build:compile`
 - run `mvn -f java-agent/pom.xml package`
 - sync shipped skills into the target client skill directory
-- do not install MCP config entries
+- by default prompt for a first workspace and generate MCP env config block output (Codex/Kiro specific)
+
+Default MCP registry env input can be skipped:
+
+```bash
+./scripts/install.sh --client codex --no-configure-mcp-env
+```
+
+MCP env input captures:
+- `MCP_PROBE_BASE_URL` (default `http://127.0.0.1:9193`)
+- `MCP_WORKSPACE_ROOT` (required)
+- `MCP_PROBE_CONFIG_FILE` (defaults to `<workspace>/.mcpjvm/probe-config.json`)
+- `MCP_PROBE_PROFILE` (default `dev`)
 
 ### Spring Integration Launcher
 
@@ -187,6 +200,7 @@ Default is `false`.
 | Variable | Purpose |
 |---|---|
 | `MCP_PROBE_BASE_URL` | URL of the running probe agent |
+| `MCP_PROBE_CONFIG_FILE` | Path to probe registry JSON for multi-probe mode |
 
 #### Optional
 
@@ -208,6 +222,11 @@ Default is `false`.
 |---|---|---|
 | `MCP_WORKSPACE_ROOT` / `--workspace-root` | MCP server | Path resolution for project validation and synthesis search roots |
 | `MCP_PROBE_BASE_URL` / `--probe-base-url` | MCP server | Default probe endpoint for tool calls |
+| `MCP_PROBE_CONFIG_FILE` | MCP server | Multi-probe registry file with workspaces/profiles/probes |
+| `MCP_PROBE_PROFILE` | MCP server | Explicit profile override when registry mode is enabled |
+
+If `MCP_PROBE_CONFIG_FILE` is not set, MCP will auto-discover only:
+1. `.mcpjvm/probe-config.json`
 | `include` / `exclude` in `-javaagent:...` (or `mcp.probe.include` / `MCP_PROBE_INCLUDE`) | Java agent | Which classes are instrumented at runtime |
 | `MCP_PROBE_INCLUDE_EXECUTION_PATHS` | MCP server | Whether `executionPaths` arrays are included in returned probe payloads |
 
@@ -259,4 +278,11 @@ Start there before opening a large pull request or changing public tool contract
 | `probe_reset` | |
 | `probe_wait_for_hit` | |
 | `probe_enable` | |
+| `probe_registry_list` | |
+| `probe_registry_reload` | |
+
+Probe registry runtime behavior:
+- Registry config is loaded on startup.
+- When `MCP_PROBE_CONFIG_FILE` (or workspace `.mcpjvm/probe-config.json`) is active, file edits are auto-reloaded with debounce.
+- `probe_registry_reload` remains available as deterministic manual refresh/fallback.
 
