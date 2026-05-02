@@ -32,7 +32,10 @@ export type PreflightReasonCode =
   | "secret_default_forbidden"
   | "step_expectations_missing"
   | "step_expectation_invalid"
-  | "top_level_expectations_unsupported";
+  | "top_level_expectations_unsupported"
+  | "correlation_session_missing"
+  | "correlation_window_invalid"
+  | "correlation_key_invalid";
 
 export type PrerequisiteProvisioning = "user_input" | "discoverable";
 
@@ -128,6 +131,7 @@ export type PlanContract = {
   targets: PlanTarget[];
   prerequisites: PlanPrerequisite[];
   steps: PlanStep[];
+  correlation?: PlanCorrelationPolicy;
 };
 
 export type BuildPreflightArgs = {
@@ -135,5 +139,40 @@ export type BuildPreflightArgs = {
   contract: PlanContract;
   providedContext: Record<string, unknown>;
   targetCandidateCount: number;
+};
+
+export type CorrelationKeyType = "traceId" | "requestId" | "messageId";
+export type CorrelationSourceType = "header" | "json_path" | "capture_field";
+
+export type PlanCorrelationPolicy = {
+  enabled: boolean;
+  crossPlan?: boolean;
+  correlationSessionId?: string;
+  key: {
+    type: CorrelationKeyType;
+    value?: string;
+    source?: {
+      type: CorrelationSourceType;
+      path: string;
+    };
+  };
+  window: {
+    startEpochMs?: number;
+    endEpochMs?: number;
+    maxWindowMs: number;
+  };
+  probeIds: string[];
+  expectedFlow?: string[];
+  matchPolicy: {
+    requireExactKeyMatch: boolean;
+    requireWindowMatch: boolean;
+    ambiguityStrategy: "fail_closed";
+  };
+  evidencePolicy?: {
+    includeHeaders?: boolean;
+    includePayloadPreview?: boolean;
+    payloadPreviewMaxBytes?: number;
+    includeExecutionPath?: boolean;
+  };
 };
 

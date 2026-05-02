@@ -3,6 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/helpers/skills-sync-common.sh"
+# update.sh should not require MCP env inputs unless explicitly requested.
+CONFIGURE_MCP_ENV=0
 
 usage() {
   cat <<'EOF'

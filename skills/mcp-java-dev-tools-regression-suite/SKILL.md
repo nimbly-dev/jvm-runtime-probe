@@ -23,6 +23,37 @@ Use this workflow to execute crafted regression plans at controller scope, servi
    - `.mcpjvm/regression/<plan>/runs/<run_id>/context.resolved.json`
    - `.mcpjvm/regression/<plan>/runs/<run_id>/execution.result.json`
    - `.mcpjvm/regression/<plan>/runs/<run_id>/evidence.json`
+   - `.mcpjvm/regression/<plan>/runs/<run_id>/correlation.json` (required when correlation fields are present in evidence)
+   - `.mcpjvm/correlation-index.json` (required when correlation artifact is produced)
+
+## Artifact Contract Requirements
+
+Suite execution MUST emit deterministic fields needed by result rendering and correlation generation.
+
+1. `execution.result.json` step rows MUST include:
+   - `order`
+   - `id`
+   - `status`
+   - `durationMs`
+2. `evidence.json` SHOULD include normalized correlation inputs:
+   - `correlationPolicy`:
+     - `keyType`
+     - `keyValue` or `keyValueContextPath`
+     - `maxWindowMs`
+     - optional `expectedFlow[]`
+     - optional `correlationSessionId`
+   - `correlationEvents[]`:
+     - `eventId`
+     - `probeId`
+     - `timestampEpochMs`
+     - `keyType`
+     - `keyValue`
+3. Canonical-only correlation support:
+   - correlation artifacts are generated only from canonical `correlationPolicy` and `correlationEvents` fields.
+   - legacy-only correlation fields are unsupported.
+4. Persistence path requirement:
+   - do not author `correlation.json` directly in suite logic.
+   - persist only via canonical run artifact writer flow so generated `correlation.json` and `correlation-index.json` stay schema-consistent.
 
 ## MCP-First Requirement
 

@@ -34,7 +34,8 @@ Read only from persisted run artifacts:
 
 1. `.mcpjvm/regression/<plan>/runs/<run_id>/execution.result.json`
 2. `.mcpjvm/regression/<plan>/runs/<run_id>/evidence.json`
-3. optional `.mcpjvm/regression/<plan>/runs/<run_id>/context.resolved.json` for non-secret context display
+3. optional `.mcpjvm/regression/<plan>/runs/<run_id>/correlation.json` for distributed correlation verdict/timeline summary
+4. optional `.mcpjvm/regression/<plan>/runs/<run_id>/context.resolved.json` for non-secret context display
 
 ## Template Routing
 
