@@ -65,6 +65,29 @@ test("full run artifacts produce deterministic tabular summary", async () => {
         probe: {
           status: "verified_line_hit",
         },
+        correlationPolicy: {
+          keyType: "traceId",
+          keyValue: "trace-it-001",
+          maxWindowMs: 5000,
+          expectedFlow: ["gateway-service", "post-service"],
+          correlationSessionId: "sess-it-1",
+        },
+        correlationEvents: [
+          {
+            eventId: "ev-1",
+            probeId: "gateway-service",
+            timestampEpochMs: 1767265200000,
+            keyType: "traceId",
+            keyValue: "trace-it-001",
+          },
+          {
+            eventId: "ev-2",
+            probeId: "post-service",
+            timestampEpochMs: 1767265200100,
+            keyType: "traceId",
+            keyValue: "trace-it-001",
+          },
+        ],
       },
       now: new Date("2026-04-25T10:01:25.500Z"),
     });
@@ -82,6 +105,11 @@ test("full run artifacts produce deterministic tabular summary", async () => {
     assert.equal(report.rows[0].probeCoverage, "verified_line_hit");
     assert.equal(report.rows[0].memoryBytes, "4096");
     assert.match(report.table, /Memory \(bytes\)/);
+    assert.equal(report.correlation.status, "ok");
+    assert.equal(report.correlation.reasonCode, "ok");
+    assert.equal(report.correlation.keyType, "traceId");
+    assert.equal(report.correlation.keyValue, "trace-it-001");
+    assert.equal(report.correlation.matchedEvents, 2);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

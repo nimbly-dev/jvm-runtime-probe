@@ -1,5 +1,6 @@
 import type {
   BuildPreflightArgs,
+  PlanCorrelationPolicy,
   PlanStepExpectation,
   PlanPrerequisite,
   PrerequisiteResolution,
@@ -140,6 +141,52 @@ function validateStepExpectations(
     }
   }
 
+  return { ok: true };
+}
+
+function validateCorrelationPolicy(
+  correlation: PlanCorrelationPolicy | undefined,
+):
+  | { ok: true }
+  | {
+      ok: false;
+      reasonCode: "correlation_session_missing" | "correlation_window_invalid" | "correlation_key_invalid";
+      requiredUserAction: string[];
+    } {
+  if (!correlation || correlation.enabled !== true) return { ok: true };
+  if (
+    !correlation.key ||
+    (correlation.key.type !== "traceId" &&
+      correlation.key.type !== "requestId" &&
+      correlation.key.type !== "messageId")
+  ) {
+    return {
+      ok: false,
+      reasonCode: "correlation_key_invalid",
+      requiredUserAction: ["Set correlation.key.type to traceId|requestId|messageId."],
+    };
+  }
+  if (
+    typeof correlation.window?.maxWindowMs !== "number" ||
+    !Number.isFinite(correlation.window.maxWindowMs) ||
+    correlation.window.maxWindowMs <= 0
+  ) {
+    return {
+      ok: false,
+      reasonCode: "correlation_window_invalid",
+      requiredUserAction: ["Set correlation.window.maxWindowMs to a positive number."],
+    };
+  }
+  if (correlation.crossPlan === true) {
+    const sessionId = correlation.correlationSessionId;
+    if (typeof sessionId !== "string" || sessionId.trim() === "") {
+      return {
+        ok: false,
+        reasonCode: "correlation_session_missing",
+        requiredUserAction: ["Set non-empty correlation.correlationSessionId when crossPlan=true."],
+      };
+    }
+  }
   return { ok: true };
 }
 
@@ -342,6 +389,15 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
       reasonCode: stepExpectValidation.reasonCode,
       ...emptyPreflightDetails(),
       requiredUserAction: stepExpectValidation.requiredUserAction,
+    };
+  }
+  const correlationValidation = validateCorrelationPolicy(contract.correlation);
+  if (!correlationValidation.ok) {
+    return {
+      status: "blocked_invalid",
+      reasonCode: correlationValidation.reasonCode,
+      ...emptyPreflightDetails(),
+      requiredUserAction: correlationValidation.requiredUserAction,
     };
   }
 

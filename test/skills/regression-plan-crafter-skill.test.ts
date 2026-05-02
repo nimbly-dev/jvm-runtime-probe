@@ -103,6 +103,13 @@ test("regression suite skill remains execution-focused and result skill is avail
 
   assert.match(suiteText, /Using Crafted Plans/);
   assert.match(suiteText, /\.mcpjvm\/regression\/<plan>\/runs\/<run_id>/);
+  assert.match(suiteText, /correlation\.json/);
+  assert.match(suiteText, /correlation-index\.json/);
+  assert.match(suiteText, /durationMs/);
+  assert.match(suiteText, /correlationPolicy/);
+  assert.match(suiteText, /correlationEvents/);
+  assert.match(suiteText, /do not author `correlation\.json` directly/i);
+  assert.match(suiteText, /artifact writer flow/i);
   assert.match(suiteText, /Discovery-First Orchestration/);
   assert.match(resultText, /default template: `endpoint_table_result`/);
   assert.match(resultText, /references\/templates\/index\.md/);

@@ -95,6 +95,7 @@ export type WriteRegressionRunArtifactsInput = {
     discovery?: DiscoveryEvidence;
     [key: string]: unknown;
   };
+  correlation?: CorrelationArtifact;
   now?: Date;
 };
 
@@ -103,5 +104,52 @@ export type RegressionRunArtifactsWriteResult = {
   contextResolvedPathAbs: string;
   executionResultPathAbs: string;
   evidencePathAbs: string;
+  correlationPathAbs?: string;
+  correlationIndexPathAbs?: string;
+};
+
+export type CorrelationIndexRebuildResult = {
+  indexPathAbs: string;
+  entriesCount: number;
+};
+
+export type CorrelationReasonCode =
+  | "ok"
+  | "missing_correlation_key"
+  | "missing_correlation_session_id"
+  | "no_matching_events"
+  | "no_runs_in_scope"
+  | "window_exceeded"
+  | "ambiguous_correlation"
+  | "ambiguous_cross_plan_correlation"
+  | "flow_expectation_mismatch"
+  | "insufficient_evidence";
+
+export type CorrelationVerdict = "ok" | "fail_closed";
+
+export type CorrelationTimelineEvent = {
+  eventId: string;
+  probeId: string;
+  timestampEpochMs: number;
+  lineKey?: string;
+  eventType?: string;
+  evidenceRef?: string;
+};
+
+export type CorrelationArtifact = {
+  status: CorrelationVerdict;
+  reasonCode: CorrelationReasonCode;
+  correlationSessionId?: string;
+  keyType: "traceId" | "requestId" | "messageId";
+  keyValue?: string;
+  window: {
+    startEpochMs?: number;
+    endEpochMs?: number;
+    maxWindowMs: number;
+  };
+  expectedFlow?: string[];
+  timeline: CorrelationTimelineEvent[];
+  evidenceRefs?: string[];
+  generatedAtEpochMs?: number;
 };
 

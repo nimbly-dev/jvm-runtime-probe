@@ -329,6 +329,55 @@ test("preflight stale_plan when pinStrictProbeKey is enabled but strict key is i
   assert.equal(result.reasonCode, "strict_probe_key_invalid");
 });
 
+test("preflight blocks correlation when crossPlan=true and correlationSessionId is missing", () => {
+  const contract = baseContract({
+    correlation: {
+      enabled: true,
+      crossPlan: true,
+      key: { type: "traceId", value: "trace-001" },
+      window: { maxWindowMs: 5000 },
+      probeIds: ["gateway-service", "user-service"],
+      matchPolicy: {
+        requireExactKeyMatch: true,
+        requireWindowMatch: true,
+        ambiguityStrategy: "fail_closed",
+      },
+    },
+  });
+  const result = buildReplayPreflight({
+    metadata: baseMetadata(),
+    contract,
+    providedContext: { "auth.bearer": "ok" },
+    targetCandidateCount: 1,
+  });
+  assert.equal(result.status, "blocked_invalid");
+  assert.equal(result.reasonCode, "correlation_session_missing");
+});
+
+test("preflight blocks correlation when maxWindowMs is invalid", () => {
+  const contract = baseContract({
+    correlation: {
+      enabled: true,
+      key: { type: "traceId", value: "trace-001" },
+      window: { maxWindowMs: 0 },
+      probeIds: ["gateway-service", "user-service"],
+      matchPolicy: {
+        requireExactKeyMatch: true,
+        requireWindowMatch: true,
+        ambiguityStrategy: "fail_closed",
+      },
+    },
+  });
+  const result = buildReplayPreflight({
+    metadata: baseMetadata(),
+    contract,
+    providedContext: { "auth.bearer": "ok" },
+    targetCandidateCount: 1,
+  });
+  assert.equal(result.status, "blocked_invalid");
+  assert.equal(result.reasonCode, "correlation_window_invalid");
+});
+
 test("resolvePrerequisiteContext prefers provided values and falls back to defaults", () => {
   const resolved = resolvePrerequisiteContext(
     [

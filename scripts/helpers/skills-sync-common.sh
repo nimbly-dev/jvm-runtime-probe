@@ -35,14 +35,14 @@ usage_common() {
 Options:
   --client <codex|kiro>       Target client. Default: codex
   --skill-name <name>         Sync only selected skill(s). Repeatable.
-  --codex-home <absPath>      Override CODEX_HOME (default: ~/.codex)
-  --kiro-skills-dir <absPath> Override Kiro skills directory (default: ~/.kiro/skills)
+  --codex-home <path>         Override CODEX_HOME (default: ~/.codex)
+  --kiro-skills-dir <path>    Override Kiro skills directory (default: ~/.kiro/skills)
   --no-build-compile          Skip `npm run build:compile`
   --no-build-java             Skip `mvn -f java-agent/pom.xml package`
   --configure-mcp-env         Prompt/collect MCP probe-registry env values and print config block (default: enabled)
   --no-configure-mcp-env      Skip MCP env input/output block generation
   --mcp-server-name <name>    MCP server entry name for generated config block (default: mcp-java-dev-tools)
-  --workspace-root <absPath>  Workspace root for MCP_WORKSPACE_ROOT (used with --configure-mcp-env)
+  --workspace-root <path>     Workspace root for MCP_WORKSPACE_ROOT (used with --configure-mcp-env)
   --probe-config-file <path>  Probe config path for MCP_PROBE_CONFIG_FILE (used with --configure-mcp-env)
   --probe-profile <name>      Probe profile for MCP_PROBE_PROFILE (default: dev)
   --probe-base-url <url>      Default probe base URL for MCP_PROBE_BASE_URL (default: http://127.0.0.1:9193)
@@ -335,7 +335,7 @@ prompt_mcp_env_if_missing() {
   local input=""
 
   if [[ -z "$MCP_WORKSPACE_ROOT_INPUT" ]]; then
-    read -r -p "MCP workspace root (absolute path): " input
+    read -r -p "MCP workspace root: " input
     MCP_WORKSPACE_ROOT_INPUT="$(expand_home "$input")"
   fi
   if [[ -z "$MCP_WORKSPACE_ROOT_INPUT" ]]; then

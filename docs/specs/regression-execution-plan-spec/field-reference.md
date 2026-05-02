@@ -14,6 +14,8 @@
           context.resolved.json
           execution.result.json
           evidence.json
+          correlation.json
+  correlation-index.json
 ```
 
 ## `metadata.json`
@@ -119,6 +121,33 @@ Supported operators:
 - `probe_line_hit`
 - `outcome_status`
 
+### `correlation` (optional)
+
+Cross-service/cross-plan deterministic post-analysis policy.
+
+- `enabled` (boolean): enables correlation analysis after execution.
+- `crossPlan` (boolean, optional): when `true`, correlation scans compatible persisted run artifacts.
+- `correlationSessionId` (string, required when `crossPlan=true`): explicit shared correlation session.
+- `key.type` (string): `traceId` | `requestId` | `messageId`
+- `key.value` (string, optional): explicit key value.
+- `key.source.type` (string, optional): `header` | `json_path` | `capture_field`
+- `key.source.path` (string, required when `key.source` is set): extraction path.
+- `window.maxWindowMs` (number, required): bounded matching window.
+- `window.startEpochMs` (number, optional)
+- `window.endEpochMs` (number, optional)
+- `probeIds[]` (string[]): target probe IDs.
+- `expectedFlow[]` (string[], optional): expected service order for validation.
+- `matchPolicy.requireExactKeyMatch` (boolean)
+- `matchPolicy.requireWindowMatch` (boolean)
+- `matchPolicy.ambiguityStrategy` (string): `fail_closed`
+- `evidencePolicy` (object, optional): evidence shaping toggles.
+
+Fail-closed preflight validations:
+
+- `correlation_session_missing`
+- `correlation_window_invalid`
+- `correlation_key_invalid`
+
 ## `plan.md`
 
 Human-readable deterministic plan.
@@ -168,4 +197,36 @@ Examples:
 - resolved target selectors
 - probe verification details
 - diagnostics summary
+
+## `.mcpjvm/regression/<plan>/runs/<run_id>/correlation.json`
+
+Per-run persisted distributed correlation result.
+
+Expected fields:
+
+- `status` (`ok` | `fail_closed`)
+- `reasonCode`
+- `correlationSessionId` (for cross-plan scenarios)
+- `keyType`, `keyValue`
+- `window`
+- `expectedFlow` (optional)
+- `timeline[]` (deterministically ordered matched events)
+- `evidenceRefs[]` (optional)
+
+## `.mcpjvm/correlation-index.json`
+
+Workspace-level index for bounded cross-plan lookup.
+
+Expected fields:
+
+- `version`
+- `generatedAt`
+- `entries[]` with:
+  - `planName`, `runId`, `runPath`
+  - `generatedAtEpochMs`
+  - `status`, `reasonCode`
+  - `keyType`, optional `keyValue`
+  - optional `correlationSessionId`
+  - `window`
+  - `probeIds[]`
 

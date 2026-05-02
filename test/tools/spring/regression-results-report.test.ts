@@ -183,6 +183,52 @@ test("renderRegressionRunResultsTable treats non-canonical coverage token as unk
   assert.equal(rendered.rows[0].probeCoverage, "unknown");
 });
 
+test("renderRegressionRunResultsTable includes correlation summary when provided", () => {
+  const rendered = renderRegressionRunResultsTable({
+    executionResult: {
+      status: "pass",
+      steps: [],
+    },
+    evidence: {},
+    memoryMetricDefined: false,
+    correlation: {
+      status: "ok",
+      reasonCode: "ok",
+      keyType: "traceId",
+      keyValue: "trace-001",
+      correlationSessionId: "sess-1",
+      timeline: [{ eventId: "e1" }, { eventId: "e2" }],
+    },
+  });
+
+  assert.equal(rendered.correlation.status, "ok");
+  assert.equal(rendered.correlation.reasonCode, "ok");
+  assert.equal(rendered.correlation.keyType, "traceId");
+  assert.equal(rendered.correlation.keyValue, "trace-001");
+  assert.equal(rendered.correlation.correlationSessionId, "sess-1");
+  assert.equal(rendered.correlation.matchedEvents, 2);
+});
+
+test("renderRegressionRunResultsTable maps minimal correlation payload (matched + matchedEvents)", () => {
+  const rendered = renderRegressionRunResultsTable({
+    executionResult: {
+      status: "pass",
+      steps: [],
+    },
+    evidence: {},
+    memoryMetricDefined: false,
+    correlation: {
+      status: "matched",
+      reasonCode: "correlation_event_found",
+      matchedEvents: 1,
+    },
+  });
+
+  assert.equal(rendered.correlation.status, "ok");
+  assert.equal(rendered.correlation.reasonCode, "correlation_event_found");
+  assert.equal(rendered.correlation.matchedEvents, 1);
+});
+
 test("resolveRegressionRunDirAbs resolves only plan-local runs", async () => {
   const root = createTestTempDir("results-run-resolve");
   try {

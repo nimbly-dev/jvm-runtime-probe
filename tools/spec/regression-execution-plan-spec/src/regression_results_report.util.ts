@@ -18,12 +18,21 @@ type RenderArgs = {
   executionResult: Record<string, unknown>;
   evidence: Record<string, unknown>;
   memoryMetricDefined: boolean;
+  correlation?: Record<string, unknown>;
 };
 
 type RenderResult = {
   columns: ReportColumn[];
   rows: StepRow[];
   table: string;
+  correlation?: {
+    status: "ok" | "fail_closed";
+    reasonCode: string;
+    keyType?: string;
+    keyValue?: string;
+    matchedEvents: number;
+    correlationSessionId?: string;
+  };
 };
 
 type RenderFromArtifactsArgs = {
@@ -50,6 +59,11 @@ function asString(value: unknown, fallback = "n/a"): string {
 function asNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   return null;
+}
+
+function asCorrelationStatus(value: unknown): "ok" | "fail_closed" {
+  if (value === "ok" || value === "matched") return "ok";
+  return "fail_closed";
 }
 
 function toStepRecords(executionResult: Record<string, unknown>): Record<string, unknown>[] {
@@ -188,10 +202,28 @@ export function renderRegressionRunResultsTable(args: RenderArgs): RenderResult 
     });
   }
 
+  const correlation: RenderResult["correlation"] | undefined = isRecord(args.correlation)
+    ? {
+        status: asCorrelationStatus(args.correlation.status),
+        reasonCode: asString(args.correlation.reasonCode, "insufficient_evidence"),
+        ...(typeof args.correlation.keyType === "string" ? { keyType: args.correlation.keyType } : {}),
+        ...(typeof args.correlation.keyValue === "string" ? { keyValue: args.correlation.keyValue } : {}),
+        matchedEvents: typeof args.correlation.matchedEvents === "number" && Number.isFinite(args.correlation.matchedEvents)
+          ? args.correlation.matchedEvents
+          : Array.isArray(args.correlation.timeline)
+            ? args.correlation.timeline.length
+            : 0,
+        ...(typeof args.correlation.correlationSessionId === "string"
+          ? { correlationSessionId: args.correlation.correlationSessionId }
+          : {}),
+      }
+    : undefined;
+
   return {
     columns,
     rows,
     table: formatTable(columns, rows),
+    ...(correlation ? { correlation } : {}),
   };
 }
 
@@ -200,16 +232,26 @@ export async function renderRegressionRunResultsTableFromArtifacts(
 ): Promise<RenderResult> {
   const executionPath = path.join(args.runDirAbs, "execution.result.json");
   const evidencePath = path.join(args.runDirAbs, "evidence.json");
+  const correlationPath = path.join(args.runDirAbs, "correlation.json");
   const [executionText, evidenceText] = await Promise.all([
     fs.readFile(executionPath, "utf8"),
     fs.readFile(evidencePath, "utf8"),
   ]);
   const executionResult = JSON.parse(executionText) as Record<string, unknown>;
   const evidence = JSON.parse(evidenceText) as Record<string, unknown>;
+  let correlation: Record<string, unknown> | undefined;
+  try {
+    const correlationText = await fs.readFile(correlationPath, "utf8");
+    const parsed = JSON.parse(correlationText) as unknown;
+    if (isRecord(parsed)) correlation = parsed;
+  } catch {
+    correlation = undefined;
+  }
   return renderRegressionRunResultsTable({
     executionResult,
     evidence,
     memoryMetricDefined: args.memoryMetricDefined,
+    ...(correlation ? { correlation } : {}),
   });
 }
 
