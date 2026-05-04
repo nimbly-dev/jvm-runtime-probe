@@ -19,6 +19,15 @@ function createTestTempDir(prefix: string): string {
 test("full run artifacts produce deterministic tabular summary", async () => {
   const root = createTestTempDir("regression-results-it");
   try {
+    const projectName = "test-project";
+    const projectArtifactAbs = path.join(root, ".mcpjvm", projectName, "projects.json");
+    fs.mkdirSync(path.dirname(projectArtifactAbs), { recursive: true });
+    fs.writeFileSync(
+      projectArtifactAbs,
+      `${JSON.stringify({ workspaces: [{ projectRoot: root }] }, null, 2)}\n`,
+      "utf8",
+    );
+
     const runId = "2026-04-25T10-01-22Z_01";
     const written = await writeRegressionRunArtifacts({
       workspaceRootAbs: root,

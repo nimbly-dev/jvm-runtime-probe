@@ -40,6 +40,7 @@ function emptyPreflightDetails() {
   return {
     missing: [] as string[],
     discoverablePending: [] as string[],
+    checks: [] as string[],
     prerequisiteResolution: [] as PrerequisiteResolution[],
   };
 }
@@ -309,6 +310,25 @@ function classifyPrerequisites(args: {
 
 export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult {
   const { metadata, contract, providedContext, targetCandidateCount } = args;
+  if (args.projectContext?.status === "blocked" && args.projectContext.reasonCode) {
+    const isNeedsUserInput =
+      args.projectContext.reasonCode === "env_key_missing" ||
+      args.projectContext.reasonCode === "external_healthcheck_failed" ||
+      args.projectContext.reasonCode === "runtime_context_unknown";
+    const nextAction =
+      typeof args.projectContext.nextAction === "string" && args.projectContext.nextAction.trim().length > 0
+        ? args.projectContext.nextAction
+        : (args.projectContext.requiredUserAction?.[0] ?? "Provide required project context input.");
+    return {
+      status: isNeedsUserInput ? "needs_user_input" : "blocked_invalid",
+      reasonCode: args.projectContext.reasonCode,
+      ...emptyPreflightDetails(),
+      missing: args.projectContext.missing ?? [],
+      checks: args.projectContext.checks ?? [],
+      nextAction,
+      requiredUserAction: args.projectContext.requiredUserAction ?? [nextAction],
+    };
+  }
   const legacyExpectations = (contract as Record<string, unknown>).expectations;
 
   if (Array.isArray(legacyExpectations) && legacyExpectations.length > 0) {
@@ -449,6 +469,8 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
       reasonCode: "missing_prerequisites_mixed",
       missing,
       discoverablePending,
+      checks: [],
+      nextAction: `Provide ${missing[0]} and run discovery resolver.`,
       prerequisiteResolution: resolution,
       requiredUserAction: [
         ...missing.map((field) => `Provide ${field}`),
@@ -463,6 +485,8 @@ export function buildReplayPreflight(args: BuildPreflightArgs): PreflightResult 
       reasonCode: "missing_prerequisites_user_input",
       missing,
       discoverablePending,
+      checks: [],
+      nextAction: `Provide ${missing[0]}.`,
       prerequisiteResolution: resolution,
       requiredUserAction: missing.map((field) => `Provide ${field}`),
     };

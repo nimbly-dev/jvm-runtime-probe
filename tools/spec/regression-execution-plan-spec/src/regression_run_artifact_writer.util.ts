@@ -1,4 +1,5 @@
 import { promises as fs } from "node:fs";
+import { readdirSync, statSync } from "node:fs";
 import path from "node:path";
 
 import type {
@@ -7,6 +8,7 @@ import type {
   RegressionRunArtifactsWriteResult,
   WriteRegressionRunArtifactsInput,
 } from "@tools-regression-execution-plan-spec/models/regression_run_artifact.model";
+import { resolveRegressionPlansRootAbs } from "@tools-regression-execution-plan-spec/regression_artifact_paths.util";
 import { correlateEvents } from "@tools-regression-execution-plan-spec/regression_correlation.util";
 
 export type {
@@ -292,7 +294,7 @@ function correlationFileToIndexEntry(args: {
   now: Date;
 }): CorrelationIndexEntry | null {
   const relativeRun = path.relative(args.workspaceRootAbs, args.runDirAbs).replaceAll("\\", "/");
-  const match = relativeRun.match(/^\.mcpjvm\/regression\/([^/]+)\/runs\/([^/]+)$/);
+  const match = relativeRun.match(/^\.mcpjvm\/[^/]+\/plans\/regression\/([^/]+)\/runs\/([^/]+)$/);
   if (!match) return null;
   const planName = match[1];
   const runId = match[2];
@@ -399,7 +401,7 @@ export async function rebuildCorrelationIndex(args: {
   now?: Date;
 }): Promise<CorrelationIndexRebuildResult> {
   const now = args.now ?? new Date();
-  const root = path.join(args.workspaceRootAbs, ".mcpjvm", "regression");
+  const root = await resolveRegressionPlansRootAbs(args.workspaceRootAbs);
   const entries: CorrelationIndexEntry[] = [];
   try {
     const plans = await fs.readdir(root, { withFileTypes: true });
@@ -474,7 +476,34 @@ export function buildRunArtifactDirAbs(workspaceRootAbs: string, planName: strin
   if (!RUN_ID_PATTERN.test(runId)) {
     throw new Error("run_id_invalid");
   }
-  return path.join(workspaceRootAbs, ".mcpjvm", "regression", safePlanName, "runs", runId);
+  const mcpjvmRoot = path.join(workspaceRootAbs, ".mcpjvm");
+  let projectName: string | null = null;
+  try {
+    const entries = readdirSync(mcpjvmRoot, { withFileTypes: true });
+    const candidates = entries
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .filter((name) => {
+        try {
+          return statSync(path.join(mcpjvmRoot, name, "projects.json")).isFile();
+        } catch {
+          return false;
+        }
+      });
+    if (candidates.length === 1) {
+      projectName = candidates[0] ?? null;
+    } else if (candidates.length === 0) {
+      throw new Error("project_artifact_missing");
+    } else {
+      throw new Error("project_artifact_ambiguous");
+    }
+  } catch (error) {
+    if (error instanceof Error && (error.message === "project_artifact_missing" || error.message === "project_artifact_ambiguous")) {
+      throw error;
+    }
+    throw new Error("project_artifact_missing");
+  }
+  return path.join(workspaceRootAbs, ".mcpjvm", String(projectName), "plans", "regression", safePlanName, "runs", runId);
 }
 
 export async function writeRegressionRunArtifacts(
@@ -483,7 +512,11 @@ export async function writeRegressionRunArtifacts(
   if (!args.planRef?.name) {
     throw new Error("plan_name_missing");
   }
-  const runDirAbs = buildRunArtifactDirAbs(args.workspaceRootAbs, args.planRef.name, args.runId);
+  const plansRootAbs = await resolveRegressionPlansRootAbs(args.workspaceRootAbs);
+  const runDirAbs = path.join(plansRootAbs, normalizePlanName(args.planRef.name), "runs", args.runId);
+  if (!RUN_ID_PATTERN.test(args.runId)) {
+    throw new Error("run_id_invalid");
+  }
   await fs.mkdir(runDirAbs, { recursive: true });
 
   const explicitSecretPaths = new Set(args.secretContextKeys ?? []);

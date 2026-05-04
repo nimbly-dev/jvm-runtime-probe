@@ -7,6 +7,7 @@ import type {
   PreflightStatus,
 } from "@tools-regression-execution-plan-spec/models/regression_execution_plan_spec.model";
 import { buildReplayPreflight } from "@tools-regression-execution-plan-spec/regression_execution_plan_spec.util";
+import { resolveProjectContextForRegression } from "@tools-regression-execution-plan-spec/regression_project_context.util";
 
 export type DiscoveryOutcome =
   | "resolved"
@@ -99,7 +100,44 @@ export type BuildReplayPreflightWithDiscoveryArgs = BuildPreflightArgs & {
     datasource?: DiscoveryAdapter;
     runtime_context?: DiscoveryAdapter;
   };
+  projectContextOptions?: {
+    workspaceRootAbs: string;
+    projectsFileAbs: string;
+    env?: Record<string, string | undefined>;
+    runtimeContextName?: string;
+    healthChecksEnabled?: boolean;
+  };
 };
+
+async function isProbeBaseReachable(urlRaw: string, timeoutMs: number): Promise<boolean> {
+  try {
+    const ctrl = new AbortController();
+    const handle = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const response = await fetch(urlRaw, { method: "GET", signal: ctrl.signal });
+      return response.status >= 100;
+    } finally {
+      clearTimeout(handle);
+    }
+  } catch {
+    return false;
+  }
+}
+
+function resolveProbeBaseUrl(args: {
+  providedContext: Record<string, unknown>;
+  contract: PlanContract;
+}): string | null {
+  const contextValue = args.providedContext["probeBaseUrl"];
+  if (typeof contextValue === "string" && contextValue.trim().length > 0) {
+    return contextValue.trim();
+  }
+  const fromPrerequisite = args.contract.prerequisites.find((entry) => entry.key === "probeBaseUrl");
+  if (typeof fromPrerequisite?.default === "string" && fromPrerequisite.default.trim().length > 0) {
+    return fromPrerequisite.default.trim();
+  }
+  return null;
+}
 
 export type BuildReplayPreflightWithDiscoveryResult = {
   preflight: PreflightResult;
@@ -338,12 +376,59 @@ export async function resolveDiscoverablePrerequisites(
 export async function buildReplayPreflightWithDiscovery(
   args: BuildReplayPreflightWithDiscoveryArgs,
 ): Promise<BuildReplayPreflightWithDiscoveryResult> {
-  const initialPreflight = buildReplayPreflight(args);
+  let mergedProvidedContext = { ...args.providedContext };
+  let projectContextArg: BuildPreflightArgs["projectContext"] | undefined;
+  if (args.projectContextOptions) {
+    const projectContext = await resolveProjectContextForRegression(args.projectContextOptions);
+    if (projectContext.status === "ok") {
+      mergedProvidedContext = {
+        ...projectContext.contextPatch,
+        ...mergedProvidedContext,
+      };
+    } else {
+      projectContextArg = {
+        status: "blocked",
+        reasonCode: projectContext.reasonCode,
+        requiredUserAction: projectContext.requiredUserAction,
+        ...(projectContext.missing ? { missing: projectContext.missing } : {}),
+        ...(projectContext.checks ? { checks: projectContext.checks } : {}),
+        ...(projectContext.nextAction ? { nextAction: projectContext.nextAction } : {}),
+      };
+    }
+  }
+
+  if (args.metadata.execution.verifyRuntime) {
+    const probeBaseUrl = resolveProbeBaseUrl({
+      providedContext: mergedProvidedContext,
+      contract: args.contract,
+    });
+    if (probeBaseUrl) {
+      const reachable = await isProbeBaseReachable(probeBaseUrl, args.timeoutMs ?? 2000);
+      if (!reachable) {
+        projectContextArg = {
+          status: "blocked",
+          reasonCode: "external_healthcheck_failed",
+          checks: [`probe:${probeBaseUrl}=unreachable`],
+          nextAction:
+            "Start the target JVM with MCP javaagent enabled and confirm probe endpoint is reachable.",
+          requiredUserAction: [
+            `Probe endpoint unreachable at ${probeBaseUrl}. Start/restart runtime with javaagent and retry.`,
+          ],
+        };
+      }
+    }
+  }
+
+  const initialPreflight = buildReplayPreflight({
+    ...args,
+    providedContext: mergedProvidedContext,
+    ...(projectContextArg ? { projectContext: projectContextArg } : {}),
+  });
   const hasDiscoverablePending = initialPreflight.discoverablePending.length > 0;
   if (!hasDiscoverablePending) {
     return {
       preflight: initialPreflight,
-      resolvedContext: { ...args.providedContext },
+      resolvedContext: { ...mergedProvidedContext },
       discovery: null,
     };
   }
@@ -351,7 +436,7 @@ export async function buildReplayPreflightWithDiscovery(
   const discoveryArgs: ResolveDiscoverablePrerequisitesArgs = {
     metadata: args.metadata,
     contract: args.contract,
-    providedContext: args.providedContext,
+    providedContext: mergedProvidedContext,
     adapters: args.adapters,
   };
   if (typeof args.timeoutMs === "number") {
@@ -359,7 +444,7 @@ export async function buildReplayPreflightWithDiscovery(
   }
   const discovery = await resolveDiscoverablePrerequisites(discoveryArgs);
   const mergedContext = mergeDiscoveredContext({
-    providedContext: args.providedContext,
+    providedContext: mergedProvidedContext,
     discoveredContext: discovery.discoveredContext,
   });
 
@@ -383,6 +468,7 @@ export async function buildReplayPreflightWithDiscovery(
   const finalPreflight = buildReplayPreflight({
     ...args,
     providedContext: mergedContext,
+    ...(projectContextArg ? { projectContext: projectContextArg } : {}),
   });
   return {
     preflight: finalPreflight,

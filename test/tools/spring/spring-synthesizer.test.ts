@@ -332,3 +332,81 @@ test("spring synthesizer runtime_only fails closed when runtime mappings are unr
   assert.equal(result.failedStep, "runtime_mapping_fetch");
 });
 
+test("spring synthesizer resolves gateway entrypoint via gateway route config fallback", async () => {
+  const result = await synthesizeSpringRecipe(
+    {
+      rootAbs: "C:\\repo\\gateway-service",
+      workspaceRootAbs: "C:\\repo",
+      searchRootsAbs: ["C:\\repo\\gateway-service"],
+      classHint: "com.example.springcloud.gateway.GatewayServiceApplication",
+      methodHint: "main",
+      intentMode: "regression",
+    },
+    {
+      resolveRequestMappingFn: async () => ({
+        status: "report",
+        contractVersion: "0.1.0",
+        reasonCode: "request_mapping_not_proven",
+        failedStep: "request_mapping_resolution",
+        nextAction: "Refine hints.",
+        evidence: ["resolvedType=com.example.springcloud.gateway.GatewayServiceApplication"],
+        attemptedStrategies: ["java_ast_index_lookup", "java_ast_framework_resolution"],
+      }),
+      resolveGatewayRouteConfigFn: async () => ({
+        status: "ok",
+        requestCandidate: {
+          method: "GET",
+          path: "/courses/**",
+          queryTemplate: "",
+          fullUrlHint: "/courses/**",
+          rationale: ["gateway route config"],
+        },
+        evidence: ["mapping_source=spring_gateway_route_config", "gateway_path=/courses/**"],
+        attemptedStrategies: ["spring_gateway_route_config"],
+      }),
+    },
+  );
+
+  assert.equal(result.status, "recipe");
+  assert.equal(result.requestCandidate.path, "/courses/**");
+  assert.equal(result.evidence.includes("request_source=spring_gateway_route_config"), true);
+  assert.equal(result.attemptedStrategies.includes("spring_gateway_route_config"), true);
+});
+
+test("spring synthesizer returns gateway-specific fail-closed reason when entrypoint fallback has no route", async () => {
+  const result = await synthesizeSpringRecipe(
+    {
+      rootAbs: "C:\\repo\\gateway-service",
+      workspaceRootAbs: "C:\\repo",
+      searchRootsAbs: ["C:\\repo\\gateway-service"],
+      classHint: "com.example.springcloud.gateway.GatewayServiceApplication",
+      methodHint: "main",
+      intentMode: "regression",
+    },
+    {
+      resolveRequestMappingFn: async () => ({
+        status: "report",
+        contractVersion: "0.1.0",
+        reasonCode: "request_mapping_not_proven",
+        failedStep: "request_mapping_resolution",
+        nextAction: "Refine hints.",
+        evidence: ["resolvedType=com.example.springcloud.gateway.GatewayServiceApplication"],
+        attemptedStrategies: ["java_ast_index_lookup", "java_ast_framework_resolution"],
+      }),
+      resolveGatewayRouteConfigFn: async () => ({
+        status: "report",
+        reasonCode: "spring_gateway_route_not_found",
+        failedStep: "gateway_route_config_resolution",
+        nextAction: "Provide explicit route context.",
+        evidence: ["scannedConfigFiles=(none)"],
+        attemptedStrategies: ["spring_gateway_route_config"],
+      }),
+    },
+  );
+
+  assert.equal(result.status, "report");
+  assert.equal(result.reasonCode, "spring_gateway_route_not_found");
+  assert.equal(result.failedStep, "gateway_route_config_resolution");
+  assert.equal(result.attemptedStrategies.includes("spring_gateway_route_config"), true);
+});
+

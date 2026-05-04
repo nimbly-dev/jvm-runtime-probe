@@ -20,11 +20,31 @@ Use this workflow to execute crafted regression plans at controller scope, servi
 2. Execute/replay the crafted plan using existing MCP flow (no new MCP tool).
 3. If the plan is missing deterministic selectors or required context, fail closed and report exact missing fields.
 4. Persist run artifacts automatically after each suite execution under:
-   - `.mcpjvm/regression/<plan>/runs/<run_id>/context.resolved.json`
-   - `.mcpjvm/regression/<plan>/runs/<run_id>/execution.result.json`
-   - `.mcpjvm/regression/<plan>/runs/<run_id>/evidence.json`
-   - `.mcpjvm/regression/<plan>/runs/<run_id>/correlation.json` (required when correlation fields are present in evidence)
+   - `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/context.resolved.json`
+   - `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/execution.result.json`
+   - `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/evidence.json`
+   - `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/correlation.json` (required when correlation fields are present in evidence)
    - `.mcpjvm/correlation-index.json` (required when correlation artifact is produced)
+
+Project context integration:
+
+1. If `.mcpjvm/<project-name>/projects.json` is configured for the workspace, resolve it before endpoint execution.
+2. Apply env-key auth interpolation from project artifact into runtime context (key references only; never persist secret values).
+3. Run required external health checks (`tcp`/`http`) before execution.
+4. Fail closed on project-context blocking reason codes:
+   - `project_artifact_missing`
+   - `project_artifact_invalid`
+   - `workspace_root_invalid`
+   - `env_key_missing`
+   - `runtime_context_unknown`
+   - `external_system_invalid`
+   - `external_healthcheck_failed`
+5. When project-context is unresolved but recoverable, return minimal `needs_user_input` payload:
+   - `missing[]`
+   - `checks[]`
+   - `nextAction`
+6. Keep `needs_user_input` output minimal (no long narrative).
+7. Resume execution from preflight checkpoint after user input is provided.
 
 ## Artifact Contract Requirements
 
@@ -73,6 +93,12 @@ At run start, discover and persist once:
 3. Optional `apiBasePath`.
 4. Auth requirement/token only if needed.
 5. Validate probe base with `probe_check` before endpoint loop.
+6. For terminal/local runtime, start Spring apps with probe agent wiring (prefer `scripts/spring-integration/run-spring-app-with-mcp.sh`) before executing regression.
+7. If API endpoint is reachable but probe endpoint is unreachable while `verifyRuntime=true`, fail closed with `external_healthcheck_failed` (do not downgrade silently to HTTP-only).
+8. For local terminal startup, resolve probe port deterministically from `.mcpjvm/probe-config.json`:
+   - prefer `--probe-id <id>` + `--probe-config <path>`
+   - or use `--agent-port <port>` explicit override
+9. Do not rely on auto-scanned probe port when strict runtime verification is expected; it can drift from configured `probeBaseUrl`.
 
 ## Discovery-First Orchestration
 
@@ -85,6 +111,17 @@ Before requesting manual runtime inputs for discoverable prerequisites, execute 
 4. Re-run preflight.
 5. Only if still unresolved, ask user for remaining required user-input fields.
 6. Do not prompt for discoverable fields before discovery attempt.
+
+## Needs User Input Contract
+
+For resumable preflight blocks (for example missing env auth key or unreachable required external health check), emit:
+
+1. `status=needs_user_input`
+2. `missing[]` (for example missing env key names)
+3. `checks[]` (for example `postgres:tcp-open=unreachable`)
+4. `nextAction` (single deterministic instruction)
+
+Do not emit wall-of-text explanations in this contract.
 
 ## Probe Policy
 
@@ -139,6 +176,14 @@ Before requesting manual runtime inputs for discoverable prerequisites, execute 
    - `evidence`
    - `nextAction`
    - `Repro Steps`
+
+## Local Runtime Port Alignment Policy
+
+For non-Docker terminal execution:
+
+1. Probe bind port MUST match the plan/runtime `probeBaseUrl` port for the target service.
+2. If launcher-selected probe port differs from configured probe registry/baseUrl, stop and return fail-closed diagnostics.
+3. Prefer service-id based resolution (`--probe-id`) over manual port guessing.
 
 ## Fallback: Manual Endpoint Continuation
 

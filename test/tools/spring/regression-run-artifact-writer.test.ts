@@ -19,23 +19,41 @@ function readJson(filePath: string) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
 }
 
+function initProjectArtifact(root: string, projectName = "test-project"): string {
+  const projectArtifactAbs = path.join(root, ".mcpjvm", projectName, "projects.json");
+  fs.mkdirSync(path.dirname(projectArtifactAbs), { recursive: true });
+  fs.writeFileSync(
+    projectArtifactAbs,
+    `${JSON.stringify({ workspaces: [{ projectRoot: root }] }, null, 2)}\n`,
+    "utf8",
+  );
+  return projectName;
+}
+
 test("buildRunArtifactDirAbs fails closed for invalid run id", () => {
+  const root = createTestTempDir("run-artifacts-invalid");
+  try {
+    initProjectArtifact(root);
   assert.throws(
-    () => buildRunArtifactDirAbs(process.cwd(), "post-lifecycle", "2026/04/19-01"),
+      () => buildRunArtifactDirAbs(root, "post-lifecycle", "2026/04/19-01"),
     /run_id_invalid/,
   );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
-test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm/regression/<plan>/runs/<run_id>", async () => {
+test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm/<project>/plans/regression/<plan>/runs/<run_id>", async () => {
   const root = createTestTempDir("run-artifacts");
   try {
+    const projectName = initProjectArtifact(root);
     const runId = "2026-04-19T08-01-22Z_01";
     const written = await writeRegressionRunArtifacts({
       workspaceRootAbs: root,
       runId,
       planRef: {
         name: "gateway-course-review-aggregate-smoke",
-        path: ".mcpjvm/regression/gateway-course-review-aggregate-smoke",
+        path: `.mcpjvm/${projectName}/plans/regression/gateway-course-review-aggregate-smoke`,
       },
       resolvedContext: {
         tenantId: "tenant-social-001",
@@ -138,7 +156,7 @@ test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm
 
     assert.equal(
       written.runDirAbs,
-      path.join(root, ".mcpjvm", "regression", "gateway-course-review-aggregate-smoke", "runs", runId),
+      path.join(root, ".mcpjvm", projectName, "plans", "regression", "gateway-course-review-aggregate-smoke", "runs", runId),
     );
     assert.equal(context.resolvedAt, "2026-04-19T08:01:26.000Z");
     assert.equal(context.tenantId, "tenant-social-001");
@@ -167,6 +185,7 @@ test("writeRegressionRunArtifacts persists context/result/evidence under .mcpjvm
 test("writeRegressionRunArtifacts fails closed when planRef.name is missing", async () => {
   const root = createTestTempDir("run-artifacts-missing-plan");
   try {
+    initProjectArtifact(root);
     await assert.rejects(
       () =>
         writeRegressionRunArtifacts({
@@ -199,14 +218,21 @@ test("writeRegressionRunArtifacts fails closed when planRef.name is missing", as
 });
 
 test("buildRunArtifactDirAbs accepts epoch-like numeric run id", () => {
+  const root = createTestTempDir("run-artifacts-epoch");
+  try {
+    initProjectArtifact(root);
   const runId = "1777691534330";
-  const out = buildRunArtifactDirAbs(process.cwd(), "post-lifecycle", runId);
+    const out = buildRunArtifactDirAbs(root, "post-lifecycle", runId);
   assert.match(out, new RegExp(`${runId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("writeRegressionRunArtifacts auto-generates correlation artifact from evidence policy/events", async () => {
   const root = createTestTempDir("run-artifacts-auto-correlation");
   try {
+    initProjectArtifact(root);
     const runId = "2026-04-19T08-01-22Z_02";
     const written = await writeRegressionRunArtifacts({
       workspaceRootAbs: root,
@@ -274,6 +300,7 @@ test("writeRegressionRunArtifacts auto-generates correlation artifact from evide
 test("writeRegressionRunArtifacts does not generate correlation artifact without canonical correlation inputs", async () => {
   const root = createTestTempDir("run-artifacts-no-correlation");
   try {
+    initProjectArtifact(root);
     const runId = "2026-04-19T08-01-22Z_03";
     const written = await writeRegressionRunArtifacts({
       workspaceRootAbs: root,
@@ -313,6 +340,7 @@ test("writeRegressionRunArtifacts does not generate correlation artifact without
 test("rebuildCorrelationIndex regenerates canonical index from existing correlation artifacts", async () => {
   const root = createTestTempDir("rebuild-correlation-index");
   try {
+    initProjectArtifact(root);
     const runId = "2026-04-19T08-01-22Z_04";
     const written = await writeRegressionRunArtifacts({
       workspaceRootAbs: root,
@@ -367,6 +395,51 @@ test("rebuildCorrelationIndex regenerates canonical index from existing correlat
     assert.equal(rebuiltIndex.entries.length, 1);
     assert.equal(rebuiltIndex.entries[0].planName, "probe-registry-course-service-smoke");
     assert.equal(rebuiltIndex.entries[0].runId, runId);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("writeRegressionRunArtifacts uses project-scoped regression root when .mcpjvm/<project>/projects.json exists", async () => {
+  const root = createTestTempDir("run-artifacts-project-scoped");
+  try {
+    const projectName = "test-project";
+    const projectArtifactAbs = path.join(root, ".mcpjvm", projectName, "projects.json");
+    fs.mkdirSync(path.dirname(projectArtifactAbs), { recursive: true });
+    fs.writeFileSync(
+      projectArtifactAbs,
+      `${JSON.stringify({ workspaces: [{ projectRoot: root }] }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const runId = "1777699999999";
+    const written = await writeRegressionRunArtifacts({
+      workspaceRootAbs: root,
+      runId,
+      planRef: { name: "probe-registry-course-service-smoke" },
+      resolvedContext: {},
+      executionResult: {
+        status: "pass",
+        preflight: {
+          status: "ready",
+          reasonCode: "ok",
+          missing: [],
+          discoverablePending: [],
+          prerequisiteResolution: [],
+          requiredUserAction: [],
+        },
+        startedAt: "2026-04-19T08:01:22.111Z",
+        endedAt: "2026-04-19T08:01:25.333Z",
+        steps: [{ order: 1, id: "course_list", status: "pass" }],
+      },
+      evidence: { targetResolution: [] },
+      now: new Date("2026-04-19T08:01:26.000Z"),
+    });
+
+    assert.match(
+      written.runDirAbs.replaceAll("\\", "/"),
+      /\.mcpjvm\/test-project\/plans\/regression\/probe-registry-course-service-smoke\/runs\/1777699999999$/,
+    );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

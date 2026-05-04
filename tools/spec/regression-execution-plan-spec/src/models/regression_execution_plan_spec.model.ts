@@ -35,7 +35,14 @@ export type PreflightReasonCode =
   | "top_level_expectations_unsupported"
   | "correlation_session_missing"
   | "correlation_window_invalid"
-  | "correlation_key_invalid";
+  | "correlation_key_invalid"
+  | "project_artifact_missing"
+  | "project_artifact_invalid"
+  | "workspace_root_invalid"
+  | "env_key_missing"
+  | "runtime_context_unknown"
+  | "external_system_invalid"
+  | "external_healthcheck_failed";
 
 export type PrerequisiteProvisioning = "user_input" | "discoverable";
 
@@ -58,6 +65,8 @@ export type PreflightResult = {
   reasonCode: PreflightReasonCode;
   missing: string[];
   discoverablePending: string[];
+  checks?: string[];
+  nextAction?: string;
   prerequisiteResolution: PrerequisiteResolution[];
   requiredUserAction: string[];
 };
@@ -139,6 +148,21 @@ export type BuildPreflightArgs = {
   contract: PlanContract;
   providedContext: Record<string, unknown>;
   targetCandidateCount: number;
+  projectContext?: {
+    status: "ok" | "blocked";
+    reasonCode?:
+      | "project_artifact_missing"
+      | "project_artifact_invalid"
+      | "workspace_root_invalid"
+      | "env_key_missing"
+      | "runtime_context_unknown"
+      | "external_system_invalid"
+      | "external_healthcheck_failed";
+    requiredUserAction?: string[];
+    missing?: string[];
+    checks?: string[];
+    nextAction?: string;
+  };
 };
 
 export type CorrelationKeyType = "traceId" | "requestId" | "messageId";

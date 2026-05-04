@@ -10,6 +10,9 @@ import type {
 
 function formatAuthHeaderHint(auth: AuthResolution): string {
   if (!auth.requestHeaders) {
+    if (auth.required === "unknown" || auth.status === "unknown") {
+      return `Auth unresolved. ${auth.nextAction}`;
+    }
     if (auth.status === "needs_user_input") return `Auth unresolved. ${auth.nextAction}`;
     return "No auth headers required.";
   }

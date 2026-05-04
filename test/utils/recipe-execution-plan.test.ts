@@ -164,4 +164,30 @@ test("single_line_probe actuated mode adds enable and disable cleanup calls", ()
   });
 });
 
+test("execution request step does not claim no-auth when auth is unresolved", () => {
+  const unknownAuth = {
+    required: "unknown",
+    status: "unknown",
+    strategy: "unknown",
+    nextAction: "Resolve route/auth evidence first.",
+    notes: [],
+  };
+
+  const plan = buildRecipeExecutionPlan({
+    decision: {
+      requestedMode: "regression",
+      selectedMode: "regression",
+      lineTargetProvided: false,
+      probeIntentRequested: false,
+      routingReason: "regression only",
+    },
+    requestCandidate,
+    auth: unknownAuth,
+  });
+
+  assert.equal(plan.steps.length, 2);
+  assert.match(plan.steps[0].instruction, /Auth unresolved\./);
+  assert.doesNotMatch(plan.steps[0].instruction, /No auth headers required\./);
+});
+
 

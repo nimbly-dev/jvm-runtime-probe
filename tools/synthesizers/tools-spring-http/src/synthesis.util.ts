@@ -10,6 +10,10 @@ import type {
 import type { SynthesizerOutput } from "@/models/synthesis/synthesizer_output.model";
 import { resolveRequestMappingAst } from "@/lib/request_mapping_ast_resolver";
 import { resolveRequestMappingFromRuntime } from "@/lib/request_mapping_runtime_resolver";
+import {
+  resolveGatewayRouteConfig,
+  type GatewayRouteConfigResolveResult,
+} from "@tools-spring-http/gateway_route_config.util";
 import { SPRING_FAILURE_CODES } from "@tools-spring-http/failure_codes.util";
 
 export type SynthesizeSpringRecipeDeps = {
@@ -27,7 +31,17 @@ export type SynthesizeSpringRecipeDeps = {
     methodHint: string;
     authToken?: string;
   }) => Promise<RuntimeMappingsResolveResult>;
+  resolveGatewayRouteConfigFn?: (input: {
+    projectRootAbs: string;
+  }) => Promise<GatewayRouteConfigResolveResult>;
 };
+
+function isGatewayEntrypointTarget(input: SynthesizerInput): boolean {
+  const method = input.methodHint.trim();
+  const className = input.classHint.trim();
+  if (method !== "main") return false;
+  return /(?:^|[.$])[A-Za-z0-9_$]*Application$/.test(className);
+}
 
 function readResolverContextPathHint(
   extensions: Record<string, unknown> | undefined,
@@ -87,6 +101,8 @@ export async function synthesizeSpringRecipe(
   const resolveRequestMappingFn = deps.resolveRequestMappingFn ?? resolveRequestMappingAst;
   const resolveRuntimeMappingsFn =
     deps.resolveRuntimeMappingsFn ?? resolveRequestMappingFromRuntime;
+  const resolveGatewayRouteConfigFn =
+    deps.resolveGatewayRouteConfigFn ?? resolveGatewayRouteConfig;
   const runtimeDiscoveryPreference = input.discoveryPreference ?? "static_only";
   let runtimeFailure:
     | { reasonCode: string; failedStep: string; evidence: string[]; attemptedStrategies: string[] }
@@ -173,6 +189,61 @@ export async function synthesizeSpringRecipe(
   });
 
   if (resolved.status !== "ok") {
+    if (isGatewayEntrypointTarget(input)) {
+      const gatewayResolved = await resolveGatewayRouteConfigFn({
+        projectRootAbs: input.rootAbs,
+      });
+      if (gatewayResolved.status === "ok") {
+        return {
+          status: "recipe",
+          synthesizerUsed: "spring",
+          framework: "spring",
+          requestCandidate: gatewayResolved.requestCandidate,
+          trigger: {
+            kind: "http",
+            method: gatewayResolved.requestCandidate.method,
+            path: gatewayResolved.requestCandidate.path,
+            queryTemplate: gatewayResolved.requestCandidate.queryTemplate,
+            fullUrlHint: gatewayResolved.requestCandidate.fullUrlHint,
+            headers: {},
+          },
+          requestSource: "spring_mvc",
+          matchedRootAbs: input.rootAbs,
+          evidence: [
+            `request_source=spring_gateway_route_config`,
+            ...gatewayResolved.evidence,
+            ...resolved.evidence,
+            ...(runtimeFailure
+              ? [`runtime_mappings_fallback_reason=${runtimeFailure.reasonCode}`]
+              : []),
+          ],
+          attemptedStrategies: [
+            ...(runtimeFailure?.attemptedStrategies ?? []),
+            ...gatewayResolved.attemptedStrategies,
+            ...resolved.attemptedStrategies,
+          ],
+        };
+      }
+      return {
+        status: "report",
+        reasonCode: gatewayResolved.reasonCode,
+        failedStep: gatewayResolved.failedStep,
+        nextAction: gatewayResolved.nextAction,
+        evidence: [
+          ...gatewayResolved.evidence,
+          ...resolved.evidence,
+          ...(runtimeFailure
+            ? [`runtime_mappings_fallback_reason=${runtimeFailure.reasonCode}`]
+            : []),
+        ],
+        attemptedStrategies: [
+          ...(runtimeFailure?.attemptedStrategies ?? []),
+          ...gatewayResolved.attemptedStrategies,
+          ...resolved.attemptedStrategies,
+        ],
+        synthesizerUsed: "spring",
+      };
+    }
     return mapResolverFailureToSynthFailure(resolved, input);
   }
   const contextPathHint = readResolverContextPathHint(resolved.extensions);

@@ -5,7 +5,7 @@ This file defines the normative rules used by the craft skill.
 ## Package Layout
 
 ```text
-.mcpjvm/regression/<regression_name>/
+.mcpjvm/<project_name>/plans/regression/<regression_name>/
   metadata.json
   contract.json
   plan.md

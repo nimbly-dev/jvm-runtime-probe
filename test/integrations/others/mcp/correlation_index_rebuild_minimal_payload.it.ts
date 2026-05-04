@@ -21,11 +21,17 @@ function writeJson(filePath: string, payload: Record<string, unknown>): void {
 test("rebuildCorrelationIndex canonicalizes minimal correlation payloads with numeric run ids", async () => {
   const root = createTestTempDir("corr-index-minimal-it");
   try {
+    const projectName = "test-project";
+    writeJson(path.join(root, ".mcpjvm", projectName, "projects.json"), {
+      workspaces: [{ projectRoot: root }],
+    });
     const plan = "probe-registry-course-service-smoke";
     const runId = "1777691534330";
     const corrPath = path.join(
       root,
       ".mcpjvm",
+      projectName,
+      "plans",
       "regression",
       plan,
       "runs",
@@ -51,7 +57,7 @@ test("rebuildCorrelationIndex canonicalizes minimal correlation payloads with nu
     assert.equal(index.entries[0].runId, runId);
     assert.equal(index.entries[0].status, "ok");
     assert.equal(index.entries[0].reasonCode, "correlation_event_found");
-    assert.equal(index.entries[0].runPath, `.mcpjvm/regression/${plan}/runs/${runId}`);
+    assert.equal(index.entries[0].runPath, `.mcpjvm/test-project/plans/regression/${plan}/runs/${runId}`);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

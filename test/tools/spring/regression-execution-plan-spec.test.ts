@@ -445,3 +445,23 @@ test("buildTimestampRunId produces sortable timestamp-based run id", () => {
   assert.equal(runId, "2026-04-17T09-42-11Z_01");
 });
 
+test("preflight blocks when project context resolver reports missing env key", () => {
+  const result = buildReplayPreflight({
+    metadata: baseMetadata(),
+    contract: baseContract(),
+    providedContext: { "auth.bearer": "provided-at-runtime" },
+    targetCandidateCount: 1,
+    projectContext: {
+      status: "blocked",
+      reasonCode: "env_key_missing",
+      requiredUserAction: ["Set env key AUTH_BEARER_TOKEN before regression."],
+    },
+  });
+  assert.equal(result.status, "needs_user_input");
+  assert.equal(result.reasonCode, "env_key_missing");
+  assert.deepEqual(result.missing, []);
+  assert.deepEqual(result.checks, []);
+  assert.equal(result.nextAction, "Set env key AUTH_BEARER_TOKEN before regression.");
+  assert.deepEqual(result.requiredUserAction, ["Set env key AUTH_BEARER_TOKEN before regression."]);
+});
+

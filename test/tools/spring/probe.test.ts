@@ -340,6 +340,63 @@ test("probe_wait_for_hit timeout_no_inline_hit returns line-not-executed guidanc
   assert.ok(calls >= 2);
 });
 
+test("probe_wait_for_hit marks staleCandidate when hit count changes outside inline time window", async () => {
+  const key = "com.example.social.post.app.controller.PostController#updatePost:122";
+  const originalNow = Date.now;
+  let now = 2_000;
+  let fetchCalls = 0;
+  try {
+    LAST_RESET_EPOCH_BY_KEY.set(key, 1_900);
+    Date.now = () => {
+      now += 25;
+      return now;
+    };
+    await withMockedFetch(async () => {
+      fetchCalls += 1;
+      // Baseline read: no hit yet in this wait window.
+      if (fetchCalls === 1) {
+        return jsonResponse(200, {
+          key,
+          hitCount: 0,
+          lastHitEpoch: 0,
+          mode: "observe",
+          lineResolvable: true,
+          lineValidation: "resolvable",
+        });
+      }
+      // Poll reads: hit count changed, but lastHitEpoch is stale (< triggerWindowStartEpoch).
+      return jsonResponse(200, {
+        key,
+        hitCount: 1,
+        lastHitEpoch: 1_500,
+        mode: "observe",
+        lineResolvable: true,
+        lineValidation: "resolvable",
+      });
+    }, async () => {
+      const out = await probeWaitHit({
+        key,
+        baseUrl: "http://127.0.0.1:9191",
+        statusPath: "/__probe/status",
+        timeoutMs: 120,
+        pollIntervalMs: 60,
+        maxRetries: 1,
+      });
+      assert.equal(out.structuredContent.result.reason, "timeout_no_inline_hit");
+      assert.equal(out.structuredContent.result.reasonCode, "timeout_no_inline_hit");
+      assert.equal(out.structuredContent.result.staleCandidate.hitDelta, 1);
+      assert.equal(
+        out.structuredContent.result.staleCandidate.reason,
+        "hit_count_changed_but_not_inline_to_current_wait_window",
+      );
+    });
+    assert.equal(fetchCalls >= 2, true);
+  } finally {
+    Date.now = originalNow;
+    LAST_RESET_EPOCH_BY_KEY.delete(key);
+  }
+});
+
 test("probe_wait_for_hit emits minimal non-duplicative epoch fields", async () => {
   const key = "com.example.social.post.app.controller.PostController#updatePost:122";
   const originalNow = Date.now;

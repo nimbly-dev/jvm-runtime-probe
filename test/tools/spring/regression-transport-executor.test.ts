@@ -22,6 +22,8 @@ test("http curl adapter returns pass for 2xx response", async () => {
   assert.equal(result.status, "pass");
   assert.equal(result.statusCode, 200);
   assert.match(result.bodyPreview, /"ok":true/);
+  assert.equal(typeof result.durationMs, "number");
+  assert.equal(result.durationMs >= 1, true);
 });
 
 test("http curl adapter returns fail_http for non-2xx response", async () => {
