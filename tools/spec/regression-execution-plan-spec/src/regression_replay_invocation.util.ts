@@ -104,6 +104,7 @@ export function buildReplayUserMessage(
       preflightStatus: preflight.status,
       summary: `Replay preflight ready for ${referenceLabel(reference)}${suffix}.`,
       missing: [],
+      checks: [],
       nextActions: [],
     };
   }
@@ -113,6 +114,8 @@ export function buildReplayUserMessage(
     preflightStatus: preflight.status,
     summary: `Replay preflight blocked (${preflight.status}) for ${referenceLabel(reference)}${suffix}.`,
     missing: [...preflight.missing],
+    checks: [...(preflight.checks ?? [])],
+    ...(typeof preflight.nextAction === "string" ? { nextAction: preflight.nextAction } : {}),
     nextActions: [...preflight.requiredUserAction],
   };
 }

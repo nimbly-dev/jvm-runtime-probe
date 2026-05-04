@@ -232,9 +232,18 @@ test("renderRegressionRunResultsTable maps minimal correlation payload (matched 
 test("resolveRegressionRunDirAbs resolves only plan-local runs", async () => {
   const root = createTestTempDir("results-run-resolve");
   try {
+    const projectRoot = path.join(root, ".mcpjvm", "test-project");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, "projects.json"),
+      `${JSON.stringify({ workspaces: [{ projectRoot: root }] }, null, 2)}\n`,
+      "utf8",
+    );
     const planLocalDir = path.join(
       root,
       ".mcpjvm",
+      "test-project",
+      "plans",
       "regression",
       "04-25-26-controller-with-auth",
       "runs",
@@ -252,6 +261,38 @@ test("resolveRegressionRunDirAbs resolves only plan-local runs", async () => {
       workspaceRootAbs: root,
     });
     assert.equal(resolvedWithoutPlan, null);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("resolveRegressionRunDirAbs resolves project-scoped regression runs when project artifact exists", async () => {
+  const root = createTestTempDir("results-run-resolve-project");
+  try {
+    const projectRoot = path.join(root, ".mcpjvm", "test-project");
+    fs.mkdirSync(projectRoot, { recursive: true });
+    fs.writeFileSync(
+      path.join(projectRoot, "projects.json"),
+      `${JSON.stringify({ workspaces: [{ projectRoot: root }] }, null, 2)}\n`,
+      "utf8",
+    );
+    const planLocalDir = path.join(
+      root,
+      ".mcpjvm",
+      "test-project",
+      "plans",
+      "regression",
+      "04-25-26-controller-with-auth",
+      "runs",
+      "1777097482619",
+    );
+    fs.mkdirSync(planLocalDir, { recursive: true });
+
+    const resolvedByPlan = await resolveRegressionRunDirAbs({
+      workspaceRootAbs: root,
+      planName: "04-25-26-controller-with-auth",
+    });
+    assert.equal(resolvedByPlan, planLocalDir);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

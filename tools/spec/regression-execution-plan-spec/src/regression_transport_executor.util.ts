@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { performance } from "node:perf_hooks";
 
 import type {
   HttpTransportRequest,
@@ -75,17 +76,23 @@ function validateHttpPayload(payload: Record<string, unknown>): HttpTransportReq
   };
 }
 
+function elapsedMs(startMs: number): number {
+  const raw = performance.now() - startMs;
+  if (!Number.isFinite(raw) || raw <= 0) return 1;
+  return Math.max(1, Math.round(raw));
+}
+
 export function createHttpCurlTransportAdapter(runCommand: RunCommand = defaultRunCommand): TransportAdapter {
   return {
     protocol: "http",
     async execute(input: TransportExecuteInput): Promise<TransportExecutionResult> {
-      const start = Date.now();
+      const start = performance.now();
       const parsed = validateHttpPayload(input.payload);
       if (!parsed) {
         return {
           status: "blocked_invalid",
           protocol: "http",
-          durationMs: Date.now() - start,
+          durationMs: elapsedMs(start),
           reasonCode: "http_payload_invalid",
           errorMessage: "http transport requires method and url",
         };
@@ -113,7 +120,7 @@ export function createHttpCurlTransportAdapter(runCommand: RunCommand = defaultR
 
       const timeoutMs = parsed.timeoutMs ?? 20000;
       const commandResult = await runCommand("curl.exe", args, timeoutMs);
-      const durationMs = Date.now() - start;
+      const durationMs = elapsedMs(start);
 
       const marker = "__MCP_HTTP_CODE__:";
       const markerIdx = commandResult.stdout.lastIndexOf(marker);

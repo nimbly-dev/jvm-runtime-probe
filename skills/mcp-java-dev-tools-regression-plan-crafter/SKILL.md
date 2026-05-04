@@ -1,6 +1,6 @@
 ---
 name: mcp-java-dev-tools-regression-plan-crafter
-description: "Craft deterministic regression execution plans under .mcpjvm/regression/<name>/ using metadata.json, contract.json, and plan.md without introducing new MCP tools."
+description: "Craft deterministic regression execution plans under .mcpjvm/<project_name>/plans/regression/<name>/ using metadata.json, contract.json, and plan.md without introducing new MCP tools."
 ---
 
 # MCP JVM Regression Plan Crafter
@@ -20,11 +20,11 @@ Do not skip `Research` when route/base path evidence is incomplete.
 
 Produce a deterministic, fail-closed plan package:
 
-1. `.mcpjvm/regression/<regression_name>/metadata.json`
-2. `.mcpjvm/regression/<regression_name>/contract.json`
-3. `.mcpjvm/regression/<regression_name>/plan.md`
+1. `.mcpjvm/<project_name>/plans/regression/<regression_name>/metadata.json`
+2. `.mcpjvm/<project_name>/plans/regression/<regression_name>/contract.json`
+3. `.mcpjvm/<project_name>/plans/regression/<regression_name>/plan.md`
 
-Do not hand-author `.mcpjvm/regression/<plan>/runs/<run_id>/...` artifacts in this skill. Those are machine-generated during execution.
+Do not hand-author `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/...` artifacts in this skill. Those are machine-generated during execution.
 
 ## Portable Source of Truth
 
@@ -173,9 +173,9 @@ If any check fails, return blocked guidance with exact missing/invalid fields an
 
 When user asks to craft a plan, produce or update:
 
-1. `.mcpjvm/regression/<regression_name>/metadata.json`
-2. `.mcpjvm/regression/<regression_name>/contract.json`
-3. `.mcpjvm/regression/<regression_name>/plan.md`
+1. `.mcpjvm/<project_name>/plans/regression/<regression_name>/metadata.json`
+2. `.mcpjvm/<project_name>/plans/regression/<regression_name>/contract.json`
+3. `.mcpjvm/<project_name>/plans/regression/<regression_name>/plan.md`
 
 Never require manual hand-construction when templates can be applied.
 Use the template files, then specialize fields from the user context.
@@ -215,4 +215,4 @@ When crafting or updating plans, output:
 
 1. Do not create new MCP tools.
 2. Do not execute regression runs from this skill.
-3. Do not write `.mcpjvm/regression/<plan>/runs/<run_id>` artifacts manually.
+3. Do not write `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>` artifacts manually.

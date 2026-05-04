@@ -5,7 +5,7 @@ description: "Render deterministic, artifact-derived regression results with ext
 
 # MCP JVM Regression Result
 
-Use this workflow to generate run summaries from persisted artifacts under `.mcpjvm/regression/<plan>/runs/<run_id>/`.
+Use this workflow to generate run summaries from persisted artifacts under `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/`.
 
 ## Execution Mode
 
@@ -32,10 +32,10 @@ If user request conflicts with these rules, fail closed and return deterministic
 
 Read only from persisted run artifacts:
 
-1. `.mcpjvm/regression/<plan>/runs/<run_id>/execution.result.json`
-2. `.mcpjvm/regression/<plan>/runs/<run_id>/evidence.json`
-3. optional `.mcpjvm/regression/<plan>/runs/<run_id>/correlation.json` for distributed correlation verdict/timeline summary
-4. optional `.mcpjvm/regression/<plan>/runs/<run_id>/context.resolved.json` for non-secret context display
+1. `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/execution.result.json`
+2. `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/evidence.json`
+3. optional `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/correlation.json` for distributed correlation verdict/timeline summary
+4. optional `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/context.resolved.json` for non-secret context display
 
 ## Template Routing
 

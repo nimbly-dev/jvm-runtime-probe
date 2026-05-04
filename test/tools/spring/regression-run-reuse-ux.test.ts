@@ -69,7 +69,7 @@ function baseContract() {
 test("resolveReplayInvocation applies deterministic precedence run_id > plan_path > plan_name > latest", () => {
   const result = resolveReplayInvocation({
     runId: "2026-04-17T09-42-11Z_01",
-    planPath: ".mcpjvm/regression/post-lifecycle-runtime-auto",
+    planPath: ".mcpjvm/test-project/plans/regression/post-lifecycle-runtime-auto",
     planName: "post-lifecycle-runtime-auto",
     latest: true,
   });
@@ -120,7 +120,7 @@ test("buildReplayUserMessage returns blocked with unresolved keys for needs_user
     preflight,
     { kind: "latest" },
     {
-      selectedPlanPath: ".mcpjvm/regression/post-lifecycle-runtime-auto",
+      selectedPlanPath: ".mcpjvm/test-project/plans/regression/post-lifecycle-runtime-auto",
       selectedRunId: "2026-04-17T09-42-11Z_01",
     },
   );
@@ -129,7 +129,7 @@ test("buildReplayUserMessage returns blocked with unresolved keys for needs_user
   assert.deepEqual(message.missing, ["auth.bearer"]);
   assert.equal(
     message.summary,
-    "Replay preflight blocked (needs_user_input) for latest run (plan=.mcpjvm/regression/post-lifecycle-runtime-auto, run=2026-04-17T09-42-11Z_01).",
+    "Replay preflight blocked (needs_user_input) for latest run (plan=.mcpjvm/test-project/plans/regression/post-lifecycle-runtime-auto, run=2026-04-17T09-42-11Z_01).",
   );
   assert.deepEqual(message.nextActions, ["Provide auth.bearer"]);
 });

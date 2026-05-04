@@ -11,6 +11,9 @@ Usage:
 Options:
   --project <absPath>       Absolute path to Spring project
   --app-port <port>         Spring server port (default: 8080)
+  --agent-port <port>       Exact probe agent port (no auto-scan)
+  --probe-id <id>           Probe id from .mcpjvm/probe-config.json to resolve probe port
+  --probe-config <path>     Probe config file path (default: <project>/.mcpjvm/probe-config.json)
   --jdk21-compat            Add allowJava21=true in javaagent options
   --jdwp-port <port>        Optional JDWP debug port
   --agent-port-start <port> Start scanning probe agent port from this value (default: 9173)
@@ -26,6 +29,9 @@ APP_PORT="8080"
 JDK21_COMPAT=0
 JDK21_COMPAT_EXPLICIT=0
 JDWP_PORT=""
+AGENT_PORT_EXACT=""
+PROBE_ID=""
+PROBE_CONFIG_PATH=""
 AGENT_PORT_START="9173"
 AGENT_EXCLUDE="com.nimbly.mcpjavadevtools.agent.**,**.config.**,**Test"
 
@@ -33,6 +39,9 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --project) PROJECT_PATH="${2:-}"; shift 2 ;;
     --app-port) APP_PORT="${2:-}"; shift 2 ;;
+    --agent-port) AGENT_PORT_EXACT="${2:-}"; shift 2 ;;
+    --probe-id) PROBE_ID="${2:-}"; shift 2 ;;
+    --probe-config) PROBE_CONFIG_PATH="${2:-}"; shift 2 ;;
     --jdk21-compat) JDK21_COMPAT=1; JDK21_COMPAT_EXPLICIT=1; shift ;;
     --jdwp-port) JDWP_PORT="${2:-}"; shift 2 ;;
     --agent-port-start) AGENT_PORT_START="${2:-}"; shift 2 ;;
@@ -114,8 +123,48 @@ if [[ ! "$AGENT_PORT_START" =~ ^[0-9]+$ ]]; then
   echo "agent-port-start must be numeric: $AGENT_PORT_START" >&2
   exit 1
 fi
+if [[ -n "$AGENT_PORT_EXACT" && ! "$AGENT_PORT_EXACT" =~ ^[0-9]+$ ]]; then
+  echo "agent-port must be numeric: $AGENT_PORT_EXACT" >&2
+  exit 1
+fi
 
 PROJECT_PATH="$(cd "$PROJECT_PATH" && pwd)"
+if [[ -z "$PROBE_CONFIG_PATH" ]]; then
+  PROBE_CONFIG_PATH="$PROJECT_PATH/.mcpjvm/probe-config.json"
+fi
+
+resolve_port_from_probe_registry() {
+  local cfg="$1"
+  local probe_id="$2"
+  local app_port="$3"
+  if [[ ! -f "$cfg" ]]; then
+    return
+  fi
+  node - "$cfg" "$probe_id" "$app_port" <<'NODE'
+const fs = require("node:fs");
+const cfg = process.argv[2];
+const probeId = process.argv[3];
+const appPort = Number(process.argv[4]);
+let parsed;
+try {
+  parsed = JSON.parse(fs.readFileSync(cfg, "utf8"));
+} catch {
+  process.exit(0);
+}
+const profileName = parsed.defaultProfile || "dev";
+const profile = parsed.profiles?.[profileName];
+if (!profile || !profile.probes) process.exit(0);
+const probes = Object.entries(profile.probes);
+const byId = probeId ? probes.find(([id]) => id === probeId) : null;
+const selected = byId || probes.find(([, v]) => Number(v?.runtime?.port) === appPort);
+if (!selected) process.exit(0);
+const [id, probe] = selected;
+const baseUrl = String(probe.baseUrl || "");
+const match = baseUrl.match(/:(\d+)(?:\/)?$/);
+if (!match) process.exit(0);
+process.stdout.write(`${match[1]}|${id}`);
+NODE
+}
 
 infer_base_package() {
   local project_root="$1"
@@ -211,7 +260,24 @@ if [[ -z "$BASE_PACKAGE" ]]; then
   exit 1
 fi
 
-AGENT_PORT="$(find_free_port "$AGENT_PORT_START")"
+RESOLVED_PROBE=""
+if [[ -n "$PROBE_ID" || -f "$PROBE_CONFIG_PATH" ]]; then
+  RESOLVED_PROBE="$(resolve_port_from_probe_registry "$PROBE_CONFIG_PATH" "$PROBE_ID" "$APP_PORT" || true)"
+fi
+if [[ -z "$AGENT_PORT_EXACT" ]]; then
+  if [[ -n "$RESOLVED_PROBE" ]]; then
+    AGENT_PORT_EXACT="${RESOLVED_PROBE%%|*}"
+  fi
+fi
+if [[ -n "$AGENT_PORT_EXACT" ]]; then
+  if port_in_use "$AGENT_PORT_EXACT"; then
+    echo "Requested agent-port is already in use: $AGENT_PORT_EXACT" >&2
+    exit 1
+  fi
+  AGENT_PORT="$AGENT_PORT_EXACT"
+else
+  AGENT_PORT="$(find_free_port "$AGENT_PORT_START")"
+fi
 AGENT_JAR="$(find_agent_jar)"
 if [[ -z "$AGENT_JAR" ]]; then
   echo "Java agent jar not found. Run ./scripts/install.sh or ./scripts/update.sh first." >&2
@@ -258,6 +324,9 @@ echo "Prepared Spring run launch:"
 echo "- project: $PROJECT_PATH"
 echo "- spring port: $APP_PORT"
 echo "- probe port: $AGENT_PORT"
+if [[ -n "$RESOLVED_PROBE" ]]; then
+  echo "- probe registry match: ${RESOLVED_PROBE#*|}"
+fi
 echo "- include: $BASE_PACKAGE.**"
 if [[ -n "$JDWP_PORT" ]]; then
   echo "- jdwp: $JDWP_PORT"

@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { resolveRegressionPlansRootAbs } from "@tools-regression-execution-plan-spec/regression_artifact_paths.util";
 
 type ReportColumn = "endpoint" | "status" | "http_code" | "duration_ms" | "probe_coverage" | "memory_bytes";
 type ProbeCoverageState = "verified_line_hit" | "http_only_unverified_line" | "unknown" | "n/a";
@@ -279,9 +280,10 @@ async function dirExists(dirAbs: string): Promise<boolean> {
 }
 
 export async function resolveRegressionRunDirAbs(args: ResolveRunDirArgs): Promise<string | null> {
+  const plansRootAbs = await resolveRegressionPlansRootAbs(args.workspaceRootAbs);
   const planRunsRoot =
     typeof args.planName === "string" && args.planName.trim().length > 0
-      ? path.join(args.workspaceRootAbs, ".mcpjvm", "regression", args.planName, "runs")
+      ? path.join(plansRootAbs, args.planName, "runs")
       : null;
 
   if (!planRunsRoot) {

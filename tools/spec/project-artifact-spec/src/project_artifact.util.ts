@@ -1,0 +1,242 @@
+import { promises as fs } from "node:fs";
+import path from "node:path";
+
+import type {
+  ExternalHealthCheck,
+  ProjectArtifact,
+  ProjectArtifactValidationResult,
+  ProjectExternalSystem,
+  ProjectRuntimeContext,
+  ProjectWorkspaceEntry,
+} from "@tools-project-artifact-spec/models/project_artifact.model";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function asTrimmedString(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const out = value.trim();
+  return out.length > 0 ? out : null;
+}
+
+function isPositivePort(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= 65535;
+}
+
+function normalizeRuntimeContext(
+  input: unknown,
+  index: number,
+  errors: string[],
+): ProjectRuntimeContext | null {
+  if (!isRecord(input)) {
+    errors.push(`workspaces[].runtimeContexts[${index}] must be object`);
+    return null;
+  }
+  const name = asTrimmedString(input.name);
+  const mode = asTrimmedString(input.mode);
+  if (!name) errors.push(`workspaces[].runtimeContexts[${index}].name is required`);
+  if (mode !== "local" && mode !== "docker") {
+    errors.push(`workspaces[].runtimeContexts[${index}].mode must be local|docker`);
+  }
+  const composeFile = asTrimmedString(input.composeFile) ?? undefined;
+  if (mode === "docker" && !composeFile) {
+    errors.push(`workspaces[].runtimeContexts[${index}].composeFile is required for docker mode`);
+  }
+  const execution = isRecord(input.execution)
+    ? {
+        ...(asTrimmedString(input.execution.spawn)
+          ? { spawn: asTrimmedString(input.execution.spawn) as "managed" | "existing" | "new_window" }
+          : {}),
+        ...(typeof input.execution.stopWhenPlanFinishes === "boolean"
+          ? { stopWhenPlanFinishes: input.execution.stopWhenPlanFinishes }
+          : {}),
+      }
+    : undefined;
+  if (execution?.spawn && !["managed", "existing", "new_window"].includes(execution.spawn)) {
+    errors.push(`workspaces[].runtimeContexts[${index}].execution.spawn is invalid`);
+  }
+  if (!name || (mode !== "local" && mode !== "docker")) return null;
+  return {
+    name,
+    mode,
+    ...(composeFile ? { composeFile } : {}),
+    ...(execution ? { execution } : {}),
+  };
+}
+
+function normalizeHealthCheck(input: unknown, index: number, errors: string[]): ExternalHealthCheck | null {
+  if (!isRecord(input)) {
+    errors.push(`externalSystems[].healthChecks[${index}] must be object`);
+    return null;
+  }
+  const id = asTrimmedString(input.id);
+  const type = asTrimmedString(input.type);
+  if (!id) errors.push(`externalSystems[].healthChecks[${index}].id is required`);
+  if (type !== "tcp" && type !== "http") {
+    errors.push(`externalSystems[].healthChecks[${index}].type must be tcp|http`);
+    return null;
+  }
+  if (type === "tcp") {
+    const target = asTrimmedString(input.target);
+    if (!target) {
+      errors.push(`externalSystems[].healthChecks[${index}].target is required for tcp`);
+      return null;
+    }
+    return {
+      id: id ?? `check-${index}`,
+      type,
+      target,
+      ...(typeof input.timeoutMs === "number" ? { timeoutMs: input.timeoutMs } : {}),
+      ...(typeof input.required === "boolean" ? { required: input.required } : {}),
+    };
+  }
+  const url = asTrimmedString(input.url);
+  if (!url) {
+    errors.push(`externalSystems[].healthChecks[${index}].url is required for http`);
+    return null;
+  }
+  const method = asTrimmedString(input.method) ?? undefined;
+  return {
+    id: id ?? `check-${index}`,
+    type,
+    ...(method ? { method: method as "GET" | "POST" | "PUT" | "DELETE" | "PATCH" | "HEAD" | "OPTIONS" } : {}),
+    url,
+    ...(isRecord(input.expect) && typeof input.expect.status === "number"
+      ? { expect: { status: input.expect.status } }
+      : {}),
+    ...(typeof input.timeoutMs === "number" ? { timeoutMs: input.timeoutMs } : {}),
+    ...(typeof input.required === "boolean" ? { required: input.required } : {}),
+  };
+}
+
+function normalizeExternalSystem(input: unknown, index: number, errors: string[]): ProjectExternalSystem | null {
+  if (!isRecord(input)) {
+    errors.push(`workspaces[].externalSystems[${index}] must be object`);
+    return null;
+  }
+  const name = asTrimmedString(input.name);
+  const kind = asTrimmedString(input.kind);
+  const host = asTrimmedString(input.host);
+  const port = input.port;
+  if (!name) errors.push(`workspaces[].externalSystems[${index}].name is required`);
+  if (!kind) errors.push(`workspaces[].externalSystems[${index}].kind is required`);
+  if (!host) errors.push(`workspaces[].externalSystems[${index}].host is required`);
+  if (!isPositivePort(port)) errors.push(`workspaces[].externalSystems[${index}].port is invalid`);
+  const healthChecks = Array.isArray(input.healthChecks)
+    ? input.healthChecks
+        .map((entry, i) => normalizeHealthCheck(entry, i, errors))
+        .filter((entry): entry is ExternalHealthCheck => entry !== null)
+    : [];
+  if (!name || !kind || !host || !isPositivePort(port)) return null;
+  return {
+    name,
+    kind,
+    host,
+    port,
+    ...(healthChecks.length > 0 ? { healthChecks } : {}),
+  };
+}
+
+function normalizeWorkspace(input: unknown, index: number, errors: string[]): ProjectWorkspaceEntry | null {
+  if (!isRecord(input)) {
+    errors.push(`workspaces[${index}] must be object`);
+    return null;
+  }
+  const projectRoot = asTrimmedString(input.projectRoot);
+  if (!projectRoot) {
+    errors.push(`workspaces[${index}].projectRoot is required`);
+    return null;
+  }
+  const envFile = asTrimmedString(input.envFile) ?? undefined;
+  let auth: ProjectWorkspaceEntry["auth"] | undefined;
+  if (isRecord(input.auth)) {
+    const bearerTokenEnv = asTrimmedString(input.auth.bearerTokenEnv) ?? undefined;
+    if (bearerTokenEnv && !/^[A-Z_][A-Z0-9_]*$/.test(bearerTokenEnv)) {
+      errors.push(`workspaces[${index}].auth.bearerTokenEnv must be ENV_KEY format`);
+    }
+    if ("bearerToken" in input.auth) {
+      errors.push(`workspaces[${index}].auth.bearerToken is forbidden; use bearerTokenEnv`);
+    }
+    auth = bearerTokenEnv ? { bearerTokenEnv } : undefined;
+  }
+
+  const runtimeContexts = Array.isArray(input.runtimeContexts)
+    ? input.runtimeContexts
+        .map((entry, i) => normalizeRuntimeContext(entry, i, errors))
+        .filter((entry): entry is ProjectRuntimeContext => entry !== null)
+    : [];
+  const externalSystems = Array.isArray(input.externalSystems)
+    ? input.externalSystems
+        .map((entry, i) => normalizeExternalSystem(entry, i, errors))
+        .filter((entry): entry is ProjectExternalSystem => entry !== null)
+    : [];
+  const defaults = isRecord(input.defaults)
+    ? {
+        ...(typeof input.defaults.requestTimeoutMs === "number"
+          ? { requestTimeoutMs: input.defaults.requestTimeoutMs }
+          : {}),
+        ...(typeof input.defaults.retryMax === "number" ? { retryMax: input.defaults.retryMax } : {}),
+      }
+    : undefined;
+
+  return {
+    projectRoot,
+    ...(envFile ? { envFile } : {}),
+    ...(auth ? { auth } : {}),
+    ...(runtimeContexts.length > 0 ? { runtimeContexts } : {}),
+    ...(externalSystems.length > 0 ? { externalSystems } : {}),
+    ...(defaults ? { defaults } : {}),
+  };
+}
+
+export function validateProjectArtifact(input: unknown): ProjectArtifactValidationResult {
+  if (!isRecord(input) || !Array.isArray(input.workspaces)) {
+    return {
+      ok: false,
+      reasonCode: "project_artifact_invalid",
+      errors: ["workspaces[] is required"],
+    };
+  }
+  const errors: string[] = [];
+  const workspaces = input.workspaces
+    .map((entry, i) => normalizeWorkspace(entry, i, errors))
+    .filter((entry): entry is ProjectWorkspaceEntry => entry !== null);
+  if (workspaces.length === 0) {
+    errors.push("at least one valid workspaces[] entry is required");
+  }
+  if (errors.length > 0) {
+    const reasonCode = errors.some((e) => e.includes("projectRoot"))
+      ? "workspace_root_invalid"
+      : errors.some((e) => e.includes("bearerTokenEnv"))
+        ? "env_key_missing"
+        : errors.some((e) => e.includes("runtimeContexts"))
+          ? "runtime_context_unknown"
+          : errors.some((e) => e.includes("externalSystems"))
+            ? "external_system_invalid"
+            : "project_artifact_invalid";
+    return { ok: false, reasonCode, errors };
+  }
+  return { ok: true, artifact: { workspaces } };
+}
+
+export async function readProjectArtifact(projectsFileAbs: string): Promise<ProjectArtifactValidationResult> {
+  const text = await fs.readFile(projectsFileAbs, "utf8");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return {
+      ok: false,
+      reasonCode: "project_artifact_invalid",
+      errors: ["projects.json is not valid JSON"],
+    };
+  }
+  return validateProjectArtifact(parsed);
+}
+
+export async function writeProjectArtifact(projectsFileAbs: string, artifact: ProjectArtifact): Promise<void> {
+  await fs.mkdir(path.dirname(projectsFileAbs), { recursive: true });
+  await fs.writeFile(projectsFileAbs, `${JSON.stringify(artifact, null, 2)}\n`, "utf8");
+}
+

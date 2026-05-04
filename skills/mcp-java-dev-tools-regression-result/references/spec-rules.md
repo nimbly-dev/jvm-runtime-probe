@@ -6,12 +6,12 @@ This file defines normative rules used by the result skill.
 
 Required:
 
-1. `.mcpjvm/regression/<plan>/runs/<run_id>/execution.result.json`
-2. `.mcpjvm/regression/<plan>/runs/<run_id>/evidence.json`
+1. `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/execution.result.json`
+2. `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/evidence.json`
 
 Optional:
 
-1. `.mcpjvm/regression/<plan>/runs/<run_id>/context.resolved.json`
+1. `.mcpjvm/<project_name>/plans/regression/<plan>/runs/<run_id>/context.resolved.json`
 
 ## Template Contract
 

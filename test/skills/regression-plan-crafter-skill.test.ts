@@ -43,7 +43,8 @@ test("bundled crafter templates can bootstrap a plan package inside test/.tmp wo
   try {
     const { metadataTemplate, contractTemplate, planTemplate } = loadCrafterTemplates();
     const regressionName = "post-lifecycle-smoke";
-    const targetDir = path.join(tmpRoot, ".mcpjvm", "regression", regressionName);
+    const projectName = "test-project";
+    const targetDir = path.join(tmpRoot, ".mcpjvm", projectName, "plans", "regression", regressionName);
     fs.mkdirSync(targetDir, { recursive: true });
 
     metadataTemplate.specVersion = "1.0.0";
@@ -102,7 +103,7 @@ test("regression suite skill remains execution-focused and result skill is avail
   const resultText = readUtf8(resultPath);
 
   assert.match(suiteText, /Using Crafted Plans/);
-  assert.match(suiteText, /\.mcpjvm\/regression\/<plan>\/runs\/<run_id>/);
+  assert.match(suiteText, /\.mcpjvm\/<project_name>\/plans\/regression\/<plan>\/runs\/<run_id>/);
   assert.match(suiteText, /correlation\.json/);
   assert.match(suiteText, /correlation-index\.json/);
   assert.match(suiteText, /durationMs/);
@@ -111,6 +112,11 @@ test("regression suite skill remains execution-focused and result skill is avail
   assert.match(suiteText, /do not author `correlation\.json` directly/i);
   assert.match(suiteText, /artifact writer flow/i);
   assert.match(suiteText, /Discovery-First Orchestration/);
+  assert.match(suiteText, /run-spring-app-with-mcp\.sh/);
+  assert.match(suiteText, /external_healthcheck_failed/);
+  assert.match(suiteText, /--probe-id <id>/);
+  assert.match(suiteText, /--agent-port <port>/);
+  assert.match(suiteText, /Do not rely on auto-scanned probe port/i);
   assert.match(resultText, /default template: `endpoint_table_result`/);
   assert.match(resultText, /references\/templates\/index\.md/);
 });

@@ -38,5 +38,7 @@ export type ReplayUserMessage = {
   preflightStatus: PreflightStatus;
   summary: string;
   missing: string[];
+  checks: string[];
+  nextAction?: string;
   nextActions: string[];
 };

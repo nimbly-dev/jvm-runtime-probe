@@ -15,6 +15,8 @@ export type SynthesizerFailureReasonCode =
   | "runtime_mapping_ambiguous"
   | "spring_entrypoint_not_proven"
   | "spring_mapping_not_proven"
+  | "spring_gateway_route_not_found"
+  | "spring_gateway_route_ambiguous"
   | "request_candidate_missing";
 
 export type SynthesizerFailure = {
