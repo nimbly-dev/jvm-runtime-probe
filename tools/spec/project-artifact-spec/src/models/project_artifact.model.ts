@@ -1,13 +1,11 @@
-export type ProjectRuntimeMode = "local" | "docker";
+export type ProjectRuntimeMode = "terminal" | "docker";
 
 export type ProjectRuntimeContext = {
   name: string;
   mode: ProjectRuntimeMode;
   composeFile?: string;
-  execution?: {
-    spawn?: "managed" | "existing" | "new_window";
-    stopWhenPlanFinishes?: boolean;
-  };
+  autoStart?: boolean;
+  autoStopOnFinish?: boolean;
 };
 
 export type ExternalHealthCheck =

@@ -36,32 +36,22 @@ function normalizeRuntimeContext(
   const name = asTrimmedString(input.name);
   const mode = asTrimmedString(input.mode);
   if (!name) errors.push(`workspaces[].runtimeContexts[${index}].name is required`);
-  if (mode !== "local" && mode !== "docker") {
-    errors.push(`workspaces[].runtimeContexts[${index}].mode must be local|docker`);
+  if (mode !== "terminal" && mode !== "docker") {
+    errors.push(`workspaces[].runtimeContexts[${index}].mode must be terminal|docker`);
   }
   const composeFile = asTrimmedString(input.composeFile) ?? undefined;
   if (mode === "docker" && !composeFile) {
     errors.push(`workspaces[].runtimeContexts[${index}].composeFile is required for docker mode`);
   }
-  const execution = isRecord(input.execution)
-    ? {
-        ...(asTrimmedString(input.execution.spawn)
-          ? { spawn: asTrimmedString(input.execution.spawn) as "managed" | "existing" | "new_window" }
-          : {}),
-        ...(typeof input.execution.stopWhenPlanFinishes === "boolean"
-          ? { stopWhenPlanFinishes: input.execution.stopWhenPlanFinishes }
-          : {}),
-      }
-    : undefined;
-  if (execution?.spawn && !["managed", "existing", "new_window"].includes(execution.spawn)) {
-    errors.push(`workspaces[].runtimeContexts[${index}].execution.spawn is invalid`);
-  }
-  if (!name || (mode !== "local" && mode !== "docker")) return null;
+  if (!name || (mode !== "terminal" && mode !== "docker")) return null;
   return {
     name,
     mode,
     ...(composeFile ? { composeFile } : {}),
-    ...(execution ? { execution } : {}),
+    ...(typeof input.autoStart === "boolean" ? { autoStart: input.autoStart } : {}),
+    ...(typeof input.autoStopOnFinish === "boolean"
+      ? { autoStopOnFinish: input.autoStopOnFinish }
+      : {}),
   };
 }
 

@@ -1,4 +1,6 @@
 import net from "node:net";
+import { spawn } from "node:child_process";
+import path from "node:path";
 import { URL } from "node:url";
 
 import type { ProjectRuntimeContext, ProjectWorkspaceEntry } from "@tools-project-artifact-spec/models/project_artifact.model";
@@ -34,7 +36,19 @@ type ResolveProjectContextArgs = {
   env?: Record<string, string | undefined>;
   runtimeContextName?: string;
   healthChecksEnabled?: boolean;
+  runtimeStarter?: RuntimeStarter;
 };
+
+type RuntimeStartResult = {
+  attempted: boolean;
+  success: boolean;
+  detail?: string;
+};
+
+type RuntimeStarter = (args: {
+  runtimeContext: ProjectRuntimeContext;
+  workspaceRootAbs: string;
+}) => Promise<RuntimeStartResult>;
 
 async function tcpCheck(target: string, timeoutMs: number): Promise<boolean> {
   const [host, portStr] = target.split(":");
@@ -88,6 +102,7 @@ async function runRequiredHealthChecks(workspace: ProjectWorkspaceEntry): Promis
 } | {
   ok: false;
   checks: string[];
+  failures: string[];
   nextAction: string;
   requiredUserAction: string[];
 }> {
@@ -130,12 +145,56 @@ async function runRequiredHealthChecks(workspace: ProjectWorkspaceEntry): Promis
   if (failures.length > 0) {
     return {
       checks,
+      failures,
       nextAction: `Ensure services are running or update .env/runtime config for: ${failures.join(", ")}.`,
       ok: false,
       requiredUserAction: [`External health checks failed: ${failures.join(", ")}`],
     };
   }
   return { ok: true, checks };
+}
+
+async function defaultRuntimeStarter(args: {
+  runtimeContext: ProjectRuntimeContext;
+  workspaceRootAbs: string;
+}): Promise<RuntimeStartResult> {
+  const { runtimeContext, workspaceRootAbs } = args;
+  if (runtimeContext.mode !== "docker") {
+    return {
+      attempted: false,
+      success: false,
+      detail: `Runtime mode '${runtimeContext.mode}' does not have auto-start command wiring in v1.`,
+    };
+  }
+  if (!runtimeContext.composeFile) {
+    return {
+      attempted: true,
+      success: false,
+      detail: "Docker runtime context requires composeFile for auto-start.",
+    };
+  }
+  const composeFileAbs = path.isAbsolute(runtimeContext.composeFile)
+    ? runtimeContext.composeFile
+    : path.resolve(workspaceRootAbs, runtimeContext.composeFile);
+  const command = "docker";
+  const cmdArgs = ["compose", "-f", composeFileAbs, "up", "-d"];
+  const result = await new Promise<{ code: number; stderr: string }>((resolve) => {
+    const child = spawn(command, cmdArgs, { windowsHide: true });
+    let stderr = "";
+    child.stderr.on("data", (buf) => {
+      stderr += String(buf);
+    });
+    child.on("close", (code) => resolve({ code: typeof code === "number" ? code : 1, stderr }));
+    child.on("error", (err) => resolve({ code: 1, stderr: String(err.message ?? err) }));
+  });
+  if (result.code === 0) {
+    return { attempted: true, success: true, detail: `Started via docker compose: ${composeFileAbs}` };
+  }
+  return {
+    attempted: true,
+    success: false,
+    detail: `docker compose start failed (${composeFileAbs}): ${result.stderr.trim()}`,
+  };
 }
 
 function selectRuntimeContext(args: {
@@ -155,8 +214,8 @@ function selectRuntimeContext(args: {
     }
     return { selected: match };
   }
-  const local = runtimeContexts.find((entry) => entry.mode === "local");
-  const selected = local ?? runtimeContexts[0];
+  const terminal = runtimeContexts.find((entry) => entry.mode === "terminal");
+  const selected = terminal ?? runtimeContexts[0];
   if (!selected) return {};
   return { selected };
 }
@@ -237,25 +296,56 @@ export async function resolveProjectContextForRegression(
   if (selectedRuntimeContext) {
     contextPatch["runtime.context.name"] = selectedRuntimeContext.name;
     contextPatch["runtime.context.mode"] = selectedRuntimeContext.mode;
-    const spawnMode = selectedRuntimeContext.execution?.spawn ?? "managed";
-    const stopWhenPlanFinishes =
-      typeof selectedRuntimeContext.execution?.stopWhenPlanFinishes === "boolean"
-        ? selectedRuntimeContext.execution.stopWhenPlanFinishes
-        : selectedRuntimeContext.mode === "local" && spawnMode === "managed";
-    contextPatch["runtime.execution.spawn"] = spawnMode;
-    contextPatch["runtime.execution.stopWhenPlanFinishes"] = stopWhenPlanFinishes;
+    const autoStart =
+      typeof selectedRuntimeContext.autoStart === "boolean"
+        ? selectedRuntimeContext.autoStart
+        : true;
+    const autoStopOnFinish =
+      typeof selectedRuntimeContext.autoStopOnFinish === "boolean"
+        ? selectedRuntimeContext.autoStopOnFinish
+        : true;
+    contextPatch["runtime.autoStart"] = autoStart;
+    contextPatch["runtime.autoStopOnFinish"] = autoStopOnFinish;
   }
 
   if (args.healthChecksEnabled !== false) {
-    const health = await runRequiredHealthChecks(workspace);
+    let health = await runRequiredHealthChecks(workspace);
+    let autoStartDetail: string | undefined;
+    let autoStartAttempted = false;
+    let autoStarted = false;
+    const autoStartEnabled =
+      selectedRuntimeContext ? (typeof selectedRuntimeContext.autoStart === "boolean" ? selectedRuntimeContext.autoStart : true) : false;
+    if (!health.ok && selectedRuntimeContext && autoStartEnabled) {
+      const starter = args.runtimeStarter ?? defaultRuntimeStarter;
+      const startResult = await starter({
+        runtimeContext: selectedRuntimeContext,
+        workspaceRootAbs: workspace.projectRoot,
+      });
+      autoStartAttempted = startResult.attempted;
+      autoStarted = startResult.success;
+      autoStartDetail = startResult.detail;
+      health = await runRequiredHealthChecks(workspace);
+    }
     if (!health.ok) {
+      const checks = [...health.checks];
+      if (autoStartAttempted) {
+        checks.push(`runtime:auto_start=${autoStarted ? "ok" : "failed"}`);
+      }
+      if (autoStartDetail) {
+        checks.push(`runtime:auto_start_detail=${autoStartDetail}`);
+      }
       return {
         status: "blocked",
         reasonCode: "external_healthcheck_failed",
-        checks: health.checks,
+        checks,
         nextAction: health.nextAction,
         requiredUserAction: health.requiredUserAction,
       };
+    }
+    if (autoStartAttempted) {
+      contextPatch["runtime.autoStartAttempted"] = true;
+      contextPatch["runtime.autoStarted"] = autoStarted;
+      if (autoStartDetail) contextPatch["runtime.autoStartDetail"] = autoStartDetail;
     }
   }
 

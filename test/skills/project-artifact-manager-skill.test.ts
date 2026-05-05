@@ -21,7 +21,9 @@ test("project artifact manager skill enforces separation, prompt, and secret rul
   assert.match(text, /`probe-config\.json` remains authoritative/);
   assert.match(text, /MUST NOT duplicate probe endpoint config/);
   assert.match(text, /never resolved token values/i);
-  assert.match(text, /mode` is restricted to `local` and `docker`/);
+  assert.match(text, /mode` is restricted to `terminal` and `docker`/);
+  assert.match(text, /autoStart/);
+  assert.match(text, /autoStopOnFinish/);
   assert.match(text, /external_healthcheck_failed/);
   assert.match(text, /references\/postgres\.md/);
   assert.match(text, /references\/dynamodb\.md/);

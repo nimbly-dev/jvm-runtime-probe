@@ -78,6 +78,7 @@ Suite execution MUST emit deterministic fields needed by result rendering and co
 ## MCP-First Requirement
 
 1. Mandatory tools: `probe_check`, `project_context_validate`, `probe_recipe_create` (per endpoint or representative target), plus probe tools when probe verification is requested/available.
+2. HTTP execution transport must be MCP-wrapped via `transport_execute`; no raw curl fallback.
 2. If MCP toolchain is unavailable, stop immediately and return:
    - `reasonCode=toolchain_unavailable`
    - `nextAction=enable_mcp_jvm_debugger_tools_then_rerun`
@@ -93,9 +94,9 @@ At run start, discover and persist once:
 3. Optional `apiBasePath`.
 4. Auth requirement/token only if needed.
 5. Validate probe base with `probe_check` before endpoint loop.
-6. For terminal/local runtime, start Spring apps with probe agent wiring (prefer `scripts/spring-integration/run-spring-app-with-mcp.sh`) before executing regression.
+6. For terminal runtime, start Spring apps with probe agent wiring (prefer `scripts/spring-integration/run-spring-app-with-mcp.sh`) before executing regression.
 7. If API endpoint is reachable but probe endpoint is unreachable while `verifyRuntime=true`, fail closed with `external_healthcheck_failed` (do not downgrade silently to HTTP-only).
-8. For local terminal startup, resolve probe port deterministically from `.mcpjvm/probe-config.json`:
+8. For terminal startup, resolve probe port deterministically from `.mcpjvm/probe-config.json`:
    - prefer `--probe-id <id>` + `--probe-config <path>`
    - or use `--agent-port <port>` explicit override
 9. Do not rely on auto-scanned probe port when strict runtime verification is expected; it can drift from configured `probeBaseUrl`.
@@ -184,6 +185,14 @@ For non-Docker terminal execution:
 1. Probe bind port MUST match the plan/runtime `probeBaseUrl` port for the target service.
 2. If launcher-selected probe port differs from configured probe registry/baseUrl, stop and return fail-closed diagnostics.
 3. Prefer service-id based resolution (`--probe-id`) over manual port guessing.
+
+## Wrapped Transport Policy
+
+Configure in `.mcpjvm/probe-config.json` profile global:
+
+1. `allowNonWrappedExecutable` (boolean)
+2. Recommended default: `false`
+3. With `false`, all executable transport must run through MCP wrappers.
 
 ## Fallback: Manual Endpoint Continuation
 

@@ -51,6 +51,7 @@ test("loads probe base URL from configured default probe in registry", () => {
       assert.equal(cfg.probeRegistry?.activeProfile, "dev");
       assert.equal(cfg.probeRegistry?.profileSource, "workspace");
       assert.equal(cfg.probeRegistry?.defaultProbeId, "order-service");
+      assert.equal(cfg.probeRegistry?.allowNonWrappedExecutable, false);
     },
   );
 });
