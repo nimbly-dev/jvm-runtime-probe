@@ -8,6 +8,7 @@ export type ProbeRegistrySummary = {
   profileSource: "env" | "workspace" | "default";
   defaultProbeId: string;
   probeCount: number;
+  allowNonWrappedExecutable: boolean;
   lastReloadAt?: string;
   lastReloadStatus?: "ok" | "error";
   lastReloadError?: string;

@@ -12,6 +12,7 @@ import { registerProbeCheckTool } from "@/tools/core/probe_check/handler";
 import { registerTargetInferTool } from "@/tools/core/target_infer/handler";
 import { registerRecipeCreateTool } from "@/tools/core/recipe_generate/handler";
 import { registerProbeTools } from "@/tools/core/probe/handler";
+import { registerTransportExecuteTool } from "@/tools/core/transport_execute/handler";
 import {
   registerProbeRegistryTools,
   type ProbeRegistrySummary,
@@ -79,6 +80,7 @@ async function main() {
       profileSource: activeRegistry.profileSource,
       defaultProbeId: activeRegistry.defaultProbeId,
       probeCount: activeRegistry.probesById.size,
+      allowNonWrappedExecutable: activeRegistry.allowNonWrappedExecutable,
       ...(lastReloadAt ? { lastReloadAt } : {}),
       ...(lastReloadStatus ? { lastReloadStatus } : {}),
       ...(lastReloadError ? { lastReloadError } : {}),
@@ -146,6 +148,7 @@ async function main() {
                 profileSource: activeRegistry.profileSource,
                 defaultProbeId: activeRegistry.defaultProbeId,
                 registryProbeCount: activeRegistry.probesById.size,
+                allowNonWrappedExecutable: activeRegistry.allowNonWrappedExecutable,
               }
             : {}),
         },
@@ -216,6 +219,9 @@ async function main() {
   registerProbeRegistryTools(server, {
     getRegistrySummary: () => toRegistrySummary(),
     reloadRegistry: () => reloadRegistry(),
+  });
+  registerTransportExecuteTool(server, {
+    allowNonWrappedExecutable: () => activeRegistry?.allowNonWrappedExecutable ?? false,
   });
 
   const transport = new StdioServerTransport();

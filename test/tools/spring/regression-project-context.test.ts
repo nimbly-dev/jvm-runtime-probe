@@ -45,7 +45,7 @@ test("resolveProjectContextForRegression resolves auth.bearer from env key refer
           auth: {
             bearerTokenEnv: "AUTH_BEARER_TOKEN",
           },
-          runtimeContexts: [{ name: "local-cli", mode: "local" }],
+          runtimeContexts: [{ name: "terminal-cli", mode: "terminal" }],
         },
       ],
     });
@@ -60,17 +60,17 @@ test("resolveProjectContextForRegression resolves auth.bearer from env key refer
     assert.equal(out.status, "ok");
     if (out.status === "ok") {
       assert.equal(out.contextPatch["auth.bearer"], "runtime-token-value");
-      assert.equal(out.runtimeContextName, "local-cli");
-      assert.equal(out.contextPatch["runtime.context.mode"], "local");
-      assert.equal(out.contextPatch["runtime.execution.spawn"], "managed");
-      assert.equal(out.contextPatch["runtime.execution.stopWhenPlanFinishes"], true);
+      assert.equal(out.runtimeContextName, "terminal-cli");
+      assert.equal(out.contextPatch["runtime.context.mode"], "terminal");
+      assert.equal(out.contextPatch["runtime.autoStart"], true);
+      assert.equal(out.contextPatch["runtime.autoStopOnFinish"], true);
     }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("resolveProjectContextForRegression prefers local runtime context when no runtimeContextName is provided", async () => {
+test("resolveProjectContextForRegression prefers terminal runtime context when no runtimeContextName is provided", async () => {
   const root = createTestTempDir("project-context-runtime-default");
   try {
     const projects = path.join(root, ".mcpjvm", "my-project", "projects.json");
@@ -80,7 +80,7 @@ test("resolveProjectContextForRegression prefers local runtime context when no r
           projectRoot: root,
           runtimeContexts: [
             { name: "docker-compose", mode: "docker", composeFile: "docker-compose.yml" },
-            { name: "local-cli", mode: "local" },
+            { name: "terminal-cli", mode: "terminal" },
           ],
         },
       ],
@@ -92,16 +92,17 @@ test("resolveProjectContextForRegression prefers local runtime context when no r
     });
     assert.equal(out.status, "ok");
     if (out.status === "ok") {
-      assert.equal(out.runtimeContextName, "local-cli");
-      assert.equal(out.contextPatch["runtime.context.mode"], "local");
-      assert.equal(out.contextPatch["runtime.execution.stopWhenPlanFinishes"], true);
+      assert.equal(out.runtimeContextName, "terminal-cli");
+      assert.equal(out.contextPatch["runtime.context.mode"], "terminal");
+      assert.equal(out.contextPatch["runtime.autoStart"], true);
+      assert.equal(out.contextPatch["runtime.autoStopOnFinish"], true);
     }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("resolveProjectContextForRegression honors explicit stopWhenPlanFinishes=false", async () => {
+test("resolveProjectContextForRegression honors explicit autoStopOnFinish=false", async () => {
   const root = createTestTempDir("project-context-runtime-cleanup-override");
   try {
     const projects = path.join(root, ".mcpjvm", "my-project", "projects.json");
@@ -111,9 +112,10 @@ test("resolveProjectContextForRegression honors explicit stopWhenPlanFinishes=fa
           projectRoot: root,
           runtimeContexts: [
             {
-              name: "local-cli",
-              mode: "local",
-              execution: { spawn: "managed", stopWhenPlanFinishes: false },
+              name: "terminal-cli",
+              mode: "terminal",
+              autoStart: true,
+              autoStopOnFinish: false,
             },
           ],
         },
@@ -126,7 +128,7 @@ test("resolveProjectContextForRegression honors explicit stopWhenPlanFinishes=fa
     });
     assert.equal(out.status, "ok");
     if (out.status === "ok") {
-      assert.equal(out.contextPatch["runtime.execution.stopWhenPlanFinishes"], false);
+      assert.equal(out.contextPatch["runtime.autoStopOnFinish"], false);
     }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -260,6 +262,99 @@ test("resolveProjectContextForRegression returns minimal checks payload when hea
       assert.deepEqual(out.checks, ["postgres:tcp-open=unreachable"]);
       assert.match(out.nextAction ?? "", /Ensure services are running/);
     }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("resolveProjectContextForRegression does not auto-start when health checks are already ready", async () => {
+  const root = createTestTempDir("project-context-autostart-ready");
+  const server = http.createServer((_req: any, res: any) => {
+    res.statusCode = 200;
+    res.end("ok");
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", () => resolve()));
+  let starterCalled = 0;
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("server address unavailable");
+    const port = address.port;
+    const projects = path.join(root, ".mcpjvm", "my-project", "projects.json");
+    writeJson(projects, {
+      workspaces: [
+        {
+          projectRoot: root,
+          runtimeContexts: [{ name: "terminal-cli", mode: "terminal", autoStart: true }],
+          externalSystems: [
+            {
+              name: "customers-api",
+              kind: "service",
+              host: "127.0.0.1",
+              port,
+              healthChecks: [
+                { id: "http-ready", type: "http", url: `http://127.0.0.1:${port}/health`, required: true },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    const out = await resolveProjectContextForRegression({
+      workspaceRootAbs: root,
+      projectsFileAbs: projects,
+      runtimeStarter: async () => {
+        starterCalled += 1;
+        return { attempted: true, success: true };
+      },
+    });
+    assert.equal(out.status, "ok");
+    assert.equal(starterCalled, 0);
+  } finally {
+    server.close();
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("resolveProjectContextForRegression attempts auto-start when health checks fail and autoStart=true", async () => {
+  const root = createTestTempDir("project-context-autostart-attempt");
+  let checks = 0;
+  let starterCalled = 0;
+  try {
+    const projects = path.join(root, ".mcpjvm", "my-project", "projects.json");
+    writeJson(projects, {
+      workspaces: [
+        {
+          projectRoot: root,
+          runtimeContexts: [{ name: "terminal-cli", mode: "terminal", autoStart: true }],
+          defaults: { retryMax: 1, requestTimeoutMs: 50 },
+          externalSystems: [
+            {
+              name: "customers-api",
+              kind: "service",
+              host: "127.0.0.1",
+              port: 1,
+              healthChecks: [{ id: "tcp-open", type: "tcp", target: "127.0.0.1:1", required: true }],
+            },
+          ],
+        },
+      ],
+    });
+    const out = await resolveProjectContextForRegression({
+      workspaceRootAbs: root,
+      projectsFileAbs: projects,
+      runtimeStarter: async () => {
+        starterCalled += 1;
+        return { attempted: true, success: false, detail: "manual terminal start required" };
+      },
+    });
+    checks += 1;
+    assert.equal(out.status, "blocked");
+    if (out.status === "blocked") {
+      assert.equal(out.reasonCode, "external_healthcheck_failed");
+      assert.equal(out.checks?.some((entry: string) => entry.includes("runtime:auto_start=failed")), true);
+    }
+    assert.equal(starterCalled, 1);
+    assert.equal(checks, 1);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

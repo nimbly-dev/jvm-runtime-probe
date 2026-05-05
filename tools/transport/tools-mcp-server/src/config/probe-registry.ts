@@ -30,6 +30,7 @@ type ProbeGlobalConfig = {
   probeWaitUnreachableRetryEnabled?: boolean;
   probeWaitUnreachableMaxRetries?: number;
   probeIncludeExecutionPaths?: boolean;
+  allowNonWrappedExecutable?: boolean;
 };
 
 type ProbeProfile = {
@@ -56,6 +57,7 @@ export type ProbeRegistry = {
   profileSource: "env" | "workspace" | "default";
   defaultProbeId: string;
   probesById: Map<string, ProbeConfigEntry>;
+  allowNonWrappedExecutable: boolean;
 };
 
 function stripUtf8Bom(raw: string): string {
@@ -170,6 +172,7 @@ export function loadProbeRegistry(args: ProbeRegistryLoadArgs): ProbeRegistry {
   }
 
   const global = profile.global ?? {};
+  const allowNonWrappedExecutable = global.allowNonWrappedExecutable === true;
   const probeEntries = profile.probes ?? {};
   const probeIds = Object.keys(probeEntries);
   if (probeIds.length === 0) {
@@ -247,5 +250,6 @@ export function loadProbeRegistry(args: ProbeRegistryLoadArgs): ProbeRegistry {
     profileSource,
     defaultProbeId,
     probesById,
+    allowNonWrappedExecutable,
   };
 }

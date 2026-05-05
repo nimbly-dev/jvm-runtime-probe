@@ -11,7 +11,7 @@ Use this skill to manage project-level artifacts while keeping probe routing in 
 
 1. Initialize `.mcpjvm/<project-name>/projects.json`.
 2. Validate deterministic project artifact shape.
-3. Add/update runtime contexts (`local`/`docker`).
+3. Add/update runtime contexts (`terminal`/`docker`).
 4. Add/update external systems and health checks.
 5. Resolve env key references (never env values).
 
@@ -21,10 +21,11 @@ Use this skill to manage project-level artifacts while keeping probe routing in 
 2. `probe-config.json` remains authoritative for probes and baseUrl routing.
 3. `projects.json` MUST NOT duplicate probe endpoint config.
 4. Persist only env key names (for example `AUTH_BEARER_TOKEN`), never resolved token values.
-5. Runtime context `mode` is restricted to `local` and `docker`.
-6. External system checks may use only deterministic `tcp` or `http` checks in v1.
-7. Fail closed on ambiguous discovery; do not guess ports, hosts, or auth keys.
-8. `defaults.retryMax` and `defaults.requestTimeoutMs` are used by orchestrator preflight health checks.
+5. Runtime context `mode` is restricted to `terminal` and `docker`.
+6. Runtime context supports `autoStart` and `autoStopOnFinish` booleans (default true).
+7. External system checks may use only deterministic `tcp` or `http` checks in v1.
+8. Fail closed on ambiguous discovery; do not guess ports, hosts, or auth keys.
+9. `defaults.retryMax` and `defaults.requestTimeoutMs` are used by orchestrator preflight health checks.
 
 ## Required Artifact Path
 
@@ -45,8 +46,10 @@ Use this skill to manage project-level artifacts while keeping probe routing in 
       },
       "runtimeContexts": [
         {
-          "name": "local-cli",
-          "mode": "local"
+          "name": "terminal-cli",
+          "mode": "terminal",
+          "autoStart": true,
+          "autoStopOnFinish": true
         },
         {
           "name": "docker-compose",

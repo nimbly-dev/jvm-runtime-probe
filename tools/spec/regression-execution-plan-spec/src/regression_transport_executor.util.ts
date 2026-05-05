@@ -1,6 +1,3 @@
-import { spawn } from "node:child_process";
-import { performance } from "node:perf_hooks";
-
 import type {
   HttpTransportRequest,
   TransportAdapter,
@@ -9,8 +6,12 @@ import type {
   TransportProtocol,
 } from "@tools-regression-execution-plan-spec/models/regression_transport.model";
 
-type CommandResult = { code: number; stdout: string; stderr: string };
-type RunCommand = (command: string, args: string[], timeoutMs: number) => Promise<CommandResult>;
+type McpToolInvoker = (args: {
+  toolName: string;
+  input: Record<string, unknown>;
+}) => Promise<{
+  structuredContent?: Record<string, unknown>;
+}>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -22,32 +23,6 @@ function asString(value: unknown): string | undefined {
 
 function asNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
-}
-
-function defaultRunCommand(command: string, args: string[], timeoutMs: number): Promise<CommandResult> {
-  return new Promise((resolve) => {
-    const child = spawn(command, args, { windowsHide: true });
-    let stdout = "";
-    let stderr = "";
-    const timer = setTimeout(() => {
-      child.kill();
-      resolve({ code: 124, stdout, stderr: `${stderr}\ncommand_timeout` });
-    }, timeoutMs);
-    child.stdout.on("data", (buf) => {
-      stdout += String(buf);
-    });
-    child.stderr.on("data", (buf) => {
-      stderr += String(buf);
-    });
-    child.on("close", (code) => {
-      clearTimeout(timer);
-      resolve({ code: typeof code === "number" ? code : 1, stdout, stderr });
-    });
-    child.on("error", (err) => {
-      clearTimeout(timer);
-      resolve({ code: 1, stdout, stderr: `${stderr}\n${String(err.message ?? err)}` });
-    });
-  });
 }
 
 function toBodyPreview(value: string): string {
@@ -76,88 +51,76 @@ function validateHttpPayload(payload: Record<string, unknown>): HttpTransportReq
   };
 }
 
-function elapsedMs(startMs: number): number {
-  const raw = performance.now() - startMs;
-  if (!Number.isFinite(raw) || raw <= 0) return 1;
-  return Math.max(1, Math.round(raw));
+function mapMcpStructuredToResult(
+  protocol: TransportProtocol,
+  structuredContent?: Record<string, unknown>,
+): TransportExecutionResult {
+  if (!structuredContent) {
+    return {
+      status: "blocked_runtime",
+      protocol,
+      durationMs: 1,
+      reasonCode: "transport_wrapper_missing_response",
+      errorMessage: "transport_execute returned no structuredContent payload",
+    };
+  }
+  const statusRaw = asString(structuredContent.status);
+  const status =
+    statusRaw === "pass" || statusRaw === "fail_http" || statusRaw === "blocked_runtime" || statusRaw === "blocked_invalid"
+      ? statusRaw
+      : "blocked_runtime";
+  const durationMs = Math.max(1, Math.round(asNumber(structuredContent.durationMs) ?? 1));
+  const statusCode = asNumber(structuredContent.statusCode);
+  const reasonCode = asString(structuredContent.reasonCode);
+  const errorMessage = asString(structuredContent.errorMessage);
+  const bodyPreviewRaw = asString(structuredContent.bodyPreview);
+
+  const headersRaw = structuredContent.headers;
+  let headers: Record<string, string> | undefined;
+  if (headersRaw && typeof headersRaw === "object" && !Array.isArray(headersRaw)) {
+    headers = {};
+    for (const [k, v] of Object.entries(headersRaw as Record<string, unknown>)) {
+      const value = asString(v);
+      if (value) headers[k] = value;
+    }
+  }
+
+  return {
+    status,
+    protocol,
+    durationMs,
+    ...(typeof statusCode === "number" ? { statusCode } : {}),
+    ...(reasonCode ? { reasonCode } : {}),
+    ...(errorMessage ? { errorMessage } : {}),
+    ...(bodyPreviewRaw ? { bodyPreview: toBodyPreview(bodyPreviewRaw) } : {}),
+    ...(headers && Object.keys(headers).length > 0 ? { headers } : {}),
+  };
 }
 
-export function createHttpCurlTransportAdapter(runCommand: RunCommand = defaultRunCommand): TransportAdapter {
+export function createMcpWrappedTransportAdapter(mcpInvoke: McpToolInvoker): TransportAdapter {
   return {
     protocol: "http",
     async execute(input: TransportExecuteInput): Promise<TransportExecutionResult> {
-      const start = performance.now();
       const parsed = validateHttpPayload(input.payload);
       if (!parsed) {
         return {
           status: "blocked_invalid",
           protocol: "http",
-          durationMs: elapsedMs(start),
+          durationMs: 1,
           reasonCode: "http_payload_invalid",
           errorMessage: "http transport requires method and url",
         };
       }
 
-      const args: string[] = [
-        "--silent",
-        "--show-error",
-        "--location",
-        "--request",
-        parsed.method,
-        "--url",
-        parsed.url,
-        "--write-out",
-        "\n__MCP_HTTP_CODE__:%{http_code}",
-      ];
-      if (parsed.headers) {
-        for (const [k, v] of Object.entries(parsed.headers)) {
-          args.push("--header", `${k}: ${v}`);
-        }
-      }
-      if (typeof parsed.body === "string") {
-        args.push("--data-raw", parsed.body);
-      }
-
-      const timeoutMs = parsed.timeoutMs ?? 20000;
-      const commandResult = await runCommand("curl.exe", args, timeoutMs);
-      const durationMs = elapsedMs(start);
-
-      const marker = "__MCP_HTTP_CODE__:";
-      const markerIdx = commandResult.stdout.lastIndexOf(marker);
-      const bodyPart = markerIdx >= 0 ? commandResult.stdout.slice(0, markerIdx) : commandResult.stdout;
-      const codePart = markerIdx >= 0 ? commandResult.stdout.slice(markerIdx + marker.length).trim() : "";
-      const statusCode = Number.parseInt(codePart, 10);
-
-      if (commandResult.code !== 0) {
-        return {
-          status: "blocked_runtime",
+      const out = await mcpInvoke({
+        toolName: "transport_execute",
+        input: {
           protocol: "http",
-          durationMs,
-          ...(Number.isFinite(statusCode) ? { statusCode } : {}),
-          bodyPreview: toBodyPreview(bodyPart),
-          reasonCode: "transport_command_failed",
-          errorMessage: toBodyPreview(commandResult.stderr),
-        };
-      }
-
-      if (!Number.isFinite(statusCode) || statusCode <= 0) {
-        return {
-          status: "blocked_runtime",
-          protocol: "http",
-          durationMs,
-          bodyPreview: toBodyPreview(bodyPart),
-          reasonCode: "http_status_missing",
-          errorMessage: "curl response did not include parseable http status code",
-        };
-      }
-
-      return {
-        status: statusCode >= 200 && statusCode < 400 ? "pass" : "fail_http",
-        protocol: "http",
-        statusCode,
-        durationMs,
-        bodyPreview: toBodyPreview(bodyPart),
-      };
+          request: parsed,
+          options: { wrappedOnly: true },
+        },
+      });
+      return mapMcpStructuredToResult("http", out.structuredContent);
     },
   };
 }
@@ -180,7 +143,7 @@ export async function executeTransportWithRegistry(args: {
     return {
       status: "blocked_invalid",
       protocol: args.protocol,
-      durationMs: 0,
+      durationMs: 1,
       reasonCode: "transport_not_supported",
       errorMessage: `No transport adapter registered for protocol=${args.protocol}`,
     };

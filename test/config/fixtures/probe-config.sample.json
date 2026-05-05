@@ -8,6 +8,7 @@
     "dev": {
       "defaultProbe": "order-service",
       "global": {
+        "allowNonWrappedExecutable": false,
         "probeLineSelectionMaxScanLines": 180,
         "probeWaitMaxRetries": 2,
         "probeWaitUnreachableRetryEnabled": true,

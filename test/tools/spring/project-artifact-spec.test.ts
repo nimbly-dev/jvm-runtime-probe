@@ -25,7 +25,7 @@ test("validateProjectArtifact accepts minimal valid shape", () => {
           bearerTokenEnv: "AUTH_BEARER_TOKEN",
         },
         runtimeContexts: [
-          { name: "local-cli", mode: "local" },
+          { name: "terminal-cli", mode: "terminal", autoStart: true, autoStopOnFinish: true },
           { name: "docker-compose", mode: "docker", composeFile: "docker-compose.yml" },
         ],
         externalSystems: [
@@ -76,7 +76,7 @@ test("validateProjectArtifact fails closed when secret value field is present", 
 
 test("validateProjectArtifact fails closed when runtime context mode is invalid", () => {
   const result = validateProjectArtifact({
-    workspaces: [
+      workspaces: [
       {
         projectRoot: "C:\\workspace\\spring",
         runtimeContexts: [{ name: "cluster", mode: "k8s" }],
@@ -95,7 +95,7 @@ test("write/read project artifact preserves deterministic shape", async () => {
       workspaces: [
         {
           projectRoot: root,
-          runtimeContexts: [{ name: "local-cli", mode: "local" }],
+          runtimeContexts: [{ name: "terminal-cli", mode: "terminal" }],
           externalSystems: [{ name: "keycloak", kind: "auth-server", host: "localhost", port: 8081 }],
         },
       ],
@@ -105,7 +105,7 @@ test("write/read project artifact preserves deterministic shape", async () => {
     assert.equal(read.ok, true);
     if (read.ok) {
       assert.equal(read.artifact.workspaces[0].projectRoot, root);
-      assert.equal(read.artifact.workspaces[0].runtimeContexts?.[0].mode, "local");
+      assert.equal(read.artifact.workspaces[0].runtimeContexts?.[0].mode, "terminal");
     }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
